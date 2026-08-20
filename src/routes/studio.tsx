@@ -162,7 +162,7 @@ function StudioPage() {
         </Suspense>
       )}
 
-      <div className="pointer-events-none absolute inset-0">
+      <div className="pointer-events-none absolute bottom-24 left-1/2 h-[55%] w-[70%] max-w-md -translate-x-1/2">
         <CharacterStage
           type={selectedCharacter}
           animation={animation}
