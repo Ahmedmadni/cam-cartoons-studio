@@ -103,8 +103,18 @@ function StudioPage() {
       }
       ctx.drawImage(video, 0, 0, width, height);
       ctx.restore();
-      if (three.width > 0 && three.height > 0) {
-        ctx.drawImage(three, 0, 0, width, height);
+      const stageRect = three.getBoundingClientRect();
+      const shellRect = shellRef.current?.getBoundingClientRect();
+      if (three.width > 0 && three.height > 0 && shellRect && shellRect.width > 0) {
+        const sx = width / shellRect.width;
+        const sy = height / shellRect.height;
+        ctx.drawImage(
+          three,
+          (stageRect.left - shellRect.left) * sx,
+          (stageRect.top - shellRect.top) * sy,
+          stageRect.width * sx,
+          stageRect.height * sy,
+        );
       }
       rafRef.current = requestAnimationFrame(draw);
     };
