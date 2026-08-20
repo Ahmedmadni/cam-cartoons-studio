@@ -42,7 +42,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   nextAnimation: () => {
     const current = get().animation;
     const index = ANIMATIONS.indexOf(current);
-    set({ animation: ANIMATIONS[(index + 1) % ANIMATIONS.length] });
+    set({ animation: ANIMATIONS[(index + 1) % ANIMATIONS.length] ?? "idle" });
   },
   setIsRecording: (value) => set({ isRecording: value }),
   setRecordedVideo: (blob) => set({ recordedVideo: blob }),
