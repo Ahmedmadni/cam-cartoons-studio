@@ -158,7 +158,7 @@ function StudioPage() {
   if (!selectedCharacter) return null;
 
   return (
-    <main className="relative h-screen w-full overflow-hidden bg-black">
+    <main ref={shellRef} className="relative h-screen w-full overflow-hidden bg-black">
       {mounted && (
         <Suspense fallback={null}>
           <Webcam
