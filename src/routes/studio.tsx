@@ -46,6 +46,7 @@ function StudioPage() {
   const [seconds, setSeconds] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
+  const shellRef = useRef<HTMLElement | null>(null);
   const webcamRef = useRef<{ video: HTMLVideoElement | null } | null>(null);
   const threeCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const mixCanvasRef = useRef<HTMLCanvasElement | null>(null);
