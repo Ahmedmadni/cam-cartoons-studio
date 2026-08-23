@@ -24,11 +24,14 @@ type StudioState = {
   animation: AnimationType;
   isRecording: boolean;
   recordedVideo: Blob | null;
+  isFaceTrackingEnabled: boolean;
   setSelectedCharacter: (character: CharacterType) => void;
   setAnimation: (animation: AnimationType) => void;
   nextAnimation: () => void;
   setIsRecording: (value: boolean) => void;
   setRecordedVideo: (blob: Blob | null) => void;
+  toggleFaceTracking: () => void;
+  setFaceTracking: (value: boolean) => void;
   reset: () => void;
 };
 
@@ -37,6 +40,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   animation: "idle",
   isRecording: false,
   recordedVideo: null,
+  isFaceTrackingEnabled: false,
   setSelectedCharacter: (character) => set({ selectedCharacter: character }),
   setAnimation: (animation) => set({ animation }),
   nextAnimation: () => {
@@ -46,11 +50,15 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   },
   setIsRecording: (value) => set({ isRecording: value }),
   setRecordedVideo: (blob) => set({ recordedVideo: blob }),
+  toggleFaceTracking: () => set({ isFaceTrackingEnabled: !get().isFaceTrackingEnabled }),
+  setFaceTracking: (value) => set({ isFaceTrackingEnabled: value }),
   reset: () =>
     set({
       selectedCharacter: null,
       animation: "idle",
       isRecording: false,
       recordedVideo: null,
+      isFaceTrackingEnabled: false,
     }),
 }));
+

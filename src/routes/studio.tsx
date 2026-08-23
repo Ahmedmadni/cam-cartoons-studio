@@ -1,8 +1,10 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Suspense, lazy, useCallback, useEffect, useRef, useState } from "react";
-import { ArrowRight, RefreshCw, Sparkles } from "lucide-react";
+import { ArrowRight, RefreshCw, ScanFace, Sparkles } from "lucide-react";
 import CharacterStage from "@/components/characters/CharacterStage";
 import { ANIMATION_LABELS, useStudioStore } from "@/lib/store";
+import { useFaceTracking } from "@/lib/useFaceTracking";
+
 
 const Webcam = lazy(() => import("react-webcam"));
 
@@ -40,6 +42,8 @@ function StudioPage() {
   const isRecording = useStudioStore((s) => s.isRecording);
   const setIsRecording = useStudioStore((s) => s.setIsRecording);
   const setRecordedVideo = useStudioStore((s) => s.setRecordedVideo);
+  const isFaceTrackingEnabled = useStudioStore((s) => s.isFaceTrackingEnabled);
+  const toggleFaceTracking = useStudioStore((s) => s.toggleFaceTracking);
 
   const [mounted, setMounted] = useState(false);
   const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
@@ -48,6 +52,7 @@ function StudioPage() {
 
   const shellRef = useRef<HTMLElement | null>(null);
   const webcamRef = useRef<{ video: HTMLVideoElement | null } | null>(null);
+  const videoElRef = useRef<HTMLVideoElement | null>(null);
   const threeCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const mixCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
@@ -55,7 +60,21 @@ function StudioPage() {
   const rafRef = useRef<number | null>(null);
   const audioStreamRef = useRef<MediaStream | null>(null);
 
+  const {
+    loading: faceLoading,
+    isTracking,
+    error: faceError,
+  } = useFaceTracking({ videoRef: videoElRef, enabled: isFaceTrackingEnabled });
+
   useEffect(() => setMounted(true), []);
+
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      videoElRef.current = webcamRef.current?.video ?? null;
+    }, 500);
+    return () => window.clearInterval(id);
+  }, []);
+
 
   useEffect(() => {
     if (!selectedCharacter) navigate({ to: "/" });
@@ -201,9 +220,18 @@ function StudioPage() {
         </div>
       )}
 
-      {error && (
+      {(error || faceError) && (
         <div className="absolute top-20 left-1/2 -translate-x-1/2 rounded-2xl bg-card px-5 py-3 text-center font-bold text-card-foreground shadow-lg">
-          {error}
+          {error ?? faceError}
+        </div>
+      )}
+
+      {faceLoading && (
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="rounded-3xl bg-card/95 px-6 py-4 text-center text-lg font-black text-card-foreground shadow-2xl">
+            <span className="mb-2 block size-6 animate-spin rounded-full border-4 border-primary border-t-transparent mx-auto" />
+            جاري تحميل الذكاء الاصطناعي...
+          </div>
         </div>
       )}
 
@@ -233,14 +261,33 @@ function StudioPage() {
 
         <button
           type="button"
-          onClick={nextAnimation}
-          className="flex size-16 flex-col items-center justify-center rounded-full bg-sunny text-sunny-foreground shadow-lg"
-          aria-label="تغيير الحركة"
+          onClick={toggleFaceTracking}
+          className={`flex size-16 flex-col items-center justify-center rounded-full shadow-lg transition ${
+            isFaceTrackingEnabled
+              ? "bg-primary text-primary-foreground ring-4 ring-sunny"
+              : "bg-card text-card-foreground"
+          }`}
+          aria-label="تتبع الوجه"
         >
-          <Sparkles className="size-7" />
-          <span className="text-[10px] font-black">{ANIMATION_LABELS[animation]}</span>
+          <ScanFace className="size-7" />
+          <span className="text-[10px] font-black">
+            {isTracking ? "يتتبع" : "تتبع الوجه"}
+          </span>
         </button>
+
+        {!isFaceTrackingEnabled && (
+          <button
+            type="button"
+            onClick={nextAnimation}
+            className="flex size-16 flex-col items-center justify-center rounded-full bg-sunny text-sunny-foreground shadow-lg"
+            aria-label="تغيير الحركة"
+          >
+            <Sparkles className="size-7" />
+            <span className="text-[10px] font-black">{ANIMATION_LABELS[animation]}</span>
+          </button>
+        )}
       </div>
+
     </main>
   );
 }

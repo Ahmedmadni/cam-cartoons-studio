@@ -1,13 +1,20 @@
 import { Canvas, useFrame } from "@react-three/fiber";
 import { ContactShadows, Environment } from "@react-three/drei";
 import { useRef } from "react";
-import type { Group } from "three";
+import type { Group, Mesh } from "three";
 import type { AnimationType, CharacterType } from "@/lib/store";
+import { faceState } from "@/lib/faceState";
 
 type ModelProps = {
   type: CharacterType;
   animation: AnimationType;
   spin: boolean;
+};
+
+type PartRefs = {
+  headRef: React.RefObject<Group | null>;
+  eyesRef: React.RefObject<Group | null>;
+  mouthRef: React.RefObject<Mesh | null>;
 };
 
 const PALETTE: Record<CharacterType, { main: string; accent: string; extra: string }> = {
@@ -17,9 +24,19 @@ const PALETTE: Record<CharacterType, { main: string; accent: string; extra: stri
   dino: { main: "#3FBF6F", accent: "#FDE047", extra: "#F59E0B" },
 };
 
-function Eyes({ y = 0, z = 0.62, spread = 0.24 }: { y?: number; z?: number; spread?: number }) {
+function Eyes({
+  y = 0,
+  z = 0.62,
+  spread = 0.24,
+  groupRef,
+}: {
+  y?: number;
+  z?: number;
+  spread?: number;
+  groupRef?: React.RefObject<Group | null>;
+}) {
   return (
-    <group position={[0, y, z]}>
+    <group ref={groupRef ?? null} position={[0, y, z]}>
       {[-spread, spread].map((x) => (
         <mesh key={x} position={[x, 0, 0]}>
           <sphereGeometry args={[0.09, 20, 20]} />
@@ -30,25 +47,31 @@ function Eyes({ y = 0, z = 0.62, spread = 0.24 }: { y?: number; z?: number; spre
   );
 }
 
-function Body({ type }: { type: CharacterType }) {
+function Body({ type, headRef, eyesRef, mouthRef }: { type: CharacterType } & PartRefs) {
   const c = PALETTE[type];
 
   if (type === "robot") {
     return (
       <group>
-        <mesh position={[0, 0.95, 0]} castShadow>
-          <boxGeometry args={[1.05, 0.9, 0.9]} />
-          <meshStandardMaterial color={c.main} roughness={0.35} metalness={0.25} />
-        </mesh>
-        <Eyes y={1.0} z={0.47} />
-        <mesh position={[0, 1.6, 0]}>
-          <cylinderGeometry args={[0.04, 0.04, 0.4, 12]} />
-          <meshStandardMaterial color={c.accent} />
-        </mesh>
-        <mesh position={[0, 1.85, 0]}>
-          <sphereGeometry args={[0.14, 18, 18]} />
-          <meshStandardMaterial color={c.extra} emissive={c.extra} emissiveIntensity={0.4} />
-        </mesh>
+        <group ref={headRef} position={[0, 0.95, 0]}>
+          <mesh castShadow>
+            <boxGeometry args={[1.05, 0.9, 0.9]} />
+            <meshStandardMaterial color={c.main} roughness={0.35} metalness={0.25} />
+          </mesh>
+          <Eyes y={0.05} z={0.47} groupRef={eyesRef} />
+          <mesh ref={mouthRef} position={[0, -0.24, 0.47]}>
+            <boxGeometry args={[0.42, 0.09, 0.05]} />
+            <meshStandardMaterial color={c.extra} emissive={c.extra} emissiveIntensity={0.3} />
+          </mesh>
+          <mesh position={[0, 0.65, 0]}>
+            <cylinderGeometry args={[0.04, 0.04, 0.4, 12]} />
+            <meshStandardMaterial color={c.accent} />
+          </mesh>
+          <mesh position={[0, 0.9, 0]}>
+            <sphereGeometry args={[0.14, 18, 18]} />
+            <meshStandardMaterial color={c.extra} emissive={c.extra} emissiveIntensity={0.4} />
+          </mesh>
+        </group>
         <mesh position={[0, -0.1, 0]} castShadow>
           <boxGeometry args={[1.2, 1.2, 0.85]} />
           <meshStandardMaterial color={c.accent} roughness={0.4} />
@@ -72,21 +95,23 @@ function Body({ type }: { type: CharacterType }) {
   if (type === "bear") {
     return (
       <group>
-        <mesh position={[0, 0.95, 0]} castShadow>
-          <sphereGeometry args={[0.62, 32, 32]} />
-          <meshStandardMaterial color={c.main} roughness={0.9} />
-        </mesh>
-        {[-0.45, 0.45].map((x) => (
-          <mesh key={x} position={[x, 1.4, 0]} castShadow>
-            <sphereGeometry args={[0.2, 24, 24]} />
+        <group ref={headRef} position={[0, 0.95, 0]}>
+          <mesh castShadow>
+            <sphereGeometry args={[0.62, 32, 32]} />
             <meshStandardMaterial color={c.main} roughness={0.9} />
           </mesh>
-        ))}
-        <Eyes y={1.02} z={0.5} spread={0.22} />
-        <mesh position={[0, 0.82, 0.55]}>
-          <sphereGeometry args={[0.16, 20, 20]} />
-          <meshStandardMaterial color={c.accent} />
-        </mesh>
+          {[-0.45, 0.45].map((x) => (
+            <mesh key={x} position={[x, 0.45, 0]} castShadow>
+              <sphereGeometry args={[0.2, 24, 24]} />
+              <meshStandardMaterial color={c.main} roughness={0.9} />
+            </mesh>
+          ))}
+          <Eyes y={0.07} z={0.5} spread={0.22} groupRef={eyesRef} />
+          <mesh ref={mouthRef} position={[0, -0.13, 0.55]}>
+            <sphereGeometry args={[0.16, 20, 20]} />
+            <meshStandardMaterial color={c.accent} />
+          </mesh>
+        </group>
         <mesh position={[0, -0.15, 0]} scale={[1, 1.15, 0.9]} castShadow>
           <sphereGeometry args={[0.7, 32, 32]} />
           <meshStandardMaterial color={c.main} roughness={0.9} />
@@ -114,21 +139,23 @@ function Body({ type }: { type: CharacterType }) {
   if (type === "rabbit") {
     return (
       <group>
-        {[-0.22, 0.22].map((x, i) => (
-          <mesh key={x} position={[x, 1.75, 0]} rotation={[0, 0, i === 0 ? 0.18 : -0.18]} castShadow>
-            <capsuleGeometry args={[0.12, 0.55, 8, 20]} />
+        <group ref={headRef} position={[0, 1.0, 0]}>
+          {[-0.22, 0.22].map((x, i) => (
+            <mesh key={x} position={[x, 0.75, 0]} rotation={[0, 0, i === 0 ? 0.18 : -0.18]} castShadow>
+              <capsuleGeometry args={[0.12, 0.55, 8, 20]} />
+              <meshStandardMaterial color={c.main} roughness={0.85} />
+            </mesh>
+          ))}
+          <mesh castShadow>
+            <sphereGeometry args={[0.55, 32, 32]} />
             <meshStandardMaterial color={c.main} roughness={0.85} />
           </mesh>
-        ))}
-        <mesh position={[0, 1.0, 0]} castShadow>
-          <sphereGeometry args={[0.55, 32, 32]} />
-          <meshStandardMaterial color={c.main} roughness={0.85} />
-        </mesh>
-        <Eyes y={1.05} z={0.46} spread={0.2} />
-        <mesh position={[0, 0.9, 0.53]}>
-          <sphereGeometry args={[0.1, 18, 18]} />
-          <meshStandardMaterial color={c.accent} />
-        </mesh>
+          <Eyes y={0.05} z={0.46} spread={0.2} groupRef={eyesRef} />
+          <mesh ref={mouthRef} position={[0, -0.1, 0.53]}>
+            <sphereGeometry args={[0.1, 18, 18]} />
+            <meshStandardMaterial color={c.accent} />
+          </mesh>
+        </group>
         <mesh position={[0, -0.1, 0]} scale={[1, 1.2, 0.95]} castShadow>
           <sphereGeometry args={[0.6, 32, 32]} />
           <meshStandardMaterial color={c.main} roughness={0.85} />
@@ -155,11 +182,17 @@ function Body({ type }: { type: CharacterType }) {
 
   return (
     <group>
-      <mesh position={[0.12, 0.95, 0.18]} scale={[1, 0.85, 1.25]} castShadow>
-        <sphereGeometry args={[0.55, 32, 32]} />
-        <meshStandardMaterial color={c.main} roughness={0.7} />
-      </mesh>
-      <Eyes y={1.12} z={0.75} spread={0.24} />
+      <group ref={headRef} position={[0.12, 0.95, 0.18]}>
+        <mesh scale={[1, 0.85, 1.25]} castShadow>
+          <sphereGeometry args={[0.55, 32, 32]} />
+          <meshStandardMaterial color={c.main} roughness={0.7} />
+        </mesh>
+        <Eyes y={0.17} z={0.57} spread={0.24} groupRef={eyesRef} />
+        <mesh ref={mouthRef} position={[0, -0.2, 0.5]}>
+          <boxGeometry args={[0.4, 0.1, 0.12]} />
+          <meshStandardMaterial color={c.accent} roughness={0.6} />
+        </mesh>
+      </group>
       <mesh position={[0, -0.1, 0]} scale={[1, 1.05, 1.1]} castShadow>
         <sphereGeometry args={[0.68, 32, 32]} />
         <meshStandardMaterial color={c.main} roughness={0.7} />
@@ -193,6 +226,10 @@ function Body({ type }: { type: CharacterType }) {
 function Model({ type, animation, spin }: ModelProps) {
   const group = useRef<Group>(null);
   const armGroup = useRef<Group>(null);
+  const headRef = useRef<Group>(null);
+  const eyesRef = useRef<Group>(null);
+  const mouthRef = useRef<Mesh>(null);
+  const eyesBase = useRef<{ x: number; y: number } | null>(null);
 
   useFrame((state, delta) => {
     const g = group.current;
@@ -214,11 +251,33 @@ function Model({ type, animation, spin }: ModelProps) {
       armGroup.current.rotation.z =
         animation === "wave" ? -0.9 + Math.sin(t * 8) * 0.5 : Math.sin(t * 1.6) * 0.08;
     }
+
+    // ===== طبقة تتبع الوجه: تُطبّق فوق الأنميشنات الحالية =====
+    const head = headRef.current;
+    if (head) {
+      head.rotation.y = -faceState.yaw * 0.7;
+      head.rotation.x = faceState.pitch * 0.5 + (animation === "jump" ? 0 : Math.sin(t * 1.6) * 0.01);
+      head.rotation.z = -faceState.roll * 0.5;
+    }
+
+    const eyes = eyesRef.current;
+    if (eyes) {
+      if (!eyesBase.current) eyesBase.current = { x: eyes.position.x, y: eyes.position.y };
+      eyes.position.x = eyesBase.current.x - faceState.eyeX * 0.12;
+      eyes.position.y = eyesBase.current.y - faceState.eyeY * 0.08;
+    }
+
+    const mouth = mouthRef.current;
+    if (mouth) {
+      const open = faceState.mouthOpen > 0.1 ? faceState.mouthOpen : 0;
+      mouth.scale.y = 1 + open * 2.2;
+      mouth.scale.z = 1 + open * 0.4;
+    }
   });
 
   return (
     <group ref={group}>
-      <Body type={type} />
+      <Body type={type} headRef={headRef} eyesRef={eyesRef} mouthRef={mouthRef} />
       <group ref={armGroup} position={[0.85, 0.15, 0]}>
         <mesh position={[0, 0.25, 0]} castShadow>
           <capsuleGeometry args={[0.11, 0.4, 8, 16]} />
