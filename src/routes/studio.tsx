@@ -148,10 +148,27 @@ function StudioPage() {
     draw();
 
     const stream = mix.captureStream(30);
+    setRecordedAudio(null);
+    audioChunksRef.current = [];
     try {
       const audio = await navigator.mediaDevices.getUserMedia({ audio: true });
       audioStreamRef.current = audio;
       audio.getAudioTracks().forEach((t) => stream.addTrack(t));
+
+      // تسجيل صوت الميكروفون بشكل منفصل ليُمرَّر لاحقاً لمحوّل الصوت
+      const micStream = new MediaStream(audio.getAudioTracks());
+      const audioMime = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+        ? "audio/webm;codecs=opus"
+        : "audio/webm";
+      const audioRecorder = new MediaRecorder(micStream, { mimeType: audioMime });
+      audioRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunksRef.current.push(e.data);
+      };
+      audioRecorder.onstop = () => {
+        setRecordedAudio(new Blob(audioChunksRef.current, { type: "audio/webm" }));
+      };
+      audioRecorderRef.current = audioRecorder;
+      audioRecorder.start();
     } catch {
       /* التسجيل يستمر بدون صوت */
     }
@@ -169,17 +186,22 @@ function StudioPage() {
       const blob = new Blob(chunksRef.current, { type: "video/webm" });
       setRecordedVideo(blob);
       setIsRecording(false);
+      playSfx("stop");
       navigate({ to: "/save" });
     };
     recorderRef.current = recorder;
     recorder.start();
     setIsRecording(true);
-  }, [cleanup, facingMode, navigate, setIsRecording, setRecordedVideo]);
+    playSfx("start");
+  }, [cleanup, facingMode, navigate, setIsRecording, setRecordedAudio, setRecordedVideo]);
 
   const stopRecording = useCallback(() => {
+    audioRecorderRef.current?.stop();
+    audioRecorderRef.current = null;
     recorderRef.current?.stop();
     recorderRef.current = null;
   }, []);
+
 
   if (!selectedCharacter) return null;
 
