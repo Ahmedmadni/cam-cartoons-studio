@@ -220,9 +220,18 @@ function StudioPage() {
         </div>
       )}
 
-      {error && (
+      {(error || faceError) && (
         <div className="absolute top-20 left-1/2 -translate-x-1/2 rounded-2xl bg-card px-5 py-3 text-center font-bold text-card-foreground shadow-lg">
-          {error}
+          {error ?? faceError}
+        </div>
+      )}
+
+      {faceLoading && (
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="rounded-3xl bg-card/95 px-6 py-4 text-center text-lg font-black text-card-foreground shadow-2xl">
+            <span className="mb-2 block size-6 animate-spin rounded-full border-4 border-primary border-t-transparent mx-auto" />
+            جاري تحميل الذكاء الاصطناعي...
+          </div>
         </div>
       )}
 
@@ -252,14 +261,33 @@ function StudioPage() {
 
         <button
           type="button"
-          onClick={nextAnimation}
-          className="flex size-16 flex-col items-center justify-center rounded-full bg-sunny text-sunny-foreground shadow-lg"
-          aria-label="تغيير الحركة"
+          onClick={toggleFaceTracking}
+          className={`flex size-16 flex-col items-center justify-center rounded-full shadow-lg transition ${
+            isFaceTrackingEnabled
+              ? "bg-primary text-primary-foreground ring-4 ring-sunny"
+              : "bg-card text-card-foreground"
+          }`}
+          aria-label="تتبع الوجه"
         >
-          <Sparkles className="size-7" />
-          <span className="text-[10px] font-black">{ANIMATION_LABELS[animation]}</span>
+          <ScanFace className="size-7" />
+          <span className="text-[10px] font-black">
+            {isTracking ? "يتتبع" : "تتبع الوجه"}
+          </span>
         </button>
+
+        {!isFaceTrackingEnabled && (
+          <button
+            type="button"
+            onClick={nextAnimation}
+            className="flex size-16 flex-col items-center justify-center rounded-full bg-sunny text-sunny-foreground shadow-lg"
+            aria-label="تغيير الحركة"
+          >
+            <Sparkles className="size-7" />
+            <span className="text-[10px] font-black">{ANIMATION_LABELS[animation]}</span>
+          </button>
+        )}
       </div>
+
     </main>
   );
 }
