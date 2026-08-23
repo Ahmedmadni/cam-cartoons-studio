@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as SaveRouteImport } from './routes/save'
+import { Route as StoryRouteImport } from './routes/story'
 import { Route as StudioRouteImport } from './routes/studio'
 
 const IndexRoute = IndexRouteImport.update({
@@ -23,6 +24,11 @@ const SaveRoute = SaveRouteImport.update({
   path: '/save',
   getParentRoute: () => rootRouteImport,
 } as any)
+const StoryRoute = StoryRouteImport.update({
+  id: '/story',
+  path: '/story',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const StudioRoute = StudioRouteImport.update({
   id: '/studio',
   path: '/studio',
@@ -32,30 +38,34 @@ const StudioRoute = StudioRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/save': typeof SaveRoute
+  '/story': typeof StoryRoute
   '/studio': typeof StudioRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/save': typeof SaveRoute
+  '/story': typeof StoryRoute
   '/studio': typeof StudioRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/save': typeof SaveRoute
+  '/story': typeof StoryRoute
   '/studio': typeof StudioRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/save' | '/studio'
+  fullPaths: '/' | '/save' | '/story' | '/studio'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/save' | '/studio'
-  id: '__root__' | '/' | '/save' | '/studio'
+  to: '/' | '/save' | '/story' | '/studio'
+  id: '__root__' | '/' | '/save' | '/story' | '/studio'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   SaveRoute: typeof SaveRoute
+  StoryRoute: typeof StoryRoute
   StudioRoute: typeof StudioRoute
 }
 
@@ -75,6 +85,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SaveRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/story': {
+      id: '/story'
+      path: '/story'
+      fullPath: '/story'
+      preLoaderRoute: typeof StoryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/studio': {
       id: '/studio'
       path: '/studio'
@@ -88,6 +105,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   SaveRoute: SaveRoute,
+  StoryRoute: StoryRoute,
   StudioRoute: StudioRoute,
 }
 export const routeTree = rootRouteImport
