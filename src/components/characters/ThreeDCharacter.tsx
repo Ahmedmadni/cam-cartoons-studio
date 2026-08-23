@@ -425,12 +425,24 @@ function Model({ type, animation, spin }: ModelProps) {
   );
 }
 
+function Backdrop({ url }: { url: string }) {
+  const texture = useTexture(url);
+  return (
+    <mesh position={[0, 0.4, -6]}>
+      <planeGeometry args={[26, 14.6]} />
+      <meshBasicMaterial map={texture} toneMapped={false} />
+    </mesh>
+  );
+}
+
 export type ThreeDCharacterProps = {
   type: CharacterType;
   animation?: AnimationType;
   spin?: boolean;
   transparent?: boolean;
   className?: string;
+  /** صورة خلفية تُرسم داخل المشهد (تظهر في الفيديو المسجَّل) */
+  backgroundUrl?: string;
   onCanvasReady?: (canvas: HTMLCanvasElement) => void;
 };
 
@@ -440,6 +452,7 @@ export default function ThreeDCharacter({
   spin = true,
   transparent = false,
   className,
+  backgroundUrl,
   onCanvasReady,
 }: ThreeDCharacterProps) {
   return (
