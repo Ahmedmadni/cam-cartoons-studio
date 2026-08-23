@@ -252,11 +252,57 @@ function StudioPage() {
         </div>
       )}
 
+      {showVoicePicker && !isRecording && (
+        <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/70 p-4">
+          <div className="w-full max-w-md rounded-4xl border-4 border-primary bg-card p-6 text-center shadow-2xl">
+            <h2 className="text-3xl font-black text-card-foreground">اختر صوت شخصيتك</h2>
+            <p className="mt-1 font-bold text-muted-foreground">
+              سنحوّل صوتك إلى صوت كرتوني بعد التسجيل!
+            </p>
+            <div className="mt-5 grid grid-cols-2 gap-3">
+              {VOICES.map((voice) => {
+                const preset = VOICE_PRESETS[voice];
+                const active = selectedVoice === voice;
+                return (
+                  <button
+                    key={voice}
+                    type="button"
+                    onClick={() => {
+                      setSelectedVoice(voice);
+                      playSfx("click");
+                    }}
+                    className={`rounded-3xl border-4 px-3 py-4 text-lg font-black transition ${
+                      active
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-border bg-muted text-foreground"
+                    }`}
+                  >
+                    <span className="block text-3xl">{preset.emoji}</span>
+                    {preset.label}
+                  </button>
+                );
+              })}
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                playSfx("success");
+                setShowVoicePicker(false);
+              }}
+              className="mt-6 w-full rounded-full bg-gradient-to-l from-primary to-sunny px-6 py-4 text-2xl font-black text-primary-foreground shadow-xl"
+            >
+              يلا نصوّر! 🎬
+            </button>
+          </div>
+        </div>
+      )}
+
       {(error || faceError) && (
         <div className="absolute top-20 left-1/2 -translate-x-1/2 rounded-2xl bg-card px-5 py-3 text-center font-bold text-card-foreground shadow-lg">
           {error ?? faceError}
         </div>
       )}
+
 
       {faceLoading && (
         <div className="absolute inset-0 flex items-center justify-center">
