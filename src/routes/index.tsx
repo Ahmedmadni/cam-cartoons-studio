@@ -23,11 +23,12 @@ export const Route = createFileRoute("/")({
 });
 
 const CHARACTERS: { type: CharacterType; emoji: string }[] = [
-  { type: "robot", emoji: "🤖" },
-  { type: "bear", emoji: "🐻" },
-  { type: "rabbit", emoji: "🐰" },
-  { type: "dino", emoji: "🦖" },
+  { type: "boy", emoji: "👦" },
+  { type: "girl", emoji: "👧" },
+  { type: "man", emoji: "👨" },
+  { type: "woman", emoji: "👩" },
 ];
+
 
 function Index() {
   const navigate = useNavigate();

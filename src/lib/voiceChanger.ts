@@ -1,37 +1,48 @@
 import type { VoiceType } from "./store";
 
 /**
- * إعدادات كل صوت كرتوني (تُستخدم في المعالجة المحلية الوهمية،
- * وستُستخدم لاحقاً لاختيار voiceId عند ربط API خارجي مثل ElevenLabs).
+ * أصوات بشرية كرتونية: طفل / ولد / بنت / رجل / امرأة.
+ * semitones = درجة الصوت الأساسية للنمط، ويضاف إليها تحكم المستخدم.
  */
 export const VOICE_PRESETS: Record<
   VoiceType,
-  { pitch: number; label: string; emoji: string; elevenLabsVoiceId?: string }
+  { semitones: number; tone: number; label: string; emoji: string }
 > = {
-  normal: { pitch: 1, label: "صوتي الطبيعي", emoji: "🙂" },
-  bear: { pitch: 0.72, label: "صوت دبدوب", emoji: "🐻" },
-  robot: { pitch: 0.85, label: "صوت روبوت", emoji: "🤖" },
-  rabbit: { pitch: 1.45, label: "صوت أرنوب", emoji: "🐰" },
-  dino: { pitch: 0.62, label: "صوت ديناصور", emoji: "🦖" },
+  normal: { semitones: 0, tone: 0.5, label: "صوتي الطبيعي", emoji: "🙂" },
+  child: { semitones: 6, tone: 0.75, label: "صوت طفل", emoji: "🧒" },
+  boy: { semitones: 4, tone: 0.65, label: "صوت ولد", emoji: "👦" },
+  girl: { semitones: 5.5, tone: 0.8, label: "صوت بنت", emoji: "👧" },
+  man: { semitones: -4, tone: 0.35, label: "صوت رجل", emoji: "👨" },
+  woman: { semitones: 2, tone: 0.6, label: "صوت امرأة", emoji: "👩" },
+};
+
+export type VoiceOptions = {
+  /** تعديل إضافي بنصف النغمات من -12 إلى +12 */
+  pitch?: number;
+  /** النبرة: 0 = دافئة، 1 = لامعة/كرتونية */
+  tone?: number;
 };
 
 /**
- * TODO: عند توفّر مفتاح API (مثل ElevenLabs Voice Changer)
- * استبدل هذه الدالة الوهمية بنداء حقيقي للـ API من طرف الخادم:
- *
- *   POST /api/voice-changer  { audio, voice }  ->  audio/mpeg
- *
- * حالياً نقوم بمعالجة محلية بسيطة (تغيير طبقة الصوت Pitch) داخل المتصفح
- * حتى يعمل التطبيق بالكامل بدون أي مفاتيح.
- * ⚠️ أرسل لي مفتاح الـ API لاحقاً لتفعيل الأصوات الكرتونية الحقيقية.
+ * TODO: عند توفّر مفتاح API (مثل ElevenLabs Voice Changer) استبدل هذه المعالجة
+ * المحلية بنداء حقيقي من طرف الخادم:  POST /api/voice-changer -> audio/mpeg
+ * حالياً نطبّق تغيير درجة الصوت + تلوين النبرة داخل المتصفح بدون أي مفاتيح.
  */
-export async function transformVoice(audio: Blob, voice: VoiceType): Promise<Blob> {
+export async function transformVoice(
+  audio: Blob,
+  voice: VoiceType,
+  options: VoiceOptions = {},
+): Promise<Blob> {
   const preset = VOICE_PRESETS[voice];
-  if (!audio || voice === "normal" || preset.pitch === 1) return audio;
+  const semitones = preset.semitones + (options.pitch ?? 0);
+  const tone = options.tone ?? preset.tone;
+  if (!audio) return audio;
+  if (voice === "normal" && Math.abs(semitones) < 0.05 && Math.abs(tone - 0.5) < 0.05) return audio;
 
   const arrayBuffer = await audio.arrayBuffer();
   const AudioCtx: typeof AudioContext =
-    window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    window.AudioContext ??
+    (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
   const decodeCtx = new AudioCtx();
   let buffer: AudioBuffer;
   try {
@@ -40,30 +51,36 @@ export async function transformVoice(audio: Blob, voice: VoiceType): Promise<Blo
     void decodeCtx.close();
   }
 
-  const rate = preset.pitch;
+  const rate = Math.pow(2, semitones / 12);
   const offline = new OfflineAudioContext(
     buffer.numberOfChannels,
-    Math.ceil(buffer.length / rate),
+    Math.max(1, Math.ceil(buffer.length / rate)),
     buffer.sampleRate,
   );
   const source = offline.createBufferSource();
   source.buffer = buffer;
   source.playbackRate.value = rate;
 
-  // لمسة كرتونية إضافية حسب الشخصية
-  const filter = offline.createBiquadFilter();
-  if (voice === "robot") {
-    filter.type = "bandpass";
-    filter.frequency.value = 1200;
-    filter.Q.value = 0.7;
-  } else {
-    filter.type = "peaking";
-    filter.frequency.value = voice === "rabbit" ? 2600 : 400;
-    filter.gain.value = 6;
-  }
+  // تلوين النبرة: نبرة دافئة = تعزيز الترددات المنخفضة، نبرة لامعة = تعزيز العالية
+  const warm = offline.createBiquadFilter();
+  warm.type = "peaking";
+  warm.frequency.value = 320;
+  warm.gain.value = (0.5 - tone) * 14;
 
-  source.connect(filter);
-  filter.connect(offline.destination);
+  const bright = offline.createBiquadFilter();
+  bright.type = "peaking";
+  bright.frequency.value = 3000;
+  bright.gain.value = (tone - 0.5) * 16;
+
+  const presence = offline.createBiquadFilter();
+  presence.type = "highshelf";
+  presence.frequency.value = 6000;
+  presence.gain.value = (tone - 0.5) * 8;
+
+  source.connect(warm);
+  warm.connect(bright);
+  bright.connect(presence);
+  presence.connect(offline.destination);
   source.start(0);
 
   const rendered = await offline.startRendering();

@@ -19,207 +19,292 @@ type PartRefs = {
   mouthRef: React.RefObject<Mesh | null>;
 };
 
-const PALETTE: Record<CharacterType, { main: string; accent: string; extra: string }> = {
-  robot: { main: "#14B8A6", accent: "#F59E0B", extra: "#FDE047" },
-  bear: { main: "#C1783C", accent: "#FDE047", extra: "#F59E0B" },
-  rabbit: { main: "#F8E7DC", accent: "#F59E0B", extra: "#14B8A6" },
-  dino: { main: "#3FBF6F", accent: "#FDE047", extra: "#F59E0B" },
+type HairStyle = "shortMessy" | "curly" | "bun" | "longWavy";
+
+type Look = {
+  skin: string;
+  hair: string;
+  shirt: string;
+  pants: string;
+  shoes: string;
+  eye: string;
+  hairStyle: HairStyle;
+  /** نسب طفولية (رأس أكبر) مقابل نسب أكبر سناً */
+  kid: boolean;
+};
+
+const LOOKS: Record<CharacterType, Look> = {
+  boy: {
+    skin: "#F4C9A6",
+    hair: "#5B3421",
+    shirt: "#FFFFFF",
+    pants: "#27364F",
+    shoes: "#FDE047",
+    eye: "#5B3421",
+    hairStyle: "shortMessy",
+    kid: true,
+  },
+  girl: {
+    skin: "#F7D2B4",
+    hair: "#3F2416",
+    shirt: "#FFF6EF",
+    pants: "#7FA9D6",
+    shoes: "#FFFFFF",
+    eye: "#4A2C17",
+    hairStyle: "bun",
+    kid: true,
+  },
+  man: {
+    skin: "#EFC09B",
+    hair: "#2E1C12",
+    shirt: "#1F2937",
+    pants: "#EFE6D6",
+    shoes: "#FFFFFF",
+    eye: "#3B2314",
+    hairStyle: "curly",
+    kid: false,
+  },
+  woman: {
+    skin: "#F6CDAE",
+    hair: "#4A2A18",
+    shirt: "#F59E0B",
+    pants: "#8FB2D9",
+    shoes: "#FFFFFF",
+    eye: "#4A2A18",
+    hairStyle: "longWavy",
+    kid: false,
+  },
 };
 
 function Eyes({
-  y = 0,
-  z = 0.62,
-  spread = 0.24,
+  look,
   groupRef,
+  spread = 0.2,
+  z = 0.5,
+  y = 0.02,
+  size = 0.115,
 }: {
-  y?: number;
-  z?: number;
-  spread?: number;
+  look: Look;
   groupRef?: React.RefObject<Group | null>;
+  spread?: number;
+  z?: number;
+  y?: number;
+  size?: number;
 }) {
   return (
     <group ref={groupRef ?? null} position={[0, y, z]}>
       {[-spread, spread].map((x) => (
-        <mesh key={x} position={[x, 0, 0]}>
-          <sphereGeometry args={[0.09, 20, 20]} />
-          <meshStandardMaterial color="#1F2937" />
+        <group key={x} position={[x, 0, 0]}>
+          {/* بياض العين */}
+          <mesh>
+            <sphereGeometry args={[size, 24, 24]} />
+            <meshStandardMaterial color="#FFFFFF" roughness={0.25} />
+          </mesh>
+          {/* القزحية */}
+          <mesh position={[0, 0, size * 0.72]}>
+            <sphereGeometry args={[size * 0.62, 20, 20]} />
+            <meshStandardMaterial color={look.eye} roughness={0.2} />
+          </mesh>
+          {/* البؤبؤ + لمعة */}
+          <mesh position={[0, 0, size * 0.95]}>
+            <sphereGeometry args={[size * 0.3, 16, 16]} />
+            <meshStandardMaterial color="#141414" />
+          </mesh>
+          <mesh position={[size * 0.22, size * 0.28, size * 1.0]}>
+            <sphereGeometry args={[size * 0.16, 12, 12]} />
+            <meshStandardMaterial color="#FFFFFF" emissive="#FFFFFF" emissiveIntensity={0.5} />
+          </mesh>
+          {/* الحاجب */}
+          <mesh position={[0, size * 1.5, size * 0.6]} rotation={[0, 0, x > 0 ? -0.12 : 0.12]}>
+            <boxGeometry args={[size * 1.5, size * 0.28, size * 0.3]} />
+            <meshStandardMaterial color={look.hair} roughness={0.9} />
+          </mesh>
+        </group>
+      ))}
+    </group>
+  );
+}
+
+function Hair({ look }: { look: Look }) {
+  const { hair, hairStyle } = look;
+  const mat = <meshStandardMaterial color={hair} roughness={0.85} />;
+
+  if (hairStyle === "curly") {
+    return (
+      <group>
+        <mesh position={[0, 0.16, -0.02]} scale={[1.06, 0.95, 1.06]}>
+          <sphereGeometry args={[0.53, 28, 28]} />
+          {mat}
+        </mesh>
+        {[
+          [-0.36, 0.4, 0.16],
+          [0.36, 0.4, 0.16],
+          [0, 0.58, 0.22],
+          [-0.2, 0.6, -0.2],
+          [0.24, 0.56, -0.24],
+          [-0.44, 0.24, -0.18],
+          [0.44, 0.24, -0.18],
+        ].map(([x, y, z], i) => (
+          <mesh key={i} position={[x!, y!, z!]}>
+            <sphereGeometry args={[0.17, 18, 18]} />
+            {mat}
+          </mesh>
+        ))}
+      </group>
+    );
+  }
+
+  if (hairStyle === "bun") {
+    return (
+      <group>
+        <mesh position={[0, 0.14, -0.02]} scale={[1.04, 0.92, 1.04]}>
+          <sphereGeometry args={[0.52, 28, 28]} />
+          {mat}
+        </mesh>
+        <mesh position={[0, 0.66, -0.12]}>
+          <sphereGeometry args={[0.22, 20, 20]} />
+          {mat}
+        </mesh>
+        {[-0.46, 0.46].map((x) => (
+          <mesh key={x} position={[x, 0.05, 0.05]} scale={[0.5, 1.1, 0.6]}>
+            <sphereGeometry args={[0.18, 16, 16]} />
+            {mat}
+          </mesh>
+        ))}
+      </group>
+    );
+  }
+
+  if (hairStyle === "longWavy") {
+    return (
+      <group>
+        <mesh position={[0, 0.15, -0.02]} scale={[1.06, 0.95, 1.06]}>
+          <sphereGeometry args={[0.53, 28, 28]} />
+          {mat}
+        </mesh>
+        {[-0.44, 0.44].map((x) => (
+          <group key={x}>
+            <mesh position={[x, -0.25, -0.06]} scale={[0.65, 1.5, 0.8]}>
+              <sphereGeometry args={[0.24, 18, 18]} />
+              {mat}
+            </mesh>
+            <mesh position={[x * 1.02, -0.62, -0.06]}>
+              <sphereGeometry args={[0.16, 16, 16]} />
+              {mat}
+            </mesh>
+          </group>
+        ))}
+        <mesh position={[0, -0.2, -0.4]} scale={[1, 1.5, 0.7]}>
+          <sphereGeometry args={[0.36, 20, 20]} />
+          {mat}
+        </mesh>
+      </group>
+    );
+  }
+
+  // shortMessy
+  return (
+    <group>
+      <mesh position={[0, 0.17, -0.03]} scale={[1.04, 0.9, 1.04]}>
+        <sphereGeometry args={[0.52, 28, 28]} />
+        {mat}
+      </mesh>
+      {[
+        [-0.16, 0.56, 0.2],
+        [0.14, 0.6, 0.1],
+        [0.3, 0.5, 0.24],
+      ].map(([x, y, z], i) => (
+        <mesh key={i} position={[x!, y!, z!]} rotation={[0.3, 0, i * 0.4 - 0.3]}>
+          <coneGeometry args={[0.13, 0.26, 12]} />
+          {mat}
         </mesh>
       ))}
     </group>
   );
 }
 
-function Body({ type, headRef, eyesRef, mouthRef }: { type: CharacterType } & PartRefs) {
-  const c = PALETTE[type];
-
-  if (type === "robot") {
-    return (
-      <group>
-        <group ref={headRef} position={[0, 0.95, 0]}>
-          <mesh castShadow>
-            <boxGeometry args={[1.05, 0.9, 0.9]} />
-            <meshStandardMaterial color={c.main} roughness={0.35} metalness={0.25} />
-          </mesh>
-          <Eyes y={0.05} z={0.47} groupRef={eyesRef} />
-          <mesh ref={mouthRef} position={[0, -0.24, 0.47]}>
-            <boxGeometry args={[0.42, 0.09, 0.05]} />
-            <meshStandardMaterial color={c.extra} emissive={c.extra} emissiveIntensity={0.3} />
-          </mesh>
-          <mesh position={[0, 0.65, 0]}>
-            <cylinderGeometry args={[0.04, 0.04, 0.4, 12]} />
-            <meshStandardMaterial color={c.accent} />
-          </mesh>
-          <mesh position={[0, 0.9, 0]}>
-            <sphereGeometry args={[0.14, 18, 18]} />
-            <meshStandardMaterial color={c.extra} emissive={c.extra} emissiveIntensity={0.4} />
-          </mesh>
-        </group>
-        <mesh position={[0, -0.1, 0]} castShadow>
-          <boxGeometry args={[1.2, 1.2, 0.85]} />
-          <meshStandardMaterial color={c.accent} roughness={0.4} />
-        </mesh>
-        {[-0.85, 0.85].map((x) => (
-          <mesh key={x} position={[x, -0.05, 0]} rotation={[0, 0, Math.PI / 2]} castShadow>
-            <cylinderGeometry args={[0.16, 0.16, 0.6, 16]} />
-            <meshStandardMaterial color={c.main} />
-          </mesh>
-        ))}
-        {[-0.32, 0.32].map((x) => (
-          <mesh key={x} position={[x, -1.05, 0]} castShadow>
-            <cylinderGeometry args={[0.2, 0.2, 0.75, 16]} />
-            <meshStandardMaterial color={c.main} />
-          </mesh>
-        ))}
-      </group>
-    );
-  }
-
-  if (type === "bear") {
-    return (
-      <group>
-        <group ref={headRef} position={[0, 0.95, 0]}>
-          <mesh castShadow>
-            <sphereGeometry args={[0.62, 32, 32]} />
-            <meshStandardMaterial color={c.main} roughness={0.9} />
-          </mesh>
-          {[-0.45, 0.45].map((x) => (
-            <mesh key={x} position={[x, 0.45, 0]} castShadow>
-              <sphereGeometry args={[0.2, 24, 24]} />
-              <meshStandardMaterial color={c.main} roughness={0.9} />
-            </mesh>
-          ))}
-          <Eyes y={0.07} z={0.5} spread={0.22} groupRef={eyesRef} />
-          <mesh ref={mouthRef} position={[0, -0.13, 0.55]}>
-            <sphereGeometry args={[0.16, 20, 20]} />
-            <meshStandardMaterial color={c.accent} />
-          </mesh>
-        </group>
-        <mesh position={[0, -0.15, 0]} scale={[1, 1.15, 0.9]} castShadow>
-          <sphereGeometry args={[0.7, 32, 32]} />
-          <meshStandardMaterial color={c.main} roughness={0.9} />
-        </mesh>
-        <mesh position={[0, -0.2, 0.55]} scale={[0.75, 0.9, 0.5]}>
-          <sphereGeometry args={[0.45, 24, 24]} />
-          <meshStandardMaterial color={c.accent} roughness={0.9} />
-        </mesh>
-        {[-0.72, 0.72].map((x) => (
-          <mesh key={x} position={[x, -0.05, 0]} castShadow>
-            <sphereGeometry args={[0.24, 20, 20]} />
-            <meshStandardMaterial color={c.main} roughness={0.9} />
-          </mesh>
-        ))}
-        {[-0.32, 0.32].map((x) => (
-          <mesh key={x} position={[x, -1.05, 0.05]} castShadow>
-            <sphereGeometry args={[0.27, 20, 20]} />
-            <meshStandardMaterial color={c.main} roughness={0.9} />
-          </mesh>
-        ))}
-      </group>
-    );
-  }
-
-  if (type === "rabbit") {
-    return (
-      <group>
-        <group ref={headRef} position={[0, 1.0, 0]}>
-          {[-0.22, 0.22].map((x, i) => (
-            <mesh key={x} position={[x, 0.75, 0]} rotation={[0, 0, i === 0 ? 0.18 : -0.18]} castShadow>
-              <capsuleGeometry args={[0.12, 0.55, 8, 20]} />
-              <meshStandardMaterial color={c.main} roughness={0.85} />
-            </mesh>
-          ))}
-          <mesh castShadow>
-            <sphereGeometry args={[0.55, 32, 32]} />
-            <meshStandardMaterial color={c.main} roughness={0.85} />
-          </mesh>
-          <Eyes y={0.05} z={0.46} spread={0.2} groupRef={eyesRef} />
-          <mesh ref={mouthRef} position={[0, -0.1, 0.53]}>
-            <sphereGeometry args={[0.1, 18, 18]} />
-            <meshStandardMaterial color={c.accent} />
-          </mesh>
-        </group>
-        <mesh position={[0, -0.1, 0]} scale={[1, 1.2, 0.95]} castShadow>
-          <sphereGeometry args={[0.6, 32, 32]} />
-          <meshStandardMaterial color={c.main} roughness={0.85} />
-        </mesh>
-        <mesh position={[0, -0.25, -0.62]}>
-          <sphereGeometry args={[0.22, 20, 20]} />
-          <meshStandardMaterial color={c.extra} roughness={0.85} />
-        </mesh>
-        {[-0.62, 0.62].map((x) => (
-          <mesh key={x} position={[x, -0.1, 0]} rotation={[0, 0, Math.PI / 2]} castShadow>
-            <capsuleGeometry args={[0.14, 0.3, 8, 16]} />
-            <meshStandardMaterial color={c.main} roughness={0.85} />
-          </mesh>
-        ))}
-        {[-0.3, 0.3].map((x) => (
-          <mesh key={x} position={[x, -0.95, 0.12]} castShadow>
-            <capsuleGeometry args={[0.18, 0.22, 8, 16]} />
-            <meshStandardMaterial color={c.main} roughness={0.85} />
-          </mesh>
-        ))}
-      </group>
-    );
-  }
+function Human({ type, headRef, eyesRef, mouthRef }: { type: CharacterType } & PartRefs) {
+  const look = LOOKS[type];
+  const headScale = look.kid ? 1.08 : 0.92;
+  const headY = look.kid ? 1.0 : 1.12;
+  const bodyH = look.kid ? 0.9 : 1.05;
 
   return (
     <group>
-      <group ref={headRef} position={[0.12, 0.95, 0.18]}>
-        <mesh scale={[1, 0.85, 1.25]} castShadow>
-          <sphereGeometry args={[0.55, 32, 32]} />
-          <meshStandardMaterial color={c.main} roughness={0.7} />
+      {/* الرأس */}
+      <group ref={headRef} position={[0, headY, 0]} scale={headScale}>
+        <mesh castShadow scale={[1, 1.08, 0.95]}>
+          <sphereGeometry args={[0.5, 32, 32]} />
+          <meshStandardMaterial color={look.skin} roughness={0.55} />
         </mesh>
-        <Eyes y={0.17} z={0.57} spread={0.24} groupRef={eyesRef} />
-        <mesh ref={mouthRef} position={[0, -0.2, 0.5]}>
-          <boxGeometry args={[0.4, 0.1, 0.12]} />
-          <meshStandardMaterial color={c.accent} roughness={0.6} />
+        {/* الأذنان */}
+        {[-0.48, 0.48].map((x) => (
+          <mesh key={x} position={[x, -0.02, 0]} scale={[0.5, 1, 0.7]}>
+            <sphereGeometry args={[0.11, 16, 16]} />
+            <meshStandardMaterial color={look.skin} roughness={0.6} />
+          </mesh>
+        ))}
+        <Hair look={look} />
+        <Eyes look={look} groupRef={eyesRef} y={0.05} z={0.4} spread={0.19} />
+        {/* الأنف */}
+        <mesh position={[0, -0.09, 0.47]}>
+          <sphereGeometry args={[0.075, 16, 16]} />
+          <meshStandardMaterial color={look.skin} roughness={0.5} />
+        </mesh>
+        {/* الوجنتان */}
+        {[-0.28, 0.28].map((x) => (
+          <mesh key={x} position={[x, -0.1, 0.4]} scale={[1, 0.7, 0.4]}>
+            <sphereGeometry args={[0.1, 16, 16]} />
+            <meshStandardMaterial color="#F2A08E" transparent opacity={0.55} roughness={0.9} />
+          </mesh>
+        ))}
+        {/* الفم (يتحرك مع تتبع الوجه) */}
+        <mesh ref={mouthRef} position={[0, -0.26, 0.42]}>
+          <sphereGeometry args={[0.11, 20, 20]} />
+          <meshStandardMaterial color="#A63A4A" roughness={0.5} />
+        </mesh>
+        <mesh position={[0, -0.235, 0.46]} scale={[1, 0.35, 0.3]}>
+          <sphereGeometry args={[0.1, 16, 16]} />
+          <meshStandardMaterial color="#FFFFFF" roughness={0.35} />
         </mesh>
       </group>
-      <mesh position={[0, -0.1, 0]} scale={[1, 1.05, 1.1]} castShadow>
-        <sphereGeometry args={[0.68, 32, 32]} />
-        <meshStandardMaterial color={c.main} roughness={0.7} />
+
+      {/* الرقبة */}
+      <mesh position={[0, headY - 0.5, 0]}>
+        <cylinderGeometry args={[0.11, 0.13, 0.16, 16]} />
+        <meshStandardMaterial color={look.skin} roughness={0.6} />
       </mesh>
-      {[0.35, 0.75, 1.1].map((y, i) => (
-        <mesh key={y} position={[0, y - 0.1, -0.55 + i * 0.08]} rotation={[0, 0, Math.PI / 4]}>
-          <coneGeometry args={[0.14, 0.28, 4]} />
-          <meshStandardMaterial color={c.accent} />
-        </mesh>
-      ))}
-      <mesh position={[0, -0.35, -0.85]} rotation={[Math.PI / 2.2, 0, 0]} castShadow>
-        <coneGeometry args={[0.28, 1.1, 20]} />
-        <meshStandardMaterial color={c.main} roughness={0.7} />
+
+      {/* الجذع (قميص) */}
+      <mesh position={[0, headY - 1.05, 0]} scale={[1, 1, 0.72]} castShadow>
+        <capsuleGeometry args={[0.32, bodyH * 0.6, 10, 24]} />
+        <meshStandardMaterial color={look.shirt} roughness={0.8} />
       </mesh>
-      {[-0.6, 0.6].map((x) => (
-        <mesh key={x} position={[x, -0.05, 0.1]} rotation={[0, 0, Math.PI / 2]} castShadow>
-          <capsuleGeometry args={[0.13, 0.25, 8, 16]} />
-          <meshStandardMaterial color={c.main} roughness={0.7} />
+
+      {/* الذراع اليسرى (اليمنى تُحرَّك في Model) */}
+      <group position={[-0.4, headY - 0.95, 0]} rotation={[0, 0, 0.15]}>
+        <mesh castShadow>
+          <capsuleGeometry args={[0.09, 0.42, 8, 16]} />
+          <meshStandardMaterial color={look.shirt} roughness={0.8} />
         </mesh>
-      ))}
-      {[-0.32, 0.32].map((x) => (
-        <mesh key={x} position={[x, -1.0, 0.05]} castShadow>
-          <capsuleGeometry args={[0.2, 0.28, 8, 16]} />
-          <meshStandardMaterial color={c.extra} roughness={0.7} />
+        <mesh position={[0, -0.34, 0]}>
+          <sphereGeometry args={[0.1, 16, 16]} />
+          <meshStandardMaterial color={look.skin} roughness={0.6} />
         </mesh>
+      </group>
+
+      {/* السروال والأرجل */}
+      {[-0.16, 0.16].map((x) => (
+        <group key={x} position={[x, headY - 1.72, 0]}>
+          <mesh castShadow>
+            <capsuleGeometry args={[0.115, 0.5, 8, 16]} />
+            <meshStandardMaterial color={look.pants} roughness={0.85} />
+          </mesh>
+          <mesh position={[0, -0.42, 0.07]} scale={[1, 0.6, 1.5]} castShadow>
+            <sphereGeometry args={[0.13, 18, 18]} />
+            <meshStandardMaterial color={look.shoes} roughness={0.6} />
+          </mesh>
+        </group>
       ))}
     </group>
   );
@@ -232,6 +317,8 @@ function Model({ type, animation, spin }: ModelProps) {
   const eyesRef = useRef<Group>(null);
   const mouthRef = useRef<Mesh>(null);
   const eyesBase = useRef<{ x: number; y: number } | null>(null);
+  const look = LOOKS[type];
+  const headY = look.kid ? 1.0 : 1.12;
 
   useFrame((state, delta) => {
     const g = group.current;
@@ -251,7 +338,7 @@ function Model({ type, animation, spin }: ModelProps) {
 
     if (armGroup.current) {
       armGroup.current.rotation.z =
-        animation === "wave" ? -0.9 + Math.sin(t * 8) * 0.5 : Math.sin(t * 1.6) * 0.08;
+        animation === "wave" ? -2.2 + Math.sin(t * 8) * 0.5 : -0.15 + Math.sin(t * 1.6) * 0.08;
     }
 
     // ===== طبقة تتبع الوجه: تُطبّق فوق الأنميشنات الحالية (مع تنعيم damp) =====
@@ -272,13 +359,13 @@ function Model({ type, animation, spin }: ModelProps) {
       if (!eyesBase.current) eyesBase.current = { x: eyes.position.x, y: eyes.position.y };
       eyes.position.x = MathUtils.damp(
         eyes.position.x,
-        eyesBase.current.x - faceState.eyeX * 0.12,
+        eyesBase.current.x - faceState.eyeX * 0.1,
         8,
         delta,
       );
       eyes.position.y = MathUtils.damp(
         eyes.position.y,
-        eyesBase.current.y - faceState.eyeY * 0.08,
+        eyesBase.current.y - faceState.eyeY * 0.07,
         8,
         delta,
       );
@@ -287,19 +374,23 @@ function Model({ type, animation, spin }: ModelProps) {
     const mouth = mouthRef.current;
     if (mouth) {
       const open = faceState.mouthOpen > 0.1 ? faceState.mouthOpen : 0;
-      mouth.scale.y = MathUtils.damp(mouth.scale.y, 1 + open * 2.2, 10, delta);
-      mouth.scale.z = MathUtils.damp(mouth.scale.z, 1 + open * 0.4, 10, delta);
+      mouth.scale.y = MathUtils.damp(mouth.scale.y, 0.5 + open * 2.2, 10, delta);
+      mouth.scale.x = MathUtils.damp(mouth.scale.x, 1.15 - open * 0.15, 10, delta);
+      mouth.scale.z = MathUtils.damp(mouth.scale.z, 0.6 + open * 0.4, 10, delta);
     }
-
   });
 
   return (
     <group ref={group}>
-      <Body type={type} headRef={headRef} eyesRef={eyesRef} mouthRef={mouthRef} />
-      <group ref={armGroup} position={[0.85, 0.15, 0]}>
-        <mesh position={[0, 0.25, 0]} castShadow>
-          <capsuleGeometry args={[0.11, 0.4, 8, 16]} />
-          <meshStandardMaterial color={PALETTE[type].accent} />
+      <Human type={type} headRef={headRef} eyesRef={eyesRef} mouthRef={mouthRef} />
+      <group ref={armGroup} position={[0.4, headY - 0.95, 0]}>
+        <mesh position={[0, -0.12, 0]} castShadow>
+          <capsuleGeometry args={[0.09, 0.42, 8, 16]} />
+          <meshStandardMaterial color={look.shirt} roughness={0.8} />
+        </mesh>
+        <mesh position={[0, -0.46, 0]}>
+          <sphereGeometry args={[0.1, 16, 16]} />
+          <meshStandardMaterial color={look.skin} roughness={0.6} />
         </mesh>
       </group>
     </group>
@@ -329,16 +420,16 @@ export default function ThreeDCharacter({
       shadows
       dpr={[1, 2]}
       gl={{ alpha: true, preserveDrawingBuffer: true, antialias: true }}
-      camera={{ position: [0, 0.9, 4.6], fov: 42 }}
+      camera={{ position: [0, 0.5, 4.6], fov: 42 }}
       onCreated={({ gl }) => {
         gl.setClearAlpha(0);
         onCanvasReady?.(gl.domElement);
       }}
     >
-      <ambientLight intensity={0.8} />
-      <directionalLight position={[3, 5, 4]} intensity={1.6} castShadow />
-      <directionalLight position={[-4, 2, -3]} intensity={0.5} color="#FDE047" />
-      <group position={[0, -0.35, 0]}>
+      <ambientLight intensity={0.85} />
+      <directionalLight position={[3, 5, 4]} intensity={1.5} castShadow />
+      <directionalLight position={[-4, 2, -3]} intensity={0.45} color="#FDE047" />
+      <group position={[0, -0.4, 0]}>
         <Model type={type} animation={animation} spin={spin} />
         {!transparent && (
           <ContactShadows position={[0, -1.45, 0]} opacity={0.35} blur={2.6} scale={6} far={3} />

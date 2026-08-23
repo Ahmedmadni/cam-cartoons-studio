@@ -1,10 +1,10 @@
 import { create } from "zustand";
 
-export type CharacterType = "robot" | "bear" | "rabbit" | "dino";
+export type CharacterType = "boy" | "girl" | "man" | "woman";
 export type AnimationType = "idle" | "jump" | "wave" | "spin";
-export type VoiceType = "normal" | "bear" | "robot" | "rabbit" | "dino";
+export type VoiceType = "normal" | "child" | "boy" | "girl" | "man" | "woman";
 
-export const VOICES: VoiceType[] = ["normal", "bear", "robot", "rabbit", "dino"];
+export const VOICES: VoiceType[] = ["normal", "child", "boy", "girl", "man", "woman"];
 
 
 export const ANIMATIONS: AnimationType[] = ["idle", "jump", "wave", "spin"];
@@ -17,10 +17,10 @@ export const ANIMATION_LABELS: Record<AnimationType, string> = {
 };
 
 export const CHARACTER_LABELS: Record<CharacterType, string> = {
-  robot: "روبوت",
-  bear: "دبدوب",
-  rabbit: "أرنوب",
-  dino: "ديناصور",
+  boy: "ولد",
+  girl: "بنت",
+  man: "شاب",
+  woman: "فتاة",
 };
 
 type StudioState = {
@@ -30,6 +30,10 @@ type StudioState = {
   recordedVideo: Blob | null;
   recordedAudio: Blob | null;
   selectedVoice: VoiceType;
+  /** درجة الصوت (نصف نغمات) من -12 إلى +12 */
+  voicePitch: number;
+  /** نبرة الصوت: 0 = ناعم/دافئ، 1 = لامع/كرتوني */
+  voiceTone: number;
   isFaceTrackingEnabled: boolean;
   setSelectedCharacter: (character: CharacterType) => void;
   setAnimation: (animation: AnimationType) => void;
@@ -38,6 +42,8 @@ type StudioState = {
   setRecordedVideo: (blob: Blob | null) => void;
   setRecordedAudio: (blob: Blob | null) => void;
   setSelectedVoice: (voice: VoiceType) => void;
+  setVoicePitch: (value: number) => void;
+  setVoiceTone: (value: number) => void;
   toggleFaceTracking: () => void;
   setFaceTracking: (value: boolean) => void;
   reset: () => void;
@@ -49,7 +55,9 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   isRecording: false,
   recordedVideo: null,
   recordedAudio: null,
-  selectedVoice: "normal",
+  selectedVoice: "child",
+  voicePitch: 0,
+  voiceTone: 0.5,
   isFaceTrackingEnabled: false,
   setSelectedCharacter: (character) => set({ selectedCharacter: character }),
   setAnimation: (animation) => set({ animation }),
@@ -62,6 +70,8 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   setRecordedVideo: (blob) => set({ recordedVideo: blob }),
   setRecordedAudio: (blob) => set({ recordedAudio: blob }),
   setSelectedVoice: (voice) => set({ selectedVoice: voice }),
+  setVoicePitch: (value) => set({ voicePitch: Math.max(-12, Math.min(12, value)) }),
+  setVoiceTone: (value) => set({ voiceTone: Math.max(0, Math.min(1, value)) }),
   toggleFaceTracking: () => set({ isFaceTrackingEnabled: !get().isFaceTrackingEnabled }),
   setFaceTracking: (value) => set({ isFaceTrackingEnabled: value }),
   reset: () =>
@@ -71,9 +81,9 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       isRecording: false,
       recordedVideo: null,
       recordedAudio: null,
-      selectedVoice: "normal",
+      selectedVoice: "child",
+      voicePitch: 0,
+      voiceTone: 0.5,
       isFaceTrackingEnabled: false,
     }),
 }));
-
-
