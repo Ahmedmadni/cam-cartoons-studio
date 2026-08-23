@@ -467,6 +467,11 @@ export default function ThreeDCharacter({
         onCanvasReady?.(gl.domElement);
       }}
     >
+      {backgroundUrl && (
+        <Suspense fallback={null}>
+          <Backdrop url={backgroundUrl} />
+        </Suspense>
+      )}
       <ambientLight intensity={0.85} />
       <directionalLight position={[3, 5, 4]} intensity={1.5} castShadow />
       <directionalLight position={[-4, 2, -3]} intensity={0.45} color="#FDE047" />
