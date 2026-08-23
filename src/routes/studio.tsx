@@ -48,6 +48,11 @@ function StudioPage() {
   const setRecordedAudio = useStudioStore((s) => s.setRecordedAudio);
   const selectedVoice = useStudioStore((s) => s.selectedVoice);
   const setSelectedVoice = useStudioStore((s) => s.setSelectedVoice);
+  const voicePitch = useStudioStore((s) => s.voicePitch);
+  const setVoicePitch = useStudioStore((s) => s.setVoicePitch);
+  const voiceTone = useStudioStore((s) => s.voiceTone);
+  const setVoiceTone = useStudioStore((s) => s.setVoiceTone);
+
   const isFaceTrackingEnabled = useStudioStore((s) => s.isFaceTrackingEnabled);
   const toggleFaceTracking = useStudioStore((s) => s.toggleFaceTracking);
 
