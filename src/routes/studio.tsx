@@ -1,9 +1,12 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Suspense, lazy, useCallback, useEffect, useRef, useState } from "react";
-import { ArrowRight, RefreshCw, ScanFace, Sparkles } from "lucide-react";
+import { ArrowRight, Mic, RefreshCw, ScanFace, Sparkles } from "lucide-react";
 import CharacterStage from "@/components/characters/CharacterStage";
-import { ANIMATION_LABELS, useStudioStore } from "@/lib/store";
+import { ANIMATION_LABELS, VOICES, useStudioStore } from "@/lib/store";
+import { VOICE_PRESETS } from "@/lib/voiceChanger";
+import { playSfx } from "@/lib/sfx";
 import { useFaceTracking } from "@/lib/useFaceTracking";
+
 
 
 const Webcam = lazy(() => import("react-webcam"));
@@ -42,6 +45,9 @@ function StudioPage() {
   const isRecording = useStudioStore((s) => s.isRecording);
   const setIsRecording = useStudioStore((s) => s.setIsRecording);
   const setRecordedVideo = useStudioStore((s) => s.setRecordedVideo);
+  const setRecordedAudio = useStudioStore((s) => s.setRecordedAudio);
+  const selectedVoice = useStudioStore((s) => s.selectedVoice);
+  const setSelectedVoice = useStudioStore((s) => s.setSelectedVoice);
   const isFaceTrackingEnabled = useStudioStore((s) => s.isFaceTrackingEnabled);
   const toggleFaceTracking = useStudioStore((s) => s.toggleFaceTracking);
 
@@ -49,6 +55,7 @@ function StudioPage() {
   const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
   const [seconds, setSeconds] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [showVoicePicker, setShowVoicePicker] = useState(true);
 
   const shellRef = useRef<HTMLElement | null>(null);
   const webcamRef = useRef<{ video: HTMLVideoElement | null } | null>(null);
@@ -57,8 +64,11 @@ function StudioPage() {
   const mixCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
+  const audioRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
   const rafRef = useRef<number | null>(null);
   const audioStreamRef = useRef<MediaStream | null>(null);
+
 
   const {
     loading: faceLoading,
@@ -141,10 +151,27 @@ function StudioPage() {
     draw();
 
     const stream = mix.captureStream(30);
+    setRecordedAudio(null);
+    audioChunksRef.current = [];
     try {
       const audio = await navigator.mediaDevices.getUserMedia({ audio: true });
       audioStreamRef.current = audio;
       audio.getAudioTracks().forEach((t) => stream.addTrack(t));
+
+      // تسجيل صوت الميكروفون بشكل منفصل ليُمرَّر لاحقاً لمحوّل الصوت
+      const micStream = new MediaStream(audio.getAudioTracks());
+      const audioMime = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+        ? "audio/webm;codecs=opus"
+        : "audio/webm";
+      const audioRecorder = new MediaRecorder(micStream, { mimeType: audioMime });
+      audioRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunksRef.current.push(e.data);
+      };
+      audioRecorder.onstop = () => {
+        setRecordedAudio(new Blob(audioChunksRef.current, { type: "audio/webm" }));
+      };
+      audioRecorderRef.current = audioRecorder;
+      audioRecorder.start();
     } catch {
       /* التسجيل يستمر بدون صوت */
     }
@@ -162,17 +189,22 @@ function StudioPage() {
       const blob = new Blob(chunksRef.current, { type: "video/webm" });
       setRecordedVideo(blob);
       setIsRecording(false);
+      playSfx("stop");
       navigate({ to: "/save" });
     };
     recorderRef.current = recorder;
     recorder.start();
     setIsRecording(true);
-  }, [cleanup, facingMode, navigate, setIsRecording, setRecordedVideo]);
+    playSfx("start");
+  }, [cleanup, facingMode, navigate, setIsRecording, setRecordedAudio, setRecordedVideo]);
 
   const stopRecording = useCallback(() => {
+    audioRecorderRef.current?.stop();
+    audioRecorderRef.current = null;
     recorderRef.current?.stop();
     recorderRef.current = null;
   }, []);
+
 
   if (!selectedCharacter) return null;
 
@@ -220,11 +252,57 @@ function StudioPage() {
         </div>
       )}
 
+      {showVoicePicker && !isRecording && (
+        <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/70 p-4">
+          <div className="w-full max-w-md rounded-4xl border-4 border-primary bg-card p-6 text-center shadow-2xl">
+            <h2 className="text-3xl font-black text-card-foreground">اختر صوت شخصيتك</h2>
+            <p className="mt-1 font-bold text-muted-foreground">
+              سنحوّل صوتك إلى صوت كرتوني بعد التسجيل!
+            </p>
+            <div className="mt-5 grid grid-cols-2 gap-3">
+              {VOICES.map((voice) => {
+                const preset = VOICE_PRESETS[voice];
+                const active = selectedVoice === voice;
+                return (
+                  <button
+                    key={voice}
+                    type="button"
+                    onClick={() => {
+                      setSelectedVoice(voice);
+                      playSfx("click");
+                    }}
+                    className={`rounded-3xl border-4 px-3 py-4 text-lg font-black transition ${
+                      active
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-border bg-muted text-foreground"
+                    }`}
+                  >
+                    <span className="block text-3xl">{preset.emoji}</span>
+                    {preset.label}
+                  </button>
+                );
+              })}
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                playSfx("success");
+                setShowVoicePicker(false);
+              }}
+              className="mt-6 w-full rounded-full bg-gradient-to-l from-primary to-sunny px-6 py-4 text-2xl font-black text-primary-foreground shadow-xl"
+            >
+              يلا نصوّر! 🎬
+            </button>
+          </div>
+        </div>
+      )}
+
       {(error || faceError) && (
         <div className="absolute top-20 left-1/2 -translate-x-1/2 rounded-2xl bg-card px-5 py-3 text-center font-bold text-card-foreground shadow-lg">
           {error ?? faceError}
         </div>
       )}
+
 
       {faceLoading && (
         <div className="absolute inset-0 flex items-center justify-center">
@@ -275,10 +353,27 @@ function StudioPage() {
           </span>
         </button>
 
+        <button
+          type="button"
+          onClick={() => {
+            playSfx("click");
+            setShowVoicePicker(true);
+          }}
+          disabled={isRecording}
+          className="flex size-16 flex-col items-center justify-center rounded-full bg-card text-card-foreground shadow-lg disabled:opacity-40"
+          aria-label="اختر صوت شخصيتك"
+        >
+          <Mic className="size-7" />
+          <span className="text-[10px] font-black">{VOICE_PRESETS[selectedVoice].emoji} الصوت</span>
+        </button>
+
         {!isFaceTrackingEnabled && (
           <button
             type="button"
-            onClick={nextAnimation}
+            onClick={() => {
+              playSfx("click");
+              nextAnimation();
+            }}
             className="flex size-16 flex-col items-center justify-center rounded-full bg-sunny text-sunny-foreground shadow-lg"
             aria-label="تغيير الحركة"
           >
@@ -286,6 +381,7 @@ function StudioPage() {
             <span className="text-[10px] font-black">{ANIMATION_LABELS[animation]}</span>
           </button>
         )}
+
       </div>
 
     </main>

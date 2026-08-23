@@ -1,7 +1,9 @@
 import { Canvas, useFrame } from "@react-three/fiber";
 import { ContactShadows, Environment } from "@react-three/drei";
 import { useRef } from "react";
+import { MathUtils } from "three";
 import type { Group, Mesh } from "three";
+
 import type { AnimationType, CharacterType } from "@/lib/store";
 import { faceState } from "@/lib/faceState";
 
@@ -252,27 +254,43 @@ function Model({ type, animation, spin }: ModelProps) {
         animation === "wave" ? -0.9 + Math.sin(t * 8) * 0.5 : Math.sin(t * 1.6) * 0.08;
     }
 
-    // ===== طبقة تتبع الوجه: تُطبّق فوق الأنميشنات الحالية =====
+    // ===== طبقة تتبع الوجه: تُطبّق فوق الأنميشنات الحالية (مع تنعيم damp) =====
     const head = headRef.current;
     if (head) {
-      head.rotation.y = -faceState.yaw * 0.7;
-      head.rotation.x = faceState.pitch * 0.5 + (animation === "jump" ? 0 : Math.sin(t * 1.6) * 0.01);
-      head.rotation.z = -faceState.roll * 0.5;
+      head.rotation.y = MathUtils.damp(head.rotation.y, -faceState.yaw * 0.7, 6, delta);
+      head.rotation.x = MathUtils.damp(
+        head.rotation.x,
+        faceState.pitch * 0.5 + (animation === "jump" ? 0 : Math.sin(t * 1.6) * 0.01),
+        6,
+        delta,
+      );
+      head.rotation.z = MathUtils.damp(head.rotation.z, -faceState.roll * 0.5, 6, delta);
     }
 
     const eyes = eyesRef.current;
     if (eyes) {
       if (!eyesBase.current) eyesBase.current = { x: eyes.position.x, y: eyes.position.y };
-      eyes.position.x = eyesBase.current.x - faceState.eyeX * 0.12;
-      eyes.position.y = eyesBase.current.y - faceState.eyeY * 0.08;
+      eyes.position.x = MathUtils.damp(
+        eyes.position.x,
+        eyesBase.current.x - faceState.eyeX * 0.12,
+        8,
+        delta,
+      );
+      eyes.position.y = MathUtils.damp(
+        eyes.position.y,
+        eyesBase.current.y - faceState.eyeY * 0.08,
+        8,
+        delta,
+      );
     }
 
     const mouth = mouthRef.current;
     if (mouth) {
       const open = faceState.mouthOpen > 0.1 ? faceState.mouthOpen : 0;
-      mouth.scale.y = 1 + open * 2.2;
-      mouth.scale.z = 1 + open * 0.4;
+      mouth.scale.y = MathUtils.damp(mouth.scale.y, 1 + open * 2.2, 10, delta);
+      mouth.scale.z = MathUtils.damp(mouth.scale.z, 1 + open * 0.4, 10, delta);
     }
+
   });
 
   return (

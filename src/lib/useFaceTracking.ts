@@ -49,10 +49,17 @@ export function useFaceTracking({ videoRef, enabled }: Options) {
         setLoading(false);
         setIsTracking(true);
 
+        // تخطي إطارات للحفاظ على الأداء: نحلّل الوجه كل 3 إطارات فقط
+        const FRAME_SKIP = 3;
+        let frame = 0;
+
         const loop = () => {
           rafRef.current = requestAnimationFrame(loop);
+          frame += 1;
+          if (frame % FRAME_SKIP !== 0) return;
           const video = videoRef.current;
           if (!video || video.readyState < 2) return;
+
           let results;
           try {
             results = landmarker.detectForVideo(video, performance.now());
