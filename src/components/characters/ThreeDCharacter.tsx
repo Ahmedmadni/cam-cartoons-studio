@@ -328,30 +328,58 @@ function Model({ type, animation, spin }: ModelProps) {
     if (spin) g.rotation.y += delta * 0.6;
     if (animation === "spin") g.rotation.y += delta * 2.4;
 
-    if (animation === "jump") {
-      g.position.y = Math.abs(Math.sin(t * 3.2)) * 0.55;
-      g.rotation.z = Math.sin(t * 3.2) * 0.05;
+    // ===== مكتبة الحركات (performAction) =====
+    if (animation === "jump" || animation === "happy") {
+      const speed = animation === "happy" ? 4.2 : 3.2;
+      g.position.y = Math.abs(Math.sin(t * speed)) * (animation === "happy" ? 0.32 : 0.55);
+      g.rotation.z = Math.sin(t * speed) * 0.05;
+    } else if (animation === "dance") {
+      g.position.y = Math.abs(Math.sin(t * 5)) * 0.14;
+      g.rotation.z = Math.sin(t * 2.5) * 0.16;
+      g.rotation.y = MathUtils.damp(g.rotation.y, Math.sin(t * 1.6) * 0.5, 4, delta);
+    } else if (animation === "sad") {
+      g.position.y = MathUtils.damp(g.position.y, -0.12 + Math.sin(t * 0.9) * 0.02, 3, delta);
+      g.rotation.z = 0;
     } else {
       g.position.y = Math.sin(t * 1.6) * 0.06;
       g.rotation.z = 0;
     }
 
     if (armGroup.current) {
-      armGroup.current.rotation.z =
-        animation === "wave" ? -2.2 + Math.sin(t * 8) * 0.5 : -0.15 + Math.sin(t * 1.6) * 0.08;
+      const arm = armGroup.current;
+      let targetZ = -0.15 + Math.sin(t * 1.6) * 0.08;
+      let targetX = 0;
+      if (animation === "wave") targetZ = -2.2 + Math.sin(t * 8) * 0.5;
+      else if (animation === "bye") targetZ = -2.4 + Math.sin(t * 4) * 0.6;
+      else if (animation === "clap") targetZ = -1.5 + Math.abs(Math.sin(t * 9)) * 0.9;
+      else if (animation === "happy") targetZ = -2.6 + Math.sin(t * 6) * 0.2;
+      else if (animation === "dance") targetZ = -1.9 + Math.sin(t * 5) * 0.7;
+      else if (animation === "think") {
+        targetZ = -2.75;
+        targetX = 0.35;
+      } else if (animation === "sad") targetZ = 0.1;
+      arm.rotation.z = MathUtils.damp(arm.rotation.z, targetZ, 8, delta);
+      arm.rotation.x = MathUtils.damp(arm.rotation.x, targetX, 8, delta);
     }
 
-    // ===== طبقة تتبع الوجه: تُطبّق فوق الأنميشنات الحالية (مع تنعيم damp) =====
+    // ===== حركة الرأس حسب الحركة (وتبقى طبقة faceState متوافقة) =====
     const head = headRef.current;
     if (head) {
-      head.rotation.y = MathUtils.damp(head.rotation.y, -faceState.yaw * 0.7, 6, delta);
-      head.rotation.x = MathUtils.damp(
-        head.rotation.x,
-        faceState.pitch * 0.5 + (animation === "jump" ? 0 : Math.sin(t * 1.6) * 0.01),
-        6,
-        delta,
-      );
-      head.rotation.z = MathUtils.damp(head.rotation.z, -faceState.roll * 0.5, 6, delta);
+      let hx = faceState.pitch * 0.5 + (animation === "jump" ? 0 : Math.sin(t * 1.6) * 0.01);
+      let hy = -faceState.yaw * 0.7;
+      let hz = -faceState.roll * 0.5;
+      if (animation === "nod") hx += 0.28 + Math.sin(t * 5) * 0.22;
+      else if (animation === "sad") {
+        hx += 0.34;
+        hz += 0.1;
+      } else if (animation === "think") {
+        hz += 0.28;
+        hy += 0.2;
+      } else if (animation === "happy") hx -= 0.1;
+      else if (animation === "bye" || animation === "wave") hz += Math.sin(t * 4) * 0.06;
+      head.rotation.y = MathUtils.damp(head.rotation.y, hy, 6, delta);
+      head.rotation.x = MathUtils.damp(head.rotation.x, hx, 6, delta);
+      head.rotation.z = MathUtils.damp(head.rotation.z, hz, 6, delta);
     }
 
     const eyes = eyesRef.current;
