@@ -42,6 +42,9 @@ function StudioPage() {
   const isRecording = useStudioStore((s) => s.isRecording);
   const setIsRecording = useStudioStore((s) => s.setIsRecording);
   const setRecordedVideo = useStudioStore((s) => s.setRecordedVideo);
+  const setRecordedAudio = useStudioStore((s) => s.setRecordedAudio);
+  const selectedVoice = useStudioStore((s) => s.selectedVoice);
+  const setSelectedVoice = useStudioStore((s) => s.setSelectedVoice);
   const isFaceTrackingEnabled = useStudioStore((s) => s.isFaceTrackingEnabled);
   const toggleFaceTracking = useStudioStore((s) => s.toggleFaceTracking);
 
@@ -49,6 +52,7 @@ function StudioPage() {
   const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
   const [seconds, setSeconds] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [showVoicePicker, setShowVoicePicker] = useState(true);
 
   const shellRef = useRef<HTMLElement | null>(null);
   const webcamRef = useRef<{ video: HTMLVideoElement | null } | null>(null);
@@ -57,8 +61,11 @@ function StudioPage() {
   const mixCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
+  const audioRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
   const rafRef = useRef<number | null>(null);
   const audioStreamRef = useRef<MediaStream | null>(null);
+
 
   const {
     loading: faceLoading,
