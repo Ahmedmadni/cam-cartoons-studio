@@ -1,6 +1,6 @@
 import { Canvas, useFrame } from "@react-three/fiber";
-import { ContactShadows, Environment } from "@react-three/drei";
-import { useRef } from "react";
+import { ContactShadows, Environment, useTexture } from "@react-three/drei";
+import { Suspense, useRef } from "react";
 import { MathUtils } from "three";
 import type { Group, Mesh } from "three";
 
