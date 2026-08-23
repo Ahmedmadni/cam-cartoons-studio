@@ -253,13 +253,13 @@ function StudioPage() {
       )}
 
       {showVoicePicker && !isRecording && (
-        <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/70 p-4">
+        <div className="absolute inset-0 z-20 flex items-center justify-center overflow-y-auto bg-black/70 p-4">
           <div className="w-full max-w-md rounded-4xl border-4 border-primary bg-card p-6 text-center shadow-2xl">
             <h2 className="text-3xl font-black text-card-foreground">اختر صوت شخصيتك</h2>
             <p className="mt-1 font-bold text-muted-foreground">
-              سنحوّل صوتك إلى صوت كرتوني بعد التسجيل!
+              أصوات أطفال ورجال ونساء — مع تحكم في الدرجة والنبرة!
             </p>
-            <div className="mt-5 grid grid-cols-2 gap-3">
+            <div className="mt-5 grid grid-cols-3 gap-3">
               {VOICES.map((voice) => {
                 const preset = VOICE_PRESETS[voice];
                 const active = selectedVoice === voice;
@@ -271,18 +271,63 @@ function StudioPage() {
                       setSelectedVoice(voice);
                       playSfx("click");
                     }}
-                    className={`rounded-3xl border-4 px-3 py-4 text-lg font-black transition ${
+                    className={`rounded-3xl border-4 px-2 py-3 text-sm font-black transition ${
                       active
                         ? "border-primary bg-primary text-primary-foreground"
                         : "border-border bg-muted text-foreground"
                     }`}
                   >
-                    <span className="block text-3xl">{preset.emoji}</span>
+                    <span className="block text-2xl">{preset.emoji}</span>
                     {preset.label}
                   </button>
                 );
               })}
             </div>
+
+            <div className="mt-6 space-y-4 text-right">
+              <label className="block">
+                <span className="flex items-center justify-between text-lg font-black text-card-foreground">
+                  <span>درجة الصوت 🎚️</span>
+                  <span className="text-primary">
+                    {voicePitch > 0 ? `+${voicePitch}` : voicePitch}
+                  </span>
+                </span>
+                <input
+                  type="range"
+                  min={-12}
+                  max={12}
+                  step={1}
+                  value={voicePitch}
+                  onChange={(e) => setVoicePitch(Number(e.target.value))}
+                  className="mt-2 w-full accent-[var(--color-primary)]"
+                />
+                <span className="flex justify-between text-xs font-bold text-muted-foreground">
+                  <span>أعلى (طفولي)</span>
+                  <span>أعمق (رجالي)</span>
+                </span>
+              </label>
+
+              <label className="block">
+                <span className="flex items-center justify-between text-lg font-black text-card-foreground">
+                  <span>نبرة الصوت 🎵</span>
+                  <span className="text-primary">{Math.round(voiceTone * 100)}%</span>
+                </span>
+                <input
+                  type="range"
+                  min={0}
+                  max={1}
+                  step={0.05}
+                  value={voiceTone}
+                  onChange={(e) => setVoiceTone(Number(e.target.value))}
+                  className="mt-2 w-full accent-[var(--color-secondary)]"
+                />
+                <span className="flex justify-between text-xs font-bold text-muted-foreground">
+                  <span>ناعمة ودافئة</span>
+                  <span>كرتونية لامعة</span>
+                </span>
+              </label>
+            </div>
+
             <button
               type="button"
               onClick={() => {
@@ -296,6 +341,7 @@ function StudioPage() {
           </div>
         </div>
       )}
+
 
       {(error || faceError) && (
         <div className="absolute top-20 left-1/2 -translate-x-1/2 rounded-2xl bg-card px-5 py-3 text-center font-bold text-card-foreground shadow-lg">
