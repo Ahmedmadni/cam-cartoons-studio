@@ -1,8 +1,10 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Suspense, lazy, useCallback, useEffect, useRef, useState } from "react";
-import { ArrowRight, RefreshCw, Sparkles } from "lucide-react";
+import { ArrowRight, RefreshCw, ScanFace, Sparkles } from "lucide-react";
 import CharacterStage from "@/components/characters/CharacterStage";
 import { ANIMATION_LABELS, useStudioStore } from "@/lib/store";
+import { useFaceTracking } from "@/lib/useFaceTracking";
+
 
 const Webcam = lazy(() => import("react-webcam"));
 
