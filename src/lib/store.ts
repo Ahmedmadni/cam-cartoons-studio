@@ -1,7 +1,18 @@
 import { create } from "zustand";
 
 export type CharacterType = "boy" | "girl" | "man" | "woman";
-export type AnimationType = "idle" | "jump" | "wave" | "spin";
+export type AnimationType =
+  | "idle"
+  | "jump"
+  | "wave"
+  | "spin"
+  | "clap"
+  | "sad"
+  | "happy"
+  | "bye"
+  | "nod"
+  | "dance"
+  | "think";
 export type VoiceType = "normal" | "child" | "boy" | "girl" | "man" | "woman";
 
 export const VOICES: VoiceType[] = ["normal", "child", "boy", "girl", "man", "woman"];
