@@ -36,7 +36,7 @@ function Eyes({
   groupRef?: React.RefObject<Group | null>;
 }) {
   return (
-    <group ref={groupRef} position={[0, y, z]}>
+    <group ref={groupRef ?? null} position={[0, y, z]}>
       {[-spread, spread].map((x) => (
         <mesh key={x} position={[x, 0, 0]}>
           <sphereGeometry args={[0.09, 20, 20]} />
