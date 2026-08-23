@@ -2,6 +2,10 @@ import { create } from "zustand";
 
 export type CharacterType = "robot" | "bear" | "rabbit" | "dino";
 export type AnimationType = "idle" | "jump" | "wave" | "spin";
+export type VoiceType = "normal" | "bear" | "robot" | "rabbit" | "dino";
+
+export const VOICES: VoiceType[] = ["normal", "bear", "robot", "rabbit", "dino"];
+
 
 export const ANIMATIONS: AnimationType[] = ["idle", "jump", "wave", "spin"];
 
