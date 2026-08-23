@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
-import { Camera, Sparkles } from "lucide-react";
+import { BookOpen as Camera, Sparkles } from "lucide-react";
 import CharacterStage from "@/components/characters/CharacterStage";
 import { CHARACTER_LABELS, useStudioStore, type CharacterType } from "@/lib/store";
 
@@ -48,7 +48,7 @@ function Index() {
             اختر شخصيتك الكرتونية!
           </h1>
           <p className="mt-3 text-lg font-semibold text-muted-foreground">
-            اضغط على الشخصية التي تحبها، ثم ابدأ التصوير معها.
+            اضغط على الشخصية التي تحبها، ثم اكتب لها قصة قصيرة.
           </p>
         </header>
 
@@ -91,11 +91,11 @@ function Index() {
           <button
             type="button"
             disabled={!selectedCharacter}
-            onClick={() => navigate({ to: "/studio" })}
+            onClick={() => navigate({ to: "/story" })}
             className="inline-flex items-center gap-3 rounded-full bg-primary px-12 py-6 text-2xl font-black text-primary-foreground shadow-xl transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-40"
           >
             <Camera className="size-8" />
-            ابدأ التصوير
+            ابدأ القصة
           </button>
         </div>
       </div>

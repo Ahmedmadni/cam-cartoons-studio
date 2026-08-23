@@ -1,8 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Download, RotateCcw, Share2, Volume2 } from "lucide-react";
+import { Download, RotateCcw, Share2 } from "lucide-react";
 import { useStudioStore } from "@/lib/store";
-import { VOICE_PRESETS, transformVoice } from "@/lib/voiceChanger";
 
 
 export const Route = createFileRoute("/save")({
