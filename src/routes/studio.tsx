@@ -42,6 +42,8 @@ function StudioPage() {
   const isRecording = useStudioStore((s) => s.isRecording);
   const setIsRecording = useStudioStore((s) => s.setIsRecording);
   const setRecordedVideo = useStudioStore((s) => s.setRecordedVideo);
+  const isFaceTrackingEnabled = useStudioStore((s) => s.isFaceTrackingEnabled);
+  const toggleFaceTracking = useStudioStore((s) => s.toggleFaceTracking);
 
   const [mounted, setMounted] = useState(false);
   const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
@@ -50,6 +52,7 @@ function StudioPage() {
 
   const shellRef = useRef<HTMLElement | null>(null);
   const webcamRef = useRef<{ video: HTMLVideoElement | null } | null>(null);
+  const videoElRef = useRef<HTMLVideoElement | null>(null);
   const threeCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const mixCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
@@ -57,7 +60,21 @@ function StudioPage() {
   const rafRef = useRef<number | null>(null);
   const audioStreamRef = useRef<MediaStream | null>(null);
 
+  const {
+    loading: faceLoading,
+    isTracking,
+    error: faceError,
+  } = useFaceTracking({ videoRef: videoElRef, enabled: isFaceTrackingEnabled });
+
   useEffect(() => setMounted(true), []);
+
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      videoElRef.current = webcamRef.current?.video ?? null;
+    }, 500);
+    return () => window.clearInterval(id);
+  }, []);
+
 
   useEffect(() => {
     if (!selectedCharacter) navigate({ to: "/" });
