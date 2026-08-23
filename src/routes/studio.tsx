@@ -353,10 +353,27 @@ function StudioPage() {
           </span>
         </button>
 
+        <button
+          type="button"
+          onClick={() => {
+            playSfx("click");
+            setShowVoicePicker(true);
+          }}
+          disabled={isRecording}
+          className="flex size-16 flex-col items-center justify-center rounded-full bg-card text-card-foreground shadow-lg disabled:opacity-40"
+          aria-label="اختر صوت شخصيتك"
+        >
+          <Mic className="size-7" />
+          <span className="text-[10px] font-black">{VOICE_PRESETS[selectedVoice].emoji} الصوت</span>
+        </button>
+
         {!isFaceTrackingEnabled && (
           <button
             type="button"
-            onClick={nextAnimation}
+            onClick={() => {
+              playSfx("click");
+              nextAnimation();
+            }}
             className="flex size-16 flex-col items-center justify-center rounded-full bg-sunny text-sunny-foreground shadow-lg"
             aria-label="تغيير الحركة"
           >
@@ -364,6 +381,7 @@ function StudioPage() {
             <span className="text-[10px] font-black">{ANIMATION_LABELS[animation]}</span>
           </button>
         )}
+
       </div>
 
     </main>
