@@ -6,6 +6,8 @@ import CharacterStage from "@/components/characters/CharacterStage";
 import { faceState } from "@/lib/faceState";
 import { BACKGROUNDS, parseStory, type StoryStep } from "@/lib/story";
 import { ANIMATION_LABELS, CHARACTER_LABELS, useStudioStore, type AnimationType } from "@/lib/store";
+import { VOICE_PRESETS } from "@/lib/voiceChanger";
+import { VoicePlaybackBus, isRemoteVoiceConfigured, synthesizeRemoteVoice } from "@/lib/voiceEngine";
 
 export const Route = createFileRoute("/story")({
   head: () => ({
@@ -33,6 +35,9 @@ function StoryPage() {
   const navigate = useNavigate();
   const selectedCharacter = useStudioStore((s) => s.selectedCharacter);
   const setRecordedVideo = useStudioStore((s) => s.setRecordedVideo);
+  const selectedVoice = useStudioStore((s) => s.selectedVoice);
+  const voicePitch = useStudioStore((s) => s.voicePitch);
+  const voiceTone = useStudioStore((s) => s.voiceTone);
 
   const [text, setText] = useState(EXAMPLE);
   const [bgId, setBgId] = useState(BACKGROUNDS[0]!.id);
@@ -48,12 +53,19 @@ function StoryPage() {
   const extraTracksRef = useRef<MediaStreamTrack[]>([]);
   const mouthTimerRef = useRef<number | null>(null);
   const cancelledRef = useRef(false);
+  const voiceBusRef = useRef<VoicePlaybackBus | null>(null);
 
+  const remoteVoiceConfigured = isRemoteVoiceConfigured();
   const background = BACKGROUNDS.find((b) => b.id === bgId) ?? BACKGROUNDS[0]!;
 
   useEffect(() => {
     if (!selectedCharacter) navigate({ to: "/" });
   }, [selectedCharacter, navigate]);
+
+  const getVoiceBus = useCallback(() => {
+    if (!voiceBusRef.current) voiceBusRef.current = new VoicePlaybackBus();
+    return voiceBusRef.current;
+  }, []);
 
   const stopMouth = useCallback(() => {
     if (mouthTimerRef.current) window.clearInterval(mouthTimerRef.current);
@@ -71,29 +83,32 @@ function StoryPage() {
   /** ينفّذ حركة واحدة (مكتبة الحركات) لمدة محددة */
   const performAction = useCallback((next: AnimationType) => setAction(next), []);
 
-  const speak = useCallback(
+  const speakBrowser = useCallback(
     (line: string) =>
       new Promise<void>((resolve) => {
         if (typeof window === "undefined" || !("speechSynthesis" in window)) {
           setTimeout(resolve, 1200);
           return;
         }
+
         const utter = new SpeechSynthesisUtterance(line);
+        const preset = VOICE_PRESETS[selectedVoice];
+        const semitones = preset.semitones + voicePitch;
         utter.lang = "ar-SA";
         utter.rate = 0.95;
-        utter.pitch = 1.25;
+        utter.pitch = Math.max(0.5, Math.min(2, 1 + (semitones / 12) * 0.45));
         const arabic = window.speechSynthesis.getVoices().find((v) => v.lang.startsWith("ar"));
         if (arabic) utter.voice = arabic;
 
-        // مزامنة الفم عبر أحداث onboundary: نبضة فتح لكل كلمة بطول يتناسب مع طولها
         let gotBoundary = false;
         let rafId = 0;
         let target = 0;
         const animate = () => {
           faceState.mouthOpen += (target - faceState.mouthOpen) * 0.35;
-          target *= 0.88; // إغلاق تدريجي بين الكلمات
+          target *= 0.88;
           rafId = requestAnimationFrame(animate);
         };
+
         utter.onstart = () => {
           rafId = requestAnimationFrame(animate);
         };
@@ -101,17 +116,17 @@ function StoryPage() {
           if (e.name && e.name !== "word") return;
           if (!gotBoundary) {
             gotBoundary = true;
-            stopMouth(); // إيقاف الحركة العشوائية الاحتياطية
+            stopMouth();
           }
-          const len = e.charLength || line.slice(e.charIndex).split(/\s/)[0]?.length || 3;
+          const len = e.charLength || line.slice(e.charIndex).split(/\\s/)[0]?.length || 3;
           target = Math.min(1, 0.45 + len * 0.07);
-          // نبضة ثانية للكلمات الطويلة (مقاطع متعددة)
           if (len > 4) {
             window.setTimeout(() => {
               target = Math.max(target, 0.55 + Math.random() * 0.3);
             }, 140);
           }
         };
+
         const done = () => {
           cancelAnimationFrame(rafId);
           faceState.mouthOpen = 0;
@@ -121,7 +136,43 @@ function StoryPage() {
         utter.onerror = done;
         window.speechSynthesis.speak(utter);
       }),
-    [stopMouth],
+    [selectedVoice, stopMouth, voicePitch],
+  );
+
+  const speak = useCallback(
+    async (line: string) => {
+      if (remoteVoiceConfigured) {
+        try {
+          const audio = await synthesizeRemoteVoice(line, selectedVoice, {
+            language: "ar-SA",
+            pitch: voicePitch,
+            tone: voiceTone,
+          });
+
+          if (audio) {
+            stopMouth();
+            const bus = getVoiceBus();
+            await bus.play(audio, (level) => {
+              faceState.mouthOpen = Math.max(0, Math.min(1, level));
+            });
+            return;
+          }
+        } catch {
+          setNote("تعذّر محرك الصوت الذكي؛ تم استخدام صوت الجهاز كبديل. قد لا يُسجَّل الصوت البديل داخل الفيديو.");
+        }
+      }
+
+      await speakBrowser(line);
+    },
+    [
+      getVoiceBus,
+      remoteVoiceConfigured,
+      selectedVoice,
+      speakBrowser,
+      stopMouth,
+      voicePitch,
+      voiceTone,
+    ],
   );
 
   const runStory = useCallback(
@@ -150,6 +201,7 @@ function StoryPage() {
   const handleStop = useCallback(() => {
     cancelledRef.current = true;
     window.speechSynthesis?.cancel();
+    voiceBusRef.current?.stop();
     stopMouth();
     performAction("idle");
     setCurrentLine("");
@@ -168,22 +220,31 @@ function StoryPage() {
       if (withRecording && canvasRef.current) {
         try {
           const stream = canvasRef.current.captureStream(30);
-          // محاولة التقاط صوت المتصفح (TTS) عبر مشاركة التبويب — اختيارية
-          try {
-            const display = await navigator.mediaDevices.getDisplayMedia({
-              video: true,
-              audio: true,
-            });
-            const audio = display.getAudioTracks()[0];
-            display.getVideoTracks().forEach((t) => t.stop());
-            if (audio) {
-              stream.addTrack(audio);
-              extraTracksRef.current = [audio];
-            } else {
+
+          if (remoteVoiceConfigured) {
+            const bus = getVoiceBus();
+            const aiAudioTrack = bus.captureStream.getAudioTracks()[0];
+            if (aiAudioTrack) {
+              stream.addTrack(aiAudioTrack);
+              setNote("سيتم دمج صوت الشخصية الذكي مباشرة داخل الفيديو.");
+            }
+          } else {
+            try {
+              const display = await navigator.mediaDevices.getDisplayMedia({
+                video: true,
+                audio: true,
+              });
+              const audio = display.getAudioTracks()[0];
+              display.getVideoTracks().forEach((t) => t.stop());
+              if (audio) {
+                stream.addTrack(audio);
+                extraTracksRef.current = [audio];
+              } else {
+                setNote("تم التسجيل بدون صوت (لم تتم مشاركة صوت التبويب).");
+              }
+            } catch {
               setNote("تم التسجيل بدون صوت (لم تتم مشاركة صوت التبويب).");
             }
-          } catch {
-            setNote("تم التسجيل بدون صوت (لم تتم مشاركة صوت التبويب).");
           }
 
           chunksRef.current = [];
@@ -195,6 +256,9 @@ function StoryPage() {
             const blob = new Blob(chunksRef.current, { type: "video/webm" });
             setRecordedVideo(blob);
             setRecording(false);
+            const bus = voiceBusRef.current;
+            voiceBusRef.current = null;
+            void bus?.close();
             navigate({ to: "/save" });
           };
           recorderRef.current = recorder;
@@ -202,14 +266,32 @@ function StoryPage() {
           setRecording(true);
         } catch {
           setNote("تعذّر بدء التسجيل على هذا المتصفح.");
+          const bus = voiceBusRef.current;
+          voiceBusRef.current = null;
+          void bus?.close();
         }
       }
 
       await runStory(steps);
       setPlaying(false);
-      if (withRecording) window.setTimeout(() => stopRecorder(), 400);
+
+      if (withRecording) {
+        window.setTimeout(() => stopRecorder(), 400);
+      } else {
+        const bus = voiceBusRef.current;
+        voiceBusRef.current = null;
+        await bus?.close();
+      }
     },
-    [text, runStory, navigate, setRecordedVideo, stopRecorder],
+    [
+      getVoiceBus,
+      navigate,
+      remoteVoiceConfigured,
+      runStory,
+      setRecordedVideo,
+      stopRecorder,
+      text,
+    ],
   );
 
   useEffect(
@@ -218,6 +300,9 @@ function StoryPage() {
       window.speechSynthesis?.cancel();
       if (mouthTimerRef.current) window.clearInterval(mouthTimerRef.current);
       extraTracksRef.current.forEach((t) => t.stop());
+      const bus = voiceBusRef.current;
+      voiceBusRef.current = null;
+      void bus?.close();
     },
     [],
   );
@@ -256,6 +341,21 @@ function StoryPage() {
               className="mt-3 w-full rounded-2xl border-2 border-border bg-background p-4 text-lg font-semibold text-foreground outline-none focus:border-primary"
               placeholder="مثال: قل مرحبا بفرح، ثم ارفع يدك، ثم قفز"
             />
+
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <span
+                className={`rounded-full px-3 py-1 text-xs font-black ${
+                  remoteVoiceConfigured
+                    ? "bg-primary/15 text-primary"
+                    : "bg-muted text-muted-foreground"
+                }`}
+              >
+                {remoteVoiceConfigured ? "محرك صوت AI" : "صوت الجهاز"}
+              </span>
+              <span className="text-xs font-bold text-muted-foreground">
+                {VOICE_PRESETS[selectedVoice].emoji} {VOICE_PRESETS[selectedVoice].label}
+              </span>
+            </div>
 
             <p className="mt-4 text-sm font-bold text-muted-foreground">الخلفية</p>
             <div className="mt-2 grid grid-cols-5 gap-2">
