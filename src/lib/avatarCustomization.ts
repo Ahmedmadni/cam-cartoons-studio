@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
-import type { HairStyle } from "./avatarCatalog";
+import type { FaceShape, GlassesStyle, HairStyle } from "./avatarCatalog";
 import type { CharacterType } from "./store";
 
 export type AvatarRenderMode = "auto" | "custom" | "readyplayerme";
@@ -16,6 +16,12 @@ export type AvatarCustomization = {
   accent?: string;
   eye?: string;
   hairStyle?: HairStyle;
+  faceShape?: FaceShape;
+  eyeScale?: number;
+  eyeSpacing?: number;
+  noseScale?: number;
+  mouthScale?: number;
+  glassesStyle?: GlassesStyle;
   bodyScale?: number;
   shoulderScale?: number;
   headScale?: number;
@@ -89,4 +95,17 @@ export const HAIR_STYLE_LABELS: Record<HairStyle, string> = {
   curls: "كيرلي",
   bun: "كعكة",
   waves: "مموّج",
+};
+
+
+export const FACE_SHAPE_LABELS: Record<FaceShape, string> = {
+  round: "دائري",
+  oval: "بيضاوي",
+  square: "مربع",
+};
+
+export const GLASSES_STYLE_LABELS: Record<GlassesStyle, string> = {
+  none: "بدون",
+  round: "دائرية",
+  square: "مربعة",
 };

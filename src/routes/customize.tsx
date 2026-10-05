@@ -4,11 +4,13 @@ import { useCallback, useEffect, useState } from "react";
 
 import CharacterStage from "@/components/characters/CharacterStage";
 import ReadyPlayerMeCreator from "@/components/characters/ReadyPlayerMeCreator";
-import { getAvatarProfile, type HairStyle } from "@/lib/avatarCatalog";
+import { getAvatarProfile, type FaceShape, type GlassesStyle, type HairStyle } from "@/lib/avatarCatalog";
 import {
   ACCENT_COLORS,
   BOTTOM_COLORS,
   EYE_COLORS,
+  FACE_SHAPE_LABELS,
+  GLASSES_STYLE_LABELS,
   HAIR_COLORS,
   HAIR_STYLE_LABELS,
   SHOE_COLORS,
@@ -74,6 +76,8 @@ function ColorSwatches({ label, colors, value, onChange }: SwatchProps) {
 }
 
 const HAIR_STYLES: HairStyle[] = ["crop", "curls", "bun", "waves"];
+const FACE_SHAPES: FaceShape[] = ["round", "oval", "square"];
+const GLASSES_STYLES: GlassesStyle[] = ["none", "round", "square"];
 
 const MODE_LABELS: Record<AvatarRenderMode, { label: string; hint: string }> = {
   auto: {
@@ -133,6 +137,12 @@ function CustomizePage() {
     accent: customization?.accent ?? base.accent,
     eye: customization?.eye ?? base.eye,
     hairStyle: customization?.hairStyle ?? base.hairStyle,
+    faceShape: customization?.faceShape ?? base.faceShape,
+    eyeScale: customization?.eyeScale ?? base.eyeScale,
+    eyeSpacing: customization?.eyeSpacing ?? base.eyeSpacing,
+    noseScale: customization?.noseScale ?? base.noseScale,
+    mouthScale: customization?.mouthScale ?? base.mouthScale,
+    glassesStyle: customization?.glassesStyle ?? base.glassesStyle,
     bodyScale: customization?.bodyScale ?? base.bodyScale,
     shoulderScale: customization?.shoulderScale ?? base.shoulderScale,
     headScale: customization?.headScale ?? base.headScale,
@@ -348,6 +358,112 @@ function CustomizePage() {
                       </button>
                     ))}
                   </div>
+                </div>
+
+                <div>
+                  <p className="text-sm font-black text-foreground">شكل الوجه</p>
+                  <div className="mt-2 grid grid-cols-3 gap-2">
+                    {FACE_SHAPES.map((shape) => (
+                      <button
+                        key={shape}
+                        type="button"
+                        onClick={() => update({ faceShape: shape })}
+                        className={`rounded-xl border-2 px-3 py-2 text-sm font-black transition ${
+                          current.faceShape === shape
+                            ? "border-primary bg-primary/10 text-primary"
+                            : "border-border text-foreground hover:bg-muted"
+                        }`}
+                      >
+                        {FACE_SHAPE_LABELS[shape]}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <p className="text-sm font-black text-foreground">النظارات</p>
+                  <div className="mt-2 grid grid-cols-3 gap-2">
+                    {GLASSES_STYLES.map((style) => (
+                      <button
+                        key={style}
+                        type="button"
+                        onClick={() => update({ glassesStyle: style })}
+                        className={`rounded-xl border-2 px-3 py-2 text-sm font-black transition ${
+                          current.glassesStyle === style
+                            ? "border-primary bg-primary/10 text-primary"
+                            : "border-border text-foreground hover:bg-muted"
+                        }`}
+                      >
+                        {GLASSES_STYLE_LABELS[style]}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="space-y-4 rounded-2xl bg-muted/45 p-4">
+                  <label className="block">
+                    <span className="flex items-center justify-between text-sm font-black text-foreground">
+                      <span>حجم العين</span>
+                      <span>{current.eyeScale!.toFixed(2)}</span>
+                    </span>
+                    <input
+                      type="range"
+                      min="0.82"
+                      max="1.22"
+                      step="0.01"
+                      value={current.eyeScale}
+                      onChange={(event) => update({ eyeScale: Number(event.target.value) })}
+                      className="mt-2 w-full accent-primary"
+                    />
+                  </label>
+
+                  <label className="block">
+                    <span className="flex items-center justify-between text-sm font-black text-foreground">
+                      <span>تباعد العينين</span>
+                      <span>{current.eyeSpacing!.toFixed(2)}</span>
+                    </span>
+                    <input
+                      type="range"
+                      min="0.85"
+                      max="1.18"
+                      step="0.01"
+                      value={current.eyeSpacing}
+                      onChange={(event) => update({ eyeSpacing: Number(event.target.value) })}
+                      className="mt-2 w-full accent-primary"
+                    />
+                  </label>
+
+                  <label className="block">
+                    <span className="flex items-center justify-between text-sm font-black text-foreground">
+                      <span>حجم الأنف</span>
+                      <span>{current.noseScale!.toFixed(2)}</span>
+                    </span>
+                    <input
+                      type="range"
+                      min="0.80"
+                      max="1.22"
+                      step="0.01"
+                      value={current.noseScale}
+                      onChange={(event) => update({ noseScale: Number(event.target.value) })}
+                      className="mt-2 w-full accent-primary"
+                    />
+                  </label>
+
+                  <label className="block">
+                    <span className="flex items-center justify-between text-sm font-black text-foreground">
+                      <span>عرض الفم</span>
+                      <span>{current.mouthScale!.toFixed(2)}</span>
+                    </span>
+                    <input
+                      type="range"
+                      min="0.82"
+                      max="1.25"
+                      step="0.01"
+                      value={current.mouthScale}
+                      onChange={(event) => update({ mouthScale: Number(event.target.value) })}
+                      className="mt-2 w-full accent-primary"
+                    />
+                  </label>
                 </div>
               </div>
             </div>
