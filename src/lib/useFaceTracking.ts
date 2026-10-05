@@ -14,7 +14,7 @@ const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(mi
 
 function getBlendshapeScores(
   categories:
-    | Array<{ categoryName?: string | null; displayName?: string | null; score?: number | null }>
+    | ReadonlyArray<{ categoryName?: string | null; displayName?: string | null; score?: number | null }>
     | undefined,
 ) {
   const scores = new Map<string, number>();
