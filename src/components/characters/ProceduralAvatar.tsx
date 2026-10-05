@@ -3,7 +3,8 @@ import { useMemo, useRef, type RefObject } from "react";
 import { MathUtils } from "three";
 import type { Group, Mesh } from "three";
 
-import { getAvatarProfile, type AvatarProfile } from "@/lib/avatarCatalog";
+import { mergeAvatarProfile, type AvatarProfile } from "@/lib/avatarCatalog";
+import { useAvatarCustomizationStore } from "@/lib/avatarCustomization";
 import { faceState } from "@/lib/faceState";
 import type { AnimationType, CharacterType } from "@/lib/store";
 
@@ -419,7 +420,8 @@ function Body({
 }
 
 export default function ProceduralAvatar({ type, animation, spin }: Props) {
-  const profile = getAvatarProfile(type);
+  const customization = useAvatarCustomizationStore((state) => state.customizations[type]);
+  const profile = mergeAvatarProfile(type, customization);
   const root = useRef<Group>(null);
   const head = useRef<Group>(null);
   const eyes = useRef<Group>(null);
