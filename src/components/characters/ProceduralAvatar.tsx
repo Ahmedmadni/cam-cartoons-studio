@@ -261,15 +261,24 @@ function Head({
 }) {
   const headScale = profile.headScale;
   const cheekColor = profile.child ? "#E99786" : "#D98978";
+  const shapeScale: [number, number, number] =
+    profile.faceShape === "round"
+      ? [0.94, 1, 0.86]
+      : profile.faceShape === "square"
+        ? [0.99, 0.96, 0.86]
+        : [0.87, 1.08, 0.83];
+  const faceWidth = shapeScale[0] / 0.91;
+  const eyeX = 0.165 * profile.eyeSpacing;
+  const cheekX = 0.27 * faceWidth;
 
   return (
     <group ref={headRef} scale={headScale}>
-      <mesh castShadow scale={[0.91, 1.02, 0.84]}>
+      <mesh castShadow scale={shapeScale}>
         <sphereGeometry args={[0.47, 64, 64]} />
         <SkinMaterial color={profile.skin} />
       </mesh>
 
-      {[-0.43, 0.43].map((x) => (
+      {[-0.43 * faceWidth, 0.43 * faceWidth].map((x) => (
         <mesh key={x} position={[x, -0.015, -0.015]} scale={[0.48, 1, 0.6]}>
           <sphereGeometry args={[0.095, 24, 24]} />
           <SkinMaterial color={profile.skin} />
@@ -279,47 +288,74 @@ function Head({
       <Hair profile={profile} />
 
       <group ref={eyesRef} position={[0, 0.055, 0.382]}>
-        <Eye x={-0.165} profile={profile} />
-        <Eye x={0.165} profile={profile} />
+        <Eye x={-eyeX} profile={profile} />
+        <Eye x={eyeX} profile={profile} />
       </group>
 
-      {[-0.165, 0.165].map((x) => (
+      <Glasses profile={profile} />
+
+      {[-eyeX, eyeX].map((x) => (
         <mesh
           key={x}
           position={[x, 0.215, 0.375]}
           rotation={[0.04, 0, x < 0 ? -0.12 : 0.12]}
-          scale={[1.45, 0.32, 0.28]}
+          scale={[1.45 * profile.eyeScale, 0.32, 0.28]}
         >
           <capsuleGeometry args={[0.034, 0.13, 5, 12]} />
           <HairMaterial color={profile.hair} />
         </mesh>
       ))}
 
-      <mesh position={[0, -0.045, 0.4]} scale={[0.62, 1.08, 0.72]}>
+      <mesh
+        position={[0, -0.045, 0.4]}
+        scale={[
+          0.62 * profile.noseScale,
+          1.08 * profile.noseScale,
+          0.72 * profile.noseScale,
+        ]}
+      >
         <sphereGeometry args={[0.075, 22, 22]} />
         <SkinMaterial color={profile.skin} />
       </mesh>
-      <mesh position={[0, 0.025, 0.35]} rotation={[Math.PI / 2, 0, 0]} scale={[0.6, 0.6, 1.35]}>
+      <mesh
+        position={[0, 0.025, 0.35]}
+        rotation={[Math.PI / 2, 0, 0]}
+        scale={[
+          0.6 * profile.noseScale,
+          0.6 * profile.noseScale,
+          1.35 * profile.noseScale,
+        ]}
+      >
         <capsuleGeometry args={[0.035, 0.12, 5, 12]} />
         <SkinMaterial color={profile.skin} />
       </mesh>
 
-      {[-0.27, 0.27].map((x) => (
+      {[-cheekX, cheekX].map((x) => (
         <mesh key={x} position={[x, -0.115, 0.345]} scale={[1.25, 0.62, 0.26]}>
           <sphereGeometry args={[0.092, 20, 20]} />
           <meshStandardMaterial color={cheekColor} transparent opacity={0.18} depthWrite={false} />
         </mesh>
       ))}
 
-      <mesh ref={mouthRef} position={[0, -0.245, 0.386]} scale={[1.2, 0.36, 0.36]}>
+      <mesh
+        ref={mouthRef}
+        position={[0, -0.245, 0.386]}
+        scale={[1.2 * profile.mouthScale, 0.36, 0.36]}
+      >
         <sphereGeometry args={[0.092, 28, 28]} />
         <meshPhysicalMaterial color="#6E2932" roughness={0.45} />
       </mesh>
-      <mesh position={[0, -0.214, 0.411]} scale={[1.28, 0.18, 0.22]}>
+      <mesh
+        position={[0, -0.214, 0.411]}
+        scale={[1.28 * profile.mouthScale, 0.18, 0.22]}
+      >
         <sphereGeometry args={[0.085, 24, 24]} />
         <meshPhysicalMaterial color="#BE746E" roughness={0.48} sheen={0.35} />
       </mesh>
-      <mesh position={[0, -0.278, 0.407]} scale={[1.22, 0.17, 0.22]}>
+      <mesh
+        position={[0, -0.278, 0.407]}
+        scale={[1.22 * profile.mouthScale, 0.17, 0.22]}
+      >
         <sphereGeometry args={[0.082, 24, 24]} />
         <meshPhysicalMaterial color="#B86468" roughness={0.48} sheen={0.35} />
       </mesh>
