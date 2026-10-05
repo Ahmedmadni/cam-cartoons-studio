@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as CustomizeRouteImport } from './routes/customize'
 import { Route as SaveRouteImport } from './routes/save'
 import { Route as StoryRouteImport } from './routes/story'
 import { Route as StudioRouteImport } from './routes/studio'
@@ -17,6 +18,11 @@ import { Route as StudioRouteImport } from './routes/studio'
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CustomizeRoute = CustomizeRouteImport.update({
+  id: '/customize',
+  path: '/customize',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SaveRoute = SaveRouteImport.update({
@@ -37,12 +43,14 @@ const StudioRoute = StudioRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/customize': typeof CustomizeRoute
   '/save': typeof SaveRoute
   '/story': typeof StoryRoute
   '/studio': typeof StudioRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/customize': typeof CustomizeRoute
   '/save': typeof SaveRoute
   '/story': typeof StoryRoute
   '/studio': typeof StudioRoute
@@ -50,20 +58,22 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/customize': typeof CustomizeRoute
   '/save': typeof SaveRoute
   '/story': typeof StoryRoute
   '/studio': typeof StudioRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/save' | '/story' | '/studio'
+  fullPaths: '/' | '/customize' | '/save' | '/story' | '/studio'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/save' | '/story' | '/studio'
-  id: '__root__' | '/' | '/save' | '/story' | '/studio'
+  to: '/' | '/customize' | '/save' | '/story' | '/studio'
+  id: '__root__' | '/' | '/customize' | '/save' | '/story' | '/studio'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  CustomizeRoute: typeof CustomizeRoute
   SaveRoute: typeof SaveRoute
   StoryRoute: typeof StoryRoute
   StudioRoute: typeof StudioRoute
@@ -76,6 +86,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/customize': {
+      id: '/customize'
+      path: '/customize'
+      fullPath: '/customize'
+      preLoaderRoute: typeof CustomizeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/save': {
@@ -104,6 +121,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  CustomizeRoute: CustomizeRoute,
   SaveRoute: SaveRoute,
   StoryRoute: StoryRoute,
   StudioRoute: StudioRoute,
