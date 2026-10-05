@@ -58,6 +58,7 @@ type AudioLevelListener = (level: number) => void;
 export class VoicePlaybackBus {
   private readonly context: AudioContext;
   private readonly captureDestination: MediaStreamAudioDestinationNode;
+  private activeSource: AudioBufferSourceNode | null = null;
   private closed = false;
 
   constructor() {
@@ -86,6 +87,7 @@ export class VoicePlaybackBus {
     analyser.smoothingTimeConstant = 0.45;
 
     source.buffer = buffer;
+    this.activeSource = source;
     source.connect(analyser);
     analyser.connect(this.context.destination);
     analyser.connect(this.captureDestination);
@@ -113,6 +115,7 @@ export class VoicePlaybackBus {
         onLevel?.(0);
         source.disconnect();
         analyser.disconnect();
+        if (this.activeSource === source) this.activeSource = null;
         resolve();
       };
 
@@ -121,8 +124,19 @@ export class VoicePlaybackBus {
     });
   }
 
+  stop() {
+    const source = this.activeSource;
+    if (!source) return;
+    try {
+      source.stop();
+    } catch {
+      // Source may already have ended between frames.
+    }
+  }
+
   async close() {
     if (this.closed) return;
+    this.stop();
     this.closed = true;
     await this.context.close();
   }
