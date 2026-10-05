@@ -6,6 +6,8 @@ import CharacterStage from "@/components/characters/CharacterStage";
 import { faceState } from "@/lib/faceState";
 import { BACKGROUNDS, parseStory, type StoryStep } from "@/lib/story";
 import { ANIMATION_LABELS, CHARACTER_LABELS, useStudioStore, type AnimationType } from "@/lib/store";
+import { VOICE_PRESETS } from "@/lib/voiceChanger";
+import { VoicePlaybackBus, isRemoteVoiceConfigured, synthesizeRemoteVoice } from "@/lib/voiceEngine";
 
 export const Route = createFileRoute("/story")({
   head: () => ({
@@ -33,6 +35,9 @@ function StoryPage() {
   const navigate = useNavigate();
   const selectedCharacter = useStudioStore((s) => s.selectedCharacter);
   const setRecordedVideo = useStudioStore((s) => s.setRecordedVideo);
+  const selectedVoice = useStudioStore((s) => s.selectedVoice);
+  const voicePitch = useStudioStore((s) => s.voicePitch);
+  const voiceTone = useStudioStore((s) => s.voiceTone);
 
   const [text, setText] = useState(EXAMPLE);
   const [bgId, setBgId] = useState(BACKGROUNDS[0]!.id);
@@ -48,12 +53,19 @@ function StoryPage() {
   const extraTracksRef = useRef<MediaStreamTrack[]>([]);
   const mouthTimerRef = useRef<number | null>(null);
   const cancelledRef = useRef(false);
+  const voiceBusRef = useRef<VoicePlaybackBus | null>(null);
 
+  const remoteVoiceConfigured = isRemoteVoiceConfigured();
   const background = BACKGROUNDS.find((b) => b.id === bgId) ?? BACKGROUNDS[0]!;
 
   useEffect(() => {
     if (!selectedCharacter) navigate({ to: "/" });
   }, [selectedCharacter, navigate]);
+
+  const getVoiceBus = useCallback(() => {
+    if (!voiceBusRef.current) voiceBusRef.current = new VoicePlaybackBus();
+    return voiceBusRef.current;
+  }, []);
 
   const stopMouth = useCallback(() => {
     if (mouthTimerRef.current) window.clearInterval(mouthTimerRef.current);
