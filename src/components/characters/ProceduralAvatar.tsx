@@ -506,13 +506,16 @@ export default function ProceduralAvatar({ type, animation, spin }: Props) {
         10,
         delta,
       );
+      const blink = Math.max(faceState.blinkLeft, faceState.blinkRight);
+      eyesNode.scale.y = MathUtils.damp(eyesNode.scale.y, 1 - blink * 0.72, 14, delta);
     }
 
     const mouthNode = mouth.current;
     if (mouthNode) {
       const open = faceState.mouthOpen > 0.08 ? faceState.mouthOpen : 0;
-      mouthNode.scale.y = MathUtils.damp(mouthNode.scale.y, 0.36 + open * 1.7, 12, delta);
-      mouthNode.scale.x = MathUtils.damp(mouthNode.scale.x, 1.2 - open * 0.12, 12, delta);
+      const smile = MathUtils.clamp(faceState.smile + (animation === "happy" ? 0.45 : 0), 0, 1);
+      mouthNode.scale.y = MathUtils.damp(mouthNode.scale.y, 0.36 + open * 1.7 - smile * 0.08, 12, delta);
+      mouthNode.scale.x = MathUtils.damp(mouthNode.scale.x, 1.2 - open * 0.12 + smile * 0.35, 12, delta);
       mouthNode.scale.z = MathUtils.damp(mouthNode.scale.z, 0.36 + open * 0.42, 12, delta);
     }
 
