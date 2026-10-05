@@ -22,3 +22,31 @@ cd <repository-name>
 npm i
 npm run dev
 ```
+
+
+## 3D avatar sources
+
+The character renderer now supports two layers:
+
+1. **Ready Player Me GLB avatars** for production-quality rigged characters.
+2. A redesigned procedural cartoon fallback so the studio still works without external avatar files.
+
+To use Ready Player Me avatars, copy `.env.example` to `.env.local` and set any of:
+
+```env
+VITE_RPM_BOY_URL=https://models.readyplayer.me/<avatar-id>.glb
+VITE_RPM_GIRL_URL=https://models.readyplayer.me/<avatar-id>.glb
+VITE_RPM_MAN_URL=https://models.readyplayer.me/<avatar-id>.glb
+VITE_RPM_WOMAN_URL=https://models.readyplayer.me/<avatar-id>.glb
+```
+
+The application automatically requests facial morph targets needed for mouth, smile, eye and gaze animation when the URL is hosted by Ready Player Me.
+
+### Reference repositories
+
+- `readyplayerme/rpm-unity-sdk-core`: avatar creation/loading concepts, rigged GLB avatars, body configuration and morph-target workflow. The Unity package itself is not imported into this React/Three.js project.
+- `suno-ai/bark`: speech/audio generation reference.
+- `coqui-ai/TTS`: TTS, voice conversion and multi-speaker reference.
+- `jaywalnut310/vits`: end-to-end TTS architecture reference.
+
+Bark, Coqui TTS and VITS are therefore relevant to the **voice engine**, not to the 3D character geometry.
