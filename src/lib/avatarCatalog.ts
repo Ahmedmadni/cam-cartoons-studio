@@ -4,6 +4,8 @@ import type { CharacterType } from "./store";
 export type HairStyle = "crop" | "curls" | "bun" | "waves";
 export type FaceShape = "round" | "oval" | "square";
 export type GlassesStyle = "none" | "round" | "square";
+export type OutfitStyle = "casual" | "hoodie" | "formal";
+export type HeadwearStyle = "none" | "cap" | "beanie";
 
 export type AvatarProfile = {
   type: CharacterType;
@@ -23,6 +25,8 @@ export type AvatarProfile = {
   noseScale: number;
   mouthScale: number;
   glassesStyle: GlassesStyle;
+  outfitStyle: OutfitStyle;
+  headwearStyle: HeadwearStyle;
   child: boolean;
   bodyScale: number;
   shoulderScale: number;
@@ -80,6 +84,8 @@ export const AVATAR_PROFILES: Record<CharacterType, AvatarProfile> = {
     noseScale: 0.92,
     mouthScale: 1,
     glassesStyle: "none",
+    outfitStyle: "hoodie",
+    headwearStyle: "none",
     child: true,
     bodyScale: 0.92,
     shoulderScale: 0.88,
@@ -105,6 +111,8 @@ export const AVATAR_PROFILES: Record<CharacterType, AvatarProfile> = {
     noseScale: 0.9,
     mouthScale: 1.05,
     glassesStyle: "none",
+    outfitStyle: "casual",
+    headwearStyle: "none",
     child: true,
     bodyScale: 0.9,
     shoulderScale: 0.84,
@@ -130,6 +138,8 @@ export const AVATAR_PROFILES: Record<CharacterType, AvatarProfile> = {
     noseScale: 1.08,
     mouthScale: 0.96,
     glassesStyle: "none",
+    outfitStyle: "formal",
+    headwearStyle: "none",
     child: false,
     bodyScale: 1.04,
     shoulderScale: 1.08,
@@ -155,6 +165,8 @@ export const AVATAR_PROFILES: Record<CharacterType, AvatarProfile> = {
     noseScale: 0.96,
     mouthScale: 1.04,
     glassesStyle: "none",
+    outfitStyle: "casual",
+    headwearStyle: "none",
     child: false,
     bodyScale: 1,
     shoulderScale: 0.94,

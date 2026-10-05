@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import CharacterStage from "@/components/characters/CharacterStage";
 import ReadyPlayerMeCreator from "@/components/characters/ReadyPlayerMeCreator";
-import { getAvatarProfile, type FaceShape, type GlassesStyle, type HairStyle } from "@/lib/avatarCatalog";
+import { getAvatarProfile, type FaceShape, type GlassesStyle, type HairStyle, type HeadwearStyle, type OutfitStyle } from "@/lib/avatarCatalog";
 import {
   ACCENT_COLORS,
   BOTTOM_COLORS,
@@ -12,7 +12,9 @@ import {
   FACE_SHAPE_LABELS,
   GLASSES_STYLE_LABELS,
   HAIR_COLORS,
+  HEADWEAR_STYLE_LABELS,
   HAIR_STYLE_LABELS,
+  OUTFIT_STYLE_LABELS,
   SHOE_COLORS,
   SKIN_COLORS,
   TOP_COLORS,
@@ -78,6 +80,8 @@ function ColorSwatches({ label, colors, value, onChange }: SwatchProps) {
 const HAIR_STYLES: HairStyle[] = ["crop", "curls", "bun", "waves"];
 const FACE_SHAPES: FaceShape[] = ["round", "oval", "square"];
 const GLASSES_STYLES: GlassesStyle[] = ["none", "round", "square"];
+const HEADWEAR_STYLES: HeadwearStyle[] = ["none", "cap", "beanie"];
+const OUTFIT_STYLES: OutfitStyle[] = ["casual", "hoodie", "formal"];
 
 const MODE_LABELS: Record<AvatarRenderMode, { label: string; hint: string }> = {
   auto: {
@@ -143,6 +147,8 @@ function CustomizePage() {
     noseScale: customization?.noseScale ?? base.noseScale,
     mouthScale: customization?.mouthScale ?? base.mouthScale,
     glassesStyle: customization?.glassesStyle ?? base.glassesStyle,
+    outfitStyle: customization?.outfitStyle ?? base.outfitStyle,
+    headwearStyle: customization?.headwearStyle ?? base.headwearStyle,
     bodyScale: customization?.bodyScale ?? base.bodyScale,
     shoulderScale: customization?.shoulderScale ?? base.shoulderScale,
     headScale: customization?.headScale ?? base.headScale,
@@ -361,6 +367,26 @@ function CustomizePage() {
                 </div>
 
                 <div>
+                  <p className="text-sm font-black text-foreground">غطاء الرأس</p>
+                  <div className="mt-2 grid grid-cols-3 gap-2">
+                    {HEADWEAR_STYLES.map((style) => (
+                      <button
+                        key={style}
+                        type="button"
+                        onClick={() => update({ headwearStyle: style })}
+                        className={`rounded-xl border-2 px-3 py-2 text-sm font-black transition ${
+                          current.headwearStyle === style
+                            ? "border-primary bg-primary/10 text-primary"
+                            : "border-border text-foreground hover:bg-muted"
+                        }`}
+                      >
+                        {HEADWEAR_STYLE_LABELS[style]}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
                   <p className="text-sm font-black text-foreground">شكل الوجه</p>
                   <div className="mt-2 grid grid-cols-3 gap-2">
                     {FACE_SHAPES.map((shape) => (
@@ -471,6 +497,26 @@ function CustomizePage() {
             <div className="rounded-3xl border-2 border-border bg-card p-5 shadow-sm">
               <h2 className="text-xl font-black text-foreground">الملابس</h2>
               <div className="mt-4 space-y-5">
+                <div>
+                  <p className="text-sm font-black text-foreground">ستايل الملابس</p>
+                  <div className="mt-2 grid grid-cols-3 gap-2">
+                    {OUTFIT_STYLES.map((style) => (
+                      <button
+                        key={style}
+                        type="button"
+                        onClick={() => update({ outfitStyle: style })}
+                        className={`rounded-xl border-2 px-3 py-2 text-sm font-black transition ${
+                          current.outfitStyle === style
+                            ? "border-primary bg-primary/10 text-primary"
+                            : "border-border text-foreground hover:bg-muted"
+                        }`}
+                      >
+                        {OUTFIT_STYLE_LABELS[style]}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
                 <ColorSwatches
                   label="الجزء العلوي"
                   colors={TOP_COLORS}
