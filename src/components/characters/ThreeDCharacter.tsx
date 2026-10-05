@@ -76,6 +76,34 @@ const LOOKS: Record<CharacterType, Look> = {
   },
 };
 
+/** بشرة شبه واقعية: لمعان ناعم (sheen) وانعكاس خفيف يحاكي التشتت تحت السطح */
+function SkinMat({ color }: { color: string }) {
+  return (
+    <meshPhysicalMaterial
+      color={color}
+      roughness={0.48}
+      sheen={0.6}
+      sheenRoughness={0.5}
+      sheenColor="#FFB8A0"
+      clearcoat={0.08}
+      clearcoatRoughness={0.6}
+      specularIntensity={0.35}
+    />
+  );
+}
+
+/** قماش: خشونة عالية مع لمعان أطراف خفيف */
+function FabricMat({ color }: { color: string }) {
+  return <meshPhysicalMaterial color={color} roughness={0.85} sheen={1} sheenRoughness={0.8} sheenColor="#FFFFFF" />;
+}
+
+/** شعر: لمعان اتجاهي خفيف */
+function HairMat({ color }: { color: string }) {
+  return (
+    <meshPhysicalMaterial color={color} roughness={0.42} sheen={0.8} sheenRoughness={0.35} sheenColor="#B98A60" clearcoat={0.25} clearcoatRoughness={0.4} />
+  );
+}
+
 function Eyes({
   look,
   groupRef,
@@ -98,26 +126,35 @@ function Eyes({
           {/* بياض العين */}
           <mesh>
             <sphereGeometry args={[size, 24, 24]} />
-            <meshStandardMaterial color="#FFFFFF" roughness={0.25} />
+            <meshPhysicalMaterial color="#F7F4F0" roughness={0.15} clearcoat={1} clearcoatRoughness={0.05} />
           </mesh>
           {/* القزحية */}
           <mesh position={[0, 0, size * 0.72]}>
             <sphereGeometry args={[size * 0.62, 20, 20]} />
-            <meshStandardMaterial color={look.eye} roughness={0.2} />
+            <meshPhysicalMaterial color={look.eye} roughness={0.25} clearcoat={1} clearcoatRoughness={0.02} sheen={0.4} sheenColor="#C08850" />
           </mesh>
           {/* البؤبؤ + لمعة */}
           <mesh position={[0, 0, size * 0.95]}>
             <sphereGeometry args={[size * 0.3, 16, 16]} />
-            <meshStandardMaterial color="#141414" />
+            <meshPhysicalMaterial color="#0A0A0A" roughness={0.05} clearcoat={1} />
           </mesh>
           <mesh position={[size * 0.22, size * 0.28, size * 1.0]}>
             <sphereGeometry args={[size * 0.16, 12, 12]} />
             <meshStandardMaterial color="#FFFFFF" emissive="#FFFFFF" emissiveIntensity={0.5} />
           </mesh>
+          {/* الجفن العلوي ورموش لإحساس أكثر واقعية */}
+          <mesh position={[0, size * 0.18, size * 0.05]} rotation={[-0.35, 0, 0]}>
+            <sphereGeometry args={[size * 1.07, 32, 16, 0, Math.PI * 2, 0, Math.PI * 0.42]} />
+            <SkinMat color={look.skin} />
+          </mesh>
+          <mesh position={[0, size * 0.62, size * 0.78]} rotation={[0.5, 0, 0]}>
+            <torusGeometry args={[size * 0.82, size * 0.07, 6, 24, Math.PI]} />
+            <meshStandardMaterial color="#1A0F0A" roughness={0.6} />
+          </mesh>
           {/* الحاجب */}
-          <mesh position={[0, size * 1.5, size * 0.6]} rotation={[0, 0, x > 0 ? -0.12 : 0.12]}>
-            <boxGeometry args={[size * 1.5, size * 0.28, size * 0.3]} />
-            <meshStandardMaterial color={look.hair} roughness={0.9} />
+          <mesh position={[0, size * 1.5, size * 0.6]} rotation={[0, 0, Math.PI / 2 + (x > 0 ? -0.12 : 0.12)]}>
+            <capsuleGeometry args={[size * 0.12, size * 1.2, 4, 12]} />
+            <HairMat color={look.hair} />
           </mesh>
         </group>
       ))}
@@ -127,13 +164,13 @@ function Eyes({
 
 function Hair({ look }: { look: Look }) {
   const { hair, hairStyle } = look;
-  const mat = <meshStandardMaterial color={hair} roughness={0.85} />;
+  const mat = <HairMat color={hair} />;
 
   if (hairStyle === "curly") {
     return (
       <group>
         <mesh position={[0, 0.16, -0.02]} scale={[1.06, 0.95, 1.06]}>
-          <sphereGeometry args={[0.53, 28, 28]} />
+          <sphereGeometry args={[0.53, 48, 48]} />
           {mat}
         </mesh>
         {[
@@ -158,7 +195,7 @@ function Hair({ look }: { look: Look }) {
     return (
       <group>
         <mesh position={[0, 0.14, -0.02]} scale={[1.04, 0.92, 1.04]}>
-          <sphereGeometry args={[0.52, 28, 28]} />
+          <sphereGeometry args={[0.52, 48, 48]} />
           {mat}
         </mesh>
         <mesh position={[0, 0.66, -0.12]}>
@@ -179,7 +216,7 @@ function Hair({ look }: { look: Look }) {
     return (
       <group>
         <mesh position={[0, 0.15, -0.02]} scale={[1.06, 0.95, 1.06]}>
-          <sphereGeometry args={[0.53, 28, 28]} />
+          <sphereGeometry args={[0.53, 48, 48]} />
           {mat}
         </mesh>
         {[-0.44, 0.44].map((x) => (
@@ -206,7 +243,7 @@ function Hair({ look }: { look: Look }) {
   return (
     <group>
       <mesh position={[0, 0.17, -0.03]} scale={[1.04, 0.9, 1.04]}>
-        <sphereGeometry args={[0.52, 28, 28]} />
+        <sphereGeometry args={[0.52, 48, 48]} />
         {mat}
       </mesh>
       {[
@@ -234,14 +271,14 @@ function Human({ type, headRef, eyesRef, mouthRef }: { type: CharacterType } & P
       {/* الرأس */}
       <group ref={headRef} position={[0, headY, 0]} scale={headScale}>
         <mesh castShadow scale={[1, 1.08, 0.95]}>
-          <sphereGeometry args={[0.5, 32, 32]} />
-          <meshStandardMaterial color={look.skin} roughness={0.55} />
+          <sphereGeometry args={[0.5, 64, 64]} />
+          <SkinMat color={look.skin} />
         </mesh>
         {/* الأذنان */}
         {[-0.48, 0.48].map((x) => (
           <mesh key={x} position={[x, -0.02, 0]} scale={[0.5, 1, 0.7]}>
             <sphereGeometry args={[0.11, 16, 16]} />
-            <meshStandardMaterial color={look.skin} roughness={0.6} />
+            <SkinMat color={look.skin} />
           </mesh>
         ))}
         <Hair look={look} />
@@ -249,47 +286,47 @@ function Human({ type, headRef, eyesRef, mouthRef }: { type: CharacterType } & P
         {/* الأنف */}
         <mesh position={[0, -0.09, 0.47]}>
           <sphereGeometry args={[0.075, 16, 16]} />
-          <meshStandardMaterial color={look.skin} roughness={0.5} />
+          <SkinMat color={look.skin} />
         </mesh>
         {/* الوجنتان */}
         {[-0.28, 0.28].map((x) => (
           <mesh key={x} position={[x, -0.1, 0.4]} scale={[1, 0.7, 0.4]}>
             <sphereGeometry args={[0.1, 16, 16]} />
-            <meshStandardMaterial color="#F2A08E" transparent opacity={0.55} roughness={0.9} />
+            <meshStandardMaterial color="#E8907E" transparent opacity={0.22} roughness={0.9} depthWrite={false} />
           </mesh>
         ))}
         {/* الفم (يتحرك مع تتبع الوجه) */}
         <mesh ref={mouthRef} position={[0, -0.26, 0.42]}>
           <sphereGeometry args={[0.11, 20, 20]} />
-          <meshStandardMaterial color="#A63A4A" roughness={0.5} />
+          <meshPhysicalMaterial color="#8E2F3C" roughness={0.35} clearcoat={0.5} clearcoatRoughness={0.25} />
         </mesh>
         <mesh position={[0, -0.235, 0.46]} scale={[1, 0.35, 0.3]}>
           <sphereGeometry args={[0.1, 16, 16]} />
-          <meshStandardMaterial color="#FFFFFF" roughness={0.35} />
+          <meshPhysicalMaterial color="#C9746F" roughness={0.3} clearcoat={0.7} sheen={0.5} sheenColor="#F2B0A8" />
         </mesh>
       </group>
 
       {/* الرقبة */}
       <mesh position={[0, headY - 0.5, 0]}>
         <cylinderGeometry args={[0.11, 0.13, 0.16, 16]} />
-        <meshStandardMaterial color={look.skin} roughness={0.6} />
+        <SkinMat color={look.skin} />
       </mesh>
 
       {/* الجذع (قميص) */}
       <mesh position={[0, headY - 1.05, 0]} scale={[1, 1, 0.72]} castShadow>
         <capsuleGeometry args={[0.32, bodyH * 0.6, 10, 24]} />
-        <meshStandardMaterial color={look.shirt} roughness={0.8} />
+        <FabricMat color={look.shirt} />
       </mesh>
 
       {/* الذراع اليسرى (اليمنى تُحرَّك في Model) */}
       <group position={[-0.4, headY - 0.95, 0]} rotation={[0, 0, 0.15]}>
         <mesh castShadow>
           <capsuleGeometry args={[0.09, 0.42, 8, 16]} />
-          <meshStandardMaterial color={look.shirt} roughness={0.8} />
+          <FabricMat color={look.shirt} />
         </mesh>
         <mesh position={[0, -0.34, 0]}>
-          <sphereGeometry args={[0.1, 16, 16]} />
-          <meshStandardMaterial color={look.skin} roughness={0.6} />
+          <sphereGeometry args={[0.1, 32, 32]} />
+          <SkinMat color={look.skin} />
         </mesh>
       </group>
 
@@ -298,11 +335,11 @@ function Human({ type, headRef, eyesRef, mouthRef }: { type: CharacterType } & P
         <group key={x} position={[x, headY - 1.72, 0]}>
           <mesh castShadow>
             <capsuleGeometry args={[0.115, 0.5, 8, 16]} />
-            <meshStandardMaterial color={look.pants} roughness={0.85} />
+            <FabricMat color={look.pants} />
           </mesh>
           <mesh position={[0, -0.42, 0.07]} scale={[1, 0.6, 1.5]} castShadow>
             <sphereGeometry args={[0.13, 18, 18]} />
-            <meshStandardMaterial color={look.shoes} roughness={0.6} />
+            <meshPhysicalMaterial color={look.shoes} roughness={0.35} clearcoat={0.6} clearcoatRoughness={0.3} />
           </mesh>
         </group>
       ))}
@@ -414,11 +451,11 @@ function Model({ type, animation, spin }: ModelProps) {
       <group ref={armGroup} position={[0.4, headY - 0.95, 0]}>
         <mesh position={[0, -0.12, 0]} castShadow>
           <capsuleGeometry args={[0.09, 0.42, 8, 16]} />
-          <meshStandardMaterial color={look.shirt} roughness={0.8} />
+          <FabricMat color={look.shirt} />
         </mesh>
         <mesh position={[0, -0.46, 0]}>
-          <sphereGeometry args={[0.1, 16, 16]} />
-          <meshStandardMaterial color={look.skin} roughness={0.6} />
+          <sphereGeometry args={[0.1, 32, 32]} />
+          <SkinMat color={look.skin} />
         </mesh>
       </group>
     </group>
@@ -472,16 +509,26 @@ export default function ThreeDCharacter({
           <Backdrop url={backgroundUrl} />
         </Suspense>
       )}
-      <ambientLight intensity={0.85} />
-      <directionalLight position={[3, 5, 4]} intensity={1.5} castShadow />
-      <directionalLight position={[-4, 2, -3]} intensity={0.45} color="#FDE047" />
+      {/* إضاءة ثلاثية (رئيسية/تعبئة/حافة) بأسلوب التصوير السينمائي */}
+      <hemisphereLight args={["#FFF4E6", "#8A6A55", 0.45]} />
+      <directionalLight
+        position={[3, 5, 4]}
+        intensity={2}
+        color="#FFF1E0"
+        castShadow
+        shadow-mapSize={[2048, 2048]}
+        shadow-bias={-0.0004}
+        shadow-radius={6}
+      />
+      <directionalLight position={[-3.5, 1.5, 3]} intensity={0.55} color="#CFE3FF" />
+      <spotLight position={[0, 3, -4]} intensity={6} angle={0.7} penumbra={1} color="#FFE2B8" />
       <group position={[0, -0.4, 0]}>
         <Model type={type} animation={animation} spin={spin} />
         {!transparent && (
-          <ContactShadows position={[0, -1.45, 0]} opacity={0.35} blur={2.6} scale={6} far={3} />
+          <ContactShadows position={[0, -1.45, 0]} opacity={0.5} blur={2.2} scale={6} far={3} resolution={1024} />
         )}
       </group>
-      <Environment preset="sunset" />
+      <Environment preset="apartment" environmentIntensity={0.7} />
     </Canvas>
   );
 }
