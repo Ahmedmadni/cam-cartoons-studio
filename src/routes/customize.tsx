@@ -111,6 +111,16 @@ function CustomizePage() {
     if (!selectedCharacter) navigate({ to: "/" });
   }, [navigate, selectedCharacter]);
 
+  const handleReadyPlayerMeExport = useCallback(
+    (modelUrl: string) => {
+      if (!selectedCharacter) return;
+      updateCustomization(selectedCharacter, { modelUrl });
+      setRenderMode(selectedCharacter, "readyplayerme");
+      setShowReadyPlayerMe(false);
+    },
+    [selectedCharacter, setRenderMode, updateCustomization],
+  );
+
   if (!selectedCharacter) return null;
 
   const base = getAvatarProfile(selectedCharacter);
@@ -134,15 +144,6 @@ function CustomizePage() {
     updateCustomization(selectedCharacter, patch);
     if (renderMode !== "custom") setRenderMode(selectedCharacter, "custom");
   };
-
-  const handleReadyPlayerMeExport = useCallback(
-    (modelUrl: string) => {
-      updateCustomization(selectedCharacter, { modelUrl });
-      setRenderMode(selectedCharacter, "readyplayerme");
-      setShowReadyPlayerMe(false);
-    },
-    [selectedCharacter, setRenderMode, updateCustomization],
-  );
 
   return (
     <main className="min-h-screen bg-background px-4 py-6 sm:py-8">
