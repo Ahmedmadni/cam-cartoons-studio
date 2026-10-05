@@ -145,9 +145,13 @@ export function mergeAvatarProfile(
   type: CharacterType,
   customization: AvatarCustomization | undefined,
 ): AvatarProfile {
-  if (!customization) return AVATAR_PROFILES[type];
+  const base = AVATAR_PROFILES[type];
+  if (!customization) return base;
+
+  const rawModelUrl = customization.modelUrl?.trim();
   return {
-    ...AVATAR_PROFILES[type],
+    ...base,
     ...customization,
+    modelUrl: rawModelUrl ? prepareReadyPlayerMeUrl(rawModelUrl) : base.modelUrl,
   };
 }
