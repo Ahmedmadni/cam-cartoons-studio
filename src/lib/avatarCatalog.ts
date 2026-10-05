@@ -56,7 +56,7 @@ export const AVATAR_PROFILES: Record<CharacterType, AvatarProfile> = {
   boy: {
     type: "boy",
     label: "ولد",
-    modelUrl: rpmUrl(import.meta.env.VITE_RPM_BOY_URL),
+    modelUrl: rpmUrl(import.meta.env["VITE_RPM_BOY_URL"]),
     skin: "#D8A078",
     hair: "#3A251D",
     top: "#43A6D9",
@@ -75,7 +75,7 @@ export const AVATAR_PROFILES: Record<CharacterType, AvatarProfile> = {
   girl: {
     type: "girl",
     label: "بنت",
-    modelUrl: rpmUrl(import.meta.env.VITE_RPM_GIRL_URL),
+    modelUrl: rpmUrl(import.meta.env["VITE_RPM_GIRL_URL"]),
     skin: "#E6B08A",
     hair: "#4A2C25",
     top: "#F2A6BE",
@@ -94,7 +94,7 @@ export const AVATAR_PROFILES: Record<CharacterType, AvatarProfile> = {
   man: {
     type: "man",
     label: "شاب",
-    modelUrl: rpmUrl(import.meta.env.VITE_RPM_MAN_URL),
+    modelUrl: rpmUrl(import.meta.env["VITE_RPM_MAN_URL"]),
     skin: "#C98E68",
     hair: "#2B211E",
     top: "#2E4057",
@@ -113,7 +113,7 @@ export const AVATAR_PROFILES: Record<CharacterType, AvatarProfile> = {
   woman: {
     type: "woman",
     label: "فتاة",
-    modelUrl: rpmUrl(import.meta.env.VITE_RPM_WOMAN_URL),
+    modelUrl: rpmUrl(import.meta.env["VITE_RPM_WOMAN_URL"]),
     skin: "#E1A37D",
     hair: "#3A2724",
     top: "#D97855",
