@@ -300,6 +300,9 @@ function StoryPage() {
       window.speechSynthesis?.cancel();
       if (mouthTimerRef.current) window.clearInterval(mouthTimerRef.current);
       extraTracksRef.current.forEach((t) => t.stop());
+      const bus = voiceBusRef.current;
+      voiceBusRef.current = null;
+      void bus?.close();
     },
     [],
   );
@@ -338,6 +341,21 @@ function StoryPage() {
               className="mt-3 w-full rounded-2xl border-2 border-border bg-background p-4 text-lg font-semibold text-foreground outline-none focus:border-primary"
               placeholder="مثال: قل مرحبا بفرح، ثم ارفع يدك، ثم قفز"
             />
+
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <span
+                className={`rounded-full px-3 py-1 text-xs font-black ${
+                  remoteVoiceConfigured
+                    ? "bg-primary/15 text-primary"
+                    : "bg-muted text-muted-foreground"
+                }`}
+              >
+                {remoteVoiceConfigured ? "محرك صوت AI" : "صوت الجهاز"}
+              </span>
+              <span className="text-xs font-bold text-muted-foreground">
+                {VOICE_PRESETS[selectedVoice].emoji} {VOICE_PRESETS[selectedVoice].label}
+              </span>
+            </div>
 
             <p className="mt-4 text-sm font-bold text-muted-foreground">الخلفية</p>
             <div className="mt-2 grid grid-cols-5 gap-2">
