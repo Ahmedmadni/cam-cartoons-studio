@@ -3,6 +3,7 @@ import { Canvas } from "@react-three/fiber";
 import { Component, Suspense, type ReactNode } from "react";
 
 import { getAvatarProfile } from "@/lib/avatarCatalog";
+import { useAvatarCustomizationStore } from "@/lib/avatarCustomization";
 import type { AnimationType, CharacterType } from "@/lib/store";
 
 import ProceduralAvatar from "./ProceduralAvatar";
@@ -56,11 +57,13 @@ function Avatar({
   spin: boolean;
 }) {
   const profile = getAvatarProfile(type);
+  const renderMode = useAvatarCustomizationStore((state) => state.renderModes[type]);
   const fallback = <ProceduralAvatar type={type} animation={animation} spin={spin} />;
 
+  if (renderMode === "custom") return fallback;
   if (!profile.modelUrl) return fallback;
-
-  return (
+  if (renderMode === "readyplayerme" || renderMode === "auto") {
+    return (
     <AvatarErrorBoundary resetKey={profile.modelUrl} fallback={fallback}>
       <Suspense fallback={fallback}>
         <ReadyPlayerMeAvatar
@@ -71,7 +74,10 @@ function Avatar({
         />
       </Suspense>
     </AvatarErrorBoundary>
-  );
+    );
+  }
+
+  return fallback;
 }
 
 export type ThreeDCharacterProps = {
