@@ -3,6 +3,7 @@ import { useState } from "react";
 import { BookOpen as Camera, Palette, Sparkles } from "lucide-react";
 import CharacterStage from "@/components/characters/CharacterStage";
 import { usesReadyPlayerMe } from "@/lib/avatarCatalog";
+import { useAvatarCustomizationStore } from "@/lib/avatarCustomization";
 import { CHARACTER_LABELS, useStudioStore, type CharacterType } from "@/lib/store";
 
 export const Route = createFileRoute("/")({
@@ -35,6 +36,8 @@ function Index() {
   const navigate = useNavigate();
   const selectedCharacter = useStudioStore((s) => s.selectedCharacter);
   const setSelectedCharacter = useStudioStore((s) => s.setSelectedCharacter);
+  const customizations = useAvatarCustomizationStore((s) => s.customizations);
+  const renderModes = useAvatarCustomizationStore((s) => s.renderModes);
   const [hovered, setHovered] = useState<CharacterType | null>(null);
 
   return (
@@ -56,6 +59,17 @@ function Index() {
         <div className="mt-10 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
           {CHARACTERS.map(({ type, emoji }) => {
             const isSelected = selectedCharacter === type;
+            const hasExternalModel = Boolean(
+              customizations[type]?.modelUrl?.trim() || usesReadyPlayerMe(type),
+            );
+            const mode = renderModes[type];
+            const sourceLabel =
+              mode === "custom"
+                ? "شخصية قابلة للتخصيص"
+                : hasExternalModel
+                  ? "Ready Player Me"
+                  : "نموذج كرتوني مدمج";
+
             return (
               <button
                 key={type}
@@ -77,7 +91,7 @@ function Index() {
                   {emoji} {CHARACTER_LABELS[type]}
                 </span>
                 <span className="mt-2 rounded-full bg-muted px-3 py-1 text-[11px] font-black text-muted-foreground">
-                  {usesReadyPlayerMe(type) ? "نموذج 3D متقدم" : "نموذج كرتوني مدمج"}
+                  {sourceLabel}
                 </span>
                 <span
                   className={`mt-2 text-sm font-bold ${
