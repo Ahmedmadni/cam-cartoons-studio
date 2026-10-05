@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
-import { BookOpen as Camera, Sparkles } from "lucide-react";
+import { BookOpen as Camera, Palette, Sparkles } from "lucide-react";
 import CharacterStage from "@/components/characters/CharacterStage";
 import { usesReadyPlayerMe } from "@/lib/avatarCatalog";
 import { CHARACTER_LABELS, useStudioStore, type CharacterType } from "@/lib/store";
@@ -91,14 +91,23 @@ function Index() {
           })}
         </div>
 
-        <div className="mt-12 flex justify-center">
+        <div className="mt-12 flex flex-wrap justify-center gap-3">
+          <button
+            type="button"
+            disabled={!selectedCharacter}
+            onClick={() => navigate({ to: "/customize" })}
+            className="inline-flex items-center gap-3 rounded-full bg-secondary px-8 py-5 text-xl font-black text-secondary-foreground shadow-lg transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            <Palette className="size-7" />
+            صمّم الشخصية
+          </button>
           <button
             type="button"
             disabled={!selectedCharacter}
             onClick={() => navigate({ to: "/story" })}
-            className="inline-flex items-center gap-3 rounded-full bg-primary px-12 py-6 text-2xl font-black text-primary-foreground shadow-xl transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-40"
+            className="inline-flex items-center gap-3 rounded-full bg-primary px-10 py-5 text-xl font-black text-primary-foreground shadow-xl transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-40"
           >
-            <Camera className="size-8" />
+            <Camera className="size-7" />
             ابدأ القصة
           </button>
         </div>
