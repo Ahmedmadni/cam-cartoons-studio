@@ -12,6 +12,22 @@ type Options = {
 
 const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(min, v));
 
+function getBlendshapeScores(
+  categories:
+    | ReadonlyArray<{ categoryName?: string | null; displayName?: string | null; score?: number | null }>
+    | undefined,
+) {
+  const scores = new Map<string, number>();
+  for (const category of categories ?? []) {
+    const name = category.categoryName ?? category.displayName;
+    const score = category.score;
+    if (name && typeof score === "number" && Number.isFinite(score)) {
+      scores.set(name, score);
+    }
+  }
+  return scores;
+}
+
 export function useFaceTracking({ videoRef, enabled }: Options) {
   const [loading, setLoading] = useState(false);
   const [isTracking, setIsTracking] = useState(false);
@@ -40,16 +56,17 @@ export function useFaceTracking({ videoRef, enabled }: Options) {
           baseOptions: { modelAssetPath: MODEL_URL, delegate: "GPU" },
           runningMode: "VIDEO",
           numFaces: 1,
+          outputFaceBlendshapes: true,
         });
         if (cancelled) {
           landmarker.close();
           return;
         }
+
         landmarkerRef.current = landmarker;
         setLoading(false);
         setIsTracking(true);
 
-        // تخطي إطارات للحفاظ على الأداء: نحلّل الوجه كل 3 إطارات فقط
         const FRAME_SKIP = 3;
         let frame = 0;
 
@@ -57,6 +74,7 @@ export function useFaceTracking({ videoRef, enabled }: Options) {
           rafRef.current = requestAnimationFrame(loop);
           frame += 1;
           if (frame % FRAME_SKIP !== 0) return;
+
           const video = videoRef.current;
           if (!video || video.readyState < 2) return;
 
@@ -66,9 +84,24 @@ export function useFaceTracking({ videoRef, enabled }: Options) {
           } catch {
             return;
           }
+
           const lm = results?.faceLandmarks?.[0];
           if (!lm) {
-            lerpFaceState({ yaw: 0, pitch: 0, roll: 0, eyeX: 0, eyeY: 0, mouthOpen: 0 }, 0.1);
+            lerpFaceState(
+              {
+                yaw: 0,
+                pitch: 0,
+                roll: 0,
+                eyeX: 0,
+                eyeY: 0,
+                mouthOpen: 0,
+                smile: 0,
+                blinkLeft: 0,
+                blinkRight: 0,
+                browUp: 0,
+              },
+              0.1,
+            );
             return;
           }
 
@@ -79,8 +112,9 @@ export function useFaceTracking({ videoRef, enabled }: Options) {
           const forehead = lm[10];
           const upperLip = lm[13];
           const lowerLip = lm[14];
-          if (!nose || !leftEye || !rightEye || !chin || !forehead || !upperLip || !lowerLip)
+          if (!nose || !leftEye || !rightEye || !chin || !forehead || !upperLip || !lowerLip) {
             return;
+          }
 
           const eyeMidX = (leftEye.x + rightEye.x) / 2;
           const eyeMidY = (leftEye.y + rightEye.y) / 2;
@@ -94,17 +128,40 @@ export function useFaceTracking({ videoRef, enabled }: Options) {
             -1,
             1,
           );
-          const mouthOpen = clamp((Math.abs(lowerLip.y - upperLip.y) / faceHeight - 0.02) * 8, 0, 1);
 
-          lerpFaceState({
-            yaw,
-            pitch,
-            roll,
-            eyeX: clamp(yaw * 0.5, -0.5, 0.5),
-            eyeY: clamp(pitch * 0.5, -0.5, 0.5),
-            mouthOpen,
-          });
+          const landmarkMouthOpen = clamp(
+            (Math.abs(lowerLip.y - upperLip.y) / faceHeight - 0.02) * 8,
+            0,
+            1,
+          );
+
+          const scores = getBlendshapeScores(results?.faceBlendshapes?.[0]?.categories);
+          const jawOpen = scores.get("jawOpen") ?? 0;
+          const smileLeft = scores.get("mouthSmileLeft") ?? 0;
+          const smileRight = scores.get("mouthSmileRight") ?? 0;
+          const blinkLeft = scores.get("eyeBlinkLeft") ?? 0;
+          const blinkRight = scores.get("eyeBlinkRight") ?? 0;
+          const browInner = scores.get("browInnerUp") ?? 0;
+          const browOuterLeft = scores.get("browOuterUpLeft") ?? 0;
+          const browOuterRight = scores.get("browOuterUpRight") ?? 0;
+
+          lerpFaceState(
+            {
+              yaw,
+              pitch,
+              roll,
+              eyeX: clamp(yaw * 0.5, -0.5, 0.5),
+              eyeY: clamp(pitch * 0.5, -0.5, 0.5),
+              mouthOpen: Math.max(landmarkMouthOpen, jawOpen),
+              smile: clamp((smileLeft + smileRight) / 2, 0, 1),
+              blinkLeft: clamp(blinkLeft, 0, 1),
+              blinkRight: clamp(blinkRight, 0, 1),
+              browUp: clamp((browInner + browOuterLeft + browOuterRight) / 3, 0, 1),
+            },
+            0.24,
+          );
         };
+
         loop();
       } catch (e) {
         if (cancelled) return;
@@ -120,8 +177,8 @@ export function useFaceTracking({ videoRef, enabled }: Options) {
       cancelled = true;
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
       rafRef.current = null;
-      const l = landmarkerRef.current as { close?: () => void } | null;
-      l?.close?.();
+      const landmarker = landmarkerRef.current as { close?: () => void } | null;
+      landmarker?.close?.();
       landmarkerRef.current = null;
       setIsTracking(false);
       resetFaceState();
