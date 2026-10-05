@@ -1,8 +1,9 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { ArrowRight, Check, Link2, RotateCcw, Sparkles } from "lucide-react";
-import { useEffect } from "react";
+import { ArrowRight, Check, ExternalLink, Link2, RotateCcw, Sparkles } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
 
 import CharacterStage from "@/components/characters/CharacterStage";
+import ReadyPlayerMeCreator from "@/components/characters/ReadyPlayerMeCreator";
 import { getAvatarProfile, type HairStyle } from "@/lib/avatarCatalog";
 import {
   ACCENT_COLORS,
@@ -101,10 +102,24 @@ function CustomizePage() {
   const updateCustomization = useAvatarCustomizationStore((state) => state.updateCustomization);
   const resetCustomization = useAvatarCustomizationStore((state) => state.resetCustomization);
   const setRenderMode = useAvatarCustomizationStore((state) => state.setRenderMode);
+  const [showReadyPlayerMe, setShowReadyPlayerMe] = useState(false);
+  const [readyPlayerMeSubdomain, setReadyPlayerMeSubdomain] = useState(
+    import.meta.env["VITE_RPM_SUBDOMAIN"]?.trim() || "demo",
+  );
 
   useEffect(() => {
     if (!selectedCharacter) navigate({ to: "/" });
   }, [navigate, selectedCharacter]);
+
+  const handleReadyPlayerMeExport = useCallback(
+    (modelUrl: string) => {
+      if (!selectedCharacter) return;
+      updateCustomization(selectedCharacter, { modelUrl });
+      setRenderMode(selectedCharacter, "readyplayerme");
+      setShowReadyPlayerMe(false);
+    },
+    [selectedCharacter, setRenderMode, updateCustomization],
+  );
 
   if (!selectedCharacter) return null;
 
@@ -241,6 +256,48 @@ function CustomizePage() {
                 <p className="mt-2 text-xs font-semibold text-muted-foreground">
                   يمكن لصق رابط Ready Player Me مباشرة؛ سيضيف النظام إعدادات تعابير الوجه تلقائيًا.
                 </p>
+              </div>
+
+              <div className="mt-4 rounded-2xl border-2 border-primary/20 bg-primary/5 p-4">
+                <div className="flex items-start gap-3">
+                  <ExternalLink className="mt-0.5 size-5 shrink-0 text-primary" />
+                  <div className="min-w-0 flex-1">
+                    <p className="font-black text-foreground">أنشئ الشخصية داخل Ready Player Me</p>
+                    <p className="mt-1 text-xs font-semibold text-muted-foreground">
+                      افتح المصمم داخل التطبيق، ثم عند إنهاء الشخصية سيتم استيراد رابط GLB تلقائيًا.
+                    </p>
+                  </div>
+                </div>
+
+                <label
+                  htmlFor="rpm-subdomain"
+                  className="mt-3 block text-xs font-black text-foreground"
+                >
+                  Ready Player Me Subdomain
+                </label>
+                <div className="mt-1 flex items-center rounded-xl border border-border bg-background px-3">
+                  <span className="text-xs font-bold text-muted-foreground">https://</span>
+                  <input
+                    id="rpm-subdomain"
+                    type="text"
+                    value={readyPlayerMeSubdomain}
+                    onChange={(event) => setReadyPlayerMeSubdomain(event.target.value)}
+                    dir="ltr"
+                    spellCheck={false}
+                    className="min-w-0 flex-1 bg-transparent px-1 py-2.5 text-sm font-semibold text-foreground outline-none"
+                    placeholder="demo"
+                  />
+                  <span className="text-xs font-bold text-muted-foreground">.readyplayer.me</span>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setShowReadyPlayerMe(true)}
+                  className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-full bg-primary px-5 py-3 font-black text-primary-foreground shadow transition hover:brightness-105"
+                >
+                  <ExternalLink className="size-5" />
+                  فتح المصمم المتقدم
+                </button>
               </div>
 
               {renderMode === "readyplayerme" && hasReadyPlayerMe && (
@@ -389,6 +446,14 @@ function CustomizePage() {
           </section>
         </div>
       </div>
+
+      {showReadyPlayerMe && (
+        <ReadyPlayerMeCreator
+          subdomain={readyPlayerMeSubdomain}
+          onAvatarExported={handleReadyPlayerMeExport}
+          onClose={() => setShowReadyPlayerMe(false)}
+        />
+      )}
     </main>
   );
 }
