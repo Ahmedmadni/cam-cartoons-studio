@@ -1,3 +1,4 @@
+import type { AvatarCustomization } from "./avatarCustomization";
 import type { CharacterType } from "./store";
 
 export type HairStyle = "crop" | "curls" | "bun" | "waves";
@@ -137,4 +138,16 @@ export function getAvatarProfile(type: CharacterType) {
 
 export function usesReadyPlayerMe(type: CharacterType) {
   return Boolean(AVATAR_PROFILES[type].modelUrl);
+}
+
+
+export function mergeAvatarProfile(
+  type: CharacterType,
+  customization: AvatarCustomization | undefined,
+): AvatarProfile {
+  if (!customization) return AVATAR_PROFILES[type];
+  return {
+    ...AVATAR_PROFILES[type],
+    ...customization,
+  };
 }
