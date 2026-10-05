@@ -2,6 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { BookOpen as Camera, Sparkles } from "lucide-react";
 import CharacterStage from "@/components/characters/CharacterStage";
+import { usesReadyPlayerMe } from "@/lib/avatarCatalog";
 import { CHARACTER_LABELS, useStudioStore, type CharacterType } from "@/lib/store";
 
 export const Route = createFileRoute("/")({
@@ -75,8 +76,11 @@ function Index() {
                 <span className="mt-4 text-2xl font-black text-foreground">
                   {emoji} {CHARACTER_LABELS[type]}
                 </span>
+                <span className="mt-2 rounded-full bg-muted px-3 py-1 text-[11px] font-black text-muted-foreground">
+                  {usesReadyPlayerMe(type) ? "نموذج 3D متقدم" : "نموذج كرتوني مدمج"}
+                </span>
                 <span
-                  className={`mt-1 text-sm font-bold ${
+                  className={`mt-2 text-sm font-bold ${
                     isSelected ? "text-primary" : "text-muted-foreground"
                   }`}
                 >
