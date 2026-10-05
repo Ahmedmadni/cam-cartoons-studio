@@ -201,6 +201,7 @@ function StoryPage() {
   const handleStop = useCallback(() => {
     cancelledRef.current = true;
     window.speechSynthesis?.cancel();
+    voiceBusRef.current?.stop();
     stopMouth();
     performAction("idle");
     setCurrentLine("");
@@ -219,22 +220,31 @@ function StoryPage() {
       if (withRecording && canvasRef.current) {
         try {
           const stream = canvasRef.current.captureStream(30);
-          // محاولة التقاط صوت المتصفح (TTS) عبر مشاركة التبويب — اختيارية
-          try {
-            const display = await navigator.mediaDevices.getDisplayMedia({
-              video: true,
-              audio: true,
-            });
-            const audio = display.getAudioTracks()[0];
-            display.getVideoTracks().forEach((t) => t.stop());
-            if (audio) {
-              stream.addTrack(audio);
-              extraTracksRef.current = [audio];
-            } else {
+
+          if (remoteVoiceConfigured) {
+            const bus = getVoiceBus();
+            const aiAudioTrack = bus.captureStream.getAudioTracks()[0];
+            if (aiAudioTrack) {
+              stream.addTrack(aiAudioTrack);
+              setNote("سيتم دمج صوت الشخصية الذكي مباشرة داخل الفيديو.");
+            }
+          } else {
+            try {
+              const display = await navigator.mediaDevices.getDisplayMedia({
+                video: true,
+                audio: true,
+              });
+              const audio = display.getAudioTracks()[0];
+              display.getVideoTracks().forEach((t) => t.stop());
+              if (audio) {
+                stream.addTrack(audio);
+                extraTracksRef.current = [audio];
+              } else {
+                setNote("تم التسجيل بدون صوت (لم تتم مشاركة صوت التبويب).");
+              }
+            } catch {
               setNote("تم التسجيل بدون صوت (لم تتم مشاركة صوت التبويب).");
             }
-          } catch {
-            setNote("تم التسجيل بدون صوت (لم تتم مشاركة صوت التبويب).");
           }
 
           chunksRef.current = [];
@@ -246,6 +256,9 @@ function StoryPage() {
             const blob = new Blob(chunksRef.current, { type: "video/webm" });
             setRecordedVideo(blob);
             setRecording(false);
+            const bus = voiceBusRef.current;
+            voiceBusRef.current = null;
+            void bus?.close();
             navigate({ to: "/save" });
           };
           recorderRef.current = recorder;
@@ -253,14 +266,32 @@ function StoryPage() {
           setRecording(true);
         } catch {
           setNote("تعذّر بدء التسجيل على هذا المتصفح.");
+          const bus = voiceBusRef.current;
+          voiceBusRef.current = null;
+          void bus?.close();
         }
       }
 
       await runStory(steps);
       setPlaying(false);
-      if (withRecording) window.setTimeout(() => stopRecorder(), 400);
+
+      if (withRecording) {
+        window.setTimeout(() => stopRecorder(), 400);
+      } else {
+        const bus = voiceBusRef.current;
+        voiceBusRef.current = null;
+        await bus?.close();
+      }
     },
-    [text, runStory, navigate, setRecordedVideo, stopRecorder],
+    [
+      getVoiceBus,
+      navigate,
+      remoteVoiceConfigured,
+      runStory,
+      setRecordedVideo,
+      stopRecorder,
+      text,
+    ],
   );
 
   useEffect(
