@@ -30,3 +30,6 @@ jobs:
 
       - name: Production build
         run: bun run build
+
+      - name: Python syntax
+        run: python -m py_compile services/voice-api/app.py
