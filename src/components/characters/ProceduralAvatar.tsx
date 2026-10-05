@@ -193,6 +193,38 @@ function Hair({ profile }: { profile: AvatarProfile }) {
   );
 }
 
+function Headwear({ profile }: { profile: AvatarProfile }) {
+  if (profile.headwearStyle === "none") return null;
+
+  if (profile.headwearStyle === "cap") {
+    return (
+      <group>
+        <mesh position={[0, 0.39, -0.03]} scale={[1.05, 0.55, 0.95]} castShadow>
+          <sphereGeometry args={[0.34, 30, 30]} />
+          <ClothMaterial color={profile.top} />
+        </mesh>
+        <mesh position={[0, 0.29, 0.27]} rotation={[-0.08, 0, 0]} castShadow>
+          <boxGeometry args={[0.42, 0.035, 0.2]} />
+          <meshPhysicalMaterial color={profile.accent} roughness={0.78} />
+        </mesh>
+      </group>
+    );
+  }
+
+  return (
+    <group>
+      <mesh position={[0, 0.39, -0.03]} scale={[1.02, 0.7, 1]} castShadow>
+        <sphereGeometry args={[0.35, 32, 32]} />
+        <ClothMaterial color={profile.top} />
+      </mesh>
+      <mesh position={[0, 0.24, -0.01]} rotation={[Math.PI / 2, 0, 0]} castShadow>
+        <torusGeometry args={[0.31, 0.038, 10, 36]} />
+        <meshPhysicalMaterial color={profile.accent} roughness={0.8} />
+      </mesh>
+    </group>
+  );
+}
+
 function SquareGlassesFrame({ x, scale }: { x: number; scale: number }) {
   const material = <meshPhysicalMaterial color="#2D2D33" roughness={0.42} clearcoat={0.35} />;
   return (
@@ -286,6 +318,7 @@ function Head({
       ))}
 
       <Hair profile={profile} />
+      <Headwear profile={profile} />
 
       <group ref={eyesRef} position={[0, 0.055, 0.382]}>
         <Eye x={-eyeX} profile={profile} />
@@ -443,6 +476,80 @@ function Leg({
   );
 }
 
+function OutfitDetails({
+  profile,
+  torsoY,
+  headY,
+}: {
+  profile: AvatarProfile;
+  torsoY: number;
+  headY: number;
+}) {
+  if (profile.outfitStyle === "hoodie") {
+    return (
+      <group>
+        <mesh position={[0, headY - 0.51, -0.18]} scale={[1.05, 0.78, 0.5]} castShadow>
+          <sphereGeometry args={[0.27, 28, 28]} />
+          <ClothMaterial color={profile.top} />
+        </mesh>
+        <mesh position={[0, torsoY - 0.15, 0.285]} scale={[1.3, 0.5, 0.3]} castShadow>
+          <capsuleGeometry args={[0.09, 0.22, 6, 16]} />
+          <meshPhysicalMaterial color={profile.top} roughness={0.92} sheen={0.4} />
+        </mesh>
+        {[-0.075, 0.075].map((x) => (
+          <group key={x}>
+            <mesh position={[x, torsoY + 0.2, 0.305]}>
+              <cylinderGeometry args={[0.01, 0.01, 0.25, 10]} />
+              <meshStandardMaterial color={profile.accent} />
+            </mesh>
+            <mesh position={[x, torsoY + 0.065, 0.305]}>
+              <sphereGeometry args={[0.018, 12, 12]} />
+              <meshStandardMaterial color={profile.accent} />
+            </mesh>
+          </group>
+        ))}
+      </group>
+    );
+  }
+
+  if (profile.outfitStyle === "formal") {
+    return (
+      <group>
+        <mesh position={[0, torsoY + 0.11, 0.292]} scale={[0.5, 1.55, 0.24]}>
+          <capsuleGeometry args={[0.08, 0.3, 6, 16]} />
+          <meshPhysicalMaterial color="#F5F2EA" roughness={0.9} />
+        </mesh>
+        {[-1, 1].map((side) => (
+          <mesh
+            key={side}
+            position={[side * 0.12, torsoY + 0.12, 0.315]}
+            rotation={[0, 0, side * 0.42]}
+            scale={[0.55, 1.8, 0.22]}
+          >
+            <boxGeometry args={[0.12, 0.32, 0.025]} />
+            <ClothMaterial color={profile.top} />
+          </mesh>
+        ))}
+        <mesh position={[0, torsoY + 0.19, 0.34]} rotation={[0, 0, Math.PI]}>
+          <coneGeometry args={[0.045, 0.22, 4]} />
+          <meshPhysicalMaterial color={profile.accent} roughness={0.58} />
+        </mesh>
+        <mesh position={[0, torsoY + 0.315, 0.338]}>
+          <sphereGeometry args={[0.04, 14, 14]} />
+          <meshPhysicalMaterial color={profile.accent} roughness={0.58} />
+        </mesh>
+      </group>
+    );
+  }
+
+  return (
+    <mesh position={[0, torsoY + 0.09, 0.29]} scale={[0.65, 0.18, 0.3]}>
+      <capsuleGeometry args={[0.08, 0.28, 6, 16]} />
+      <meshPhysicalMaterial color={profile.accent} roughness={0.72} />
+    </mesh>
+  );
+}
+
 function Body({
   profile,
   refs,
@@ -486,10 +593,7 @@ function Body({
         <ClothMaterial color={profile.bottom} />
       </mesh>
 
-      <mesh position={[0, torsoY + 0.09, 0.29]} scale={[0.65, 0.18, 0.3]}>
-        <capsuleGeometry args={[0.08, 0.28, 6, 16]} />
-        <meshPhysicalMaterial color={profile.accent} roughness={0.72} />
-      </mesh>
+      <OutfitDetails profile={profile} torsoY={torsoY} headY={headY} />
 
       <Arm
         side={-1}
