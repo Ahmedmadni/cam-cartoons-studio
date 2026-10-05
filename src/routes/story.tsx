@@ -84,11 +84,44 @@ function StoryPage() {
         utter.pitch = 1.25;
         const arabic = window.speechSynthesis.getVoices().find((v) => v.lang.startsWith("ar"));
         if (arabic) utter.voice = arabic;
-        utter.onend = () => resolve();
-        utter.onerror = () => resolve();
+
+        // مزامنة الفم عبر أحداث onboundary: نبضة فتح لكل كلمة بطول يتناسب مع طولها
+        let gotBoundary = false;
+        let rafId = 0;
+        let target = 0;
+        const animate = () => {
+          faceState.mouthOpen += (target - faceState.mouthOpen) * 0.35;
+          target *= 0.88; // إغلاق تدريجي بين الكلمات
+          rafId = requestAnimationFrame(animate);
+        };
+        utter.onstart = () => {
+          rafId = requestAnimationFrame(animate);
+        };
+        utter.onboundary = (e) => {
+          if (e.name && e.name !== "word") return;
+          if (!gotBoundary) {
+            gotBoundary = true;
+            stopMouth(); // إيقاف الحركة العشوائية الاحتياطية
+          }
+          const len = e.charLength || line.slice(e.charIndex).split(/\s/)[0]?.length || 3;
+          target = Math.min(1, 0.45 + len * 0.07);
+          // نبضة ثانية للكلمات الطويلة (مقاطع متعددة)
+          if (len > 4) {
+            window.setTimeout(() => {
+              target = Math.max(target, 0.55 + Math.random() * 0.3);
+            }, 140);
+          }
+        };
+        const done = () => {
+          cancelAnimationFrame(rafId);
+          faceState.mouthOpen = 0;
+          resolve();
+        };
+        utter.onend = done;
+        utter.onerror = done;
         window.speechSynthesis.speak(utter);
       }),
-    [],
+    [stopMouth],
   );
 
   const runStory = useCallback(
