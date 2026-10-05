@@ -122,10 +122,17 @@ function setMorph(meshes: MorphMesh[], aliases: string[], value: number) {
 
 function applyFaceMorphs(rig: Rig, animation: AnimationType) {
   const open = faceState.mouthOpen > 0.06 ? faceState.mouthOpen : 0;
-  const smile = animation === "happy" ? 0.72 : 0;
+  const smile = Math.max(faceState.smile, animation === "happy" ? 0.72 : 0);
+  const blinkLeft = MathUtils.clamp(faceState.blinkLeft, 0, 1);
+  const blinkRight = MathUtils.clamp(faceState.blinkRight, 0, 1);
+  const browUp = MathUtils.clamp(faceState.browUp, 0, 1);
 
   setMorph(rig.morphMeshes, ["mouthOpen", "jawOpen", "visemeAA", "viseme_aa"], open);
   setMorph(rig.morphMeshes, ["mouthSmile", "mouthSmileLeft", "mouthSmileRight"], smile);
+  setMorph(rig.morphMeshes, ["eyeBlinkLeft"], blinkLeft);
+  setMorph(rig.morphMeshes, ["eyeBlinkRight"], blinkRight);
+  setMorph(rig.morphMeshes, ["eyesClosed"], Math.max(blinkLeft, blinkRight));
+  setMorph(rig.morphMeshes, ["browInnerUp", "browOuterUpLeft", "browOuterUpRight"], browUp);
 
   const lookX = MathUtils.clamp(faceState.eyeX, -1, 1);
   const lookY = MathUtils.clamp(faceState.eyeY, -1, 1);
