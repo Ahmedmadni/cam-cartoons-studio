@@ -29,19 +29,19 @@ type BoundaryState = {
 };
 
 class AvatarErrorBoundary extends Component<BoundaryProps, BoundaryState> {
-  state: BoundaryState = { failed: false };
+  override state: BoundaryState = { failed: false };
 
   static getDerivedStateFromError() {
     return { failed: true };
   }
 
-  componentDidUpdate(previous: BoundaryProps) {
+  override componentDidUpdate(previous: BoundaryProps) {
     if (previous.resetKey !== this.props.resetKey && this.state.failed) {
       this.setState({ failed: false });
     }
   }
 
-  render() {
+  override render() {
     return this.state.failed ? this.props.fallback : this.props.children;
   }
 }
