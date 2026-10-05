@@ -7,6 +7,7 @@ import type { CharacterType } from "./store";
 export type AvatarRenderMode = "auto" | "custom" | "readyplayerme";
 
 export type AvatarCustomization = {
+  modelUrl?: string;
   skin?: string;
   hair?: string;
   top?: string;
