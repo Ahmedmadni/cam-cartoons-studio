@@ -158,7 +158,13 @@ export default function ThreeDCharacter({
         />
       )}
 
-      <Environment preset="studio" environmentIntensity={0.62} />
+      {/* إضاءة استوديو محلية بالكامل (بدون تحميل ملفات HDR خارجية قد يفشل جلبها) */}
+      <Environment resolution={256} environmentIntensity={0.62}>
+        <Lightformer form="rect" intensity={3} color="#FFF4E8" position={[0, 4, 2]} scale={[6, 2, 1]} />
+        <Lightformer form="rect" intensity={1.5} color="#D7E8FF" position={[-5, 1, 2]} rotation-y={Math.PI / 2} scale={[4, 3, 1]} />
+        <Lightformer form="rect" intensity={1.5} color="#FFE0B8" position={[5, 1, 2]} rotation-y={-Math.PI / 2} scale={[4, 3, 1]} />
+        <Lightformer form="ring" intensity={1} color="#FFFFFF" position={[0, 1, -5]} scale={3} />
+      </Environment>
     </Canvas>
   );
 }
