@@ -1,4 +1,4 @@
-import { ContactShadows, Environment, useTexture } from "@react-three/drei";
+import { ContactShadows, Environment, Lightformer, useTexture } from "@react-three/drei";
 import { Canvas } from "@react-three/fiber";
 import { Component, Suspense, type ReactNode } from "react";
 
