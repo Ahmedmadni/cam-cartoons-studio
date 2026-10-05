@@ -1,6 +1,6 @@
 import { ContactShadows, Environment, useTexture } from "@react-three/drei";
 import { Canvas } from "@react-three/fiber";
-import { Suspense } from "react";
+import { Component, Suspense, type ReactNode } from "react";
 
 import { getAvatarProfile } from "@/lib/avatarCatalog";
 import type { AnimationType, CharacterType } from "@/lib/store";
@@ -18,6 +18,34 @@ function Backdrop({ url }: { url: string }) {
   );
 }
 
+type BoundaryProps = {
+  resetKey: string;
+  fallback: ReactNode;
+  children: ReactNode;
+};
+
+type BoundaryState = {
+  failed: boolean;
+};
+
+class AvatarErrorBoundary extends Component<BoundaryProps, BoundaryState> {
+  state: BoundaryState = { failed: false };
+
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+
+  componentDidUpdate(previous: BoundaryProps) {
+    if (previous.resetKey !== this.props.resetKey && this.state.failed) {
+      this.setState({ failed: false });
+    }
+  }
+
+  render() {
+    return this.state.failed ? this.props.fallback : this.props.children;
+  }
+}
+
 function Avatar({
   type,
   animation,
@@ -28,19 +56,22 @@ function Avatar({
   spin: boolean;
 }) {
   const profile = getAvatarProfile(type);
+  const fallback = <ProceduralAvatar type={type} animation={animation} spin={spin} />;
 
-  if (profile.modelUrl) {
-    return (
-      <ReadyPlayerMeAvatar
-        type={type}
-        url={profile.modelUrl}
-        animation={animation}
-        spin={spin}
-      />
-    );
-  }
+  if (!profile.modelUrl) return fallback;
 
-  return <ProceduralAvatar type={type} animation={animation} spin={spin} />;
+  return (
+    <AvatarErrorBoundary resetKey={profile.modelUrl} fallback={fallback}>
+      <Suspense fallback={fallback}>
+        <ReadyPlayerMeAvatar
+          type={type}
+          url={profile.modelUrl}
+          animation={animation}
+          spin={spin}
+        />
+      </Suspense>
+    </AvatarErrorBoundary>
+  );
 }
 
 export type ThreeDCharacterProps = {
