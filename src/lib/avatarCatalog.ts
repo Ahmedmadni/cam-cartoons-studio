@@ -2,6 +2,8 @@ import type { AvatarCustomization } from "./avatarCustomization";
 import type { CharacterType } from "./store";
 
 export type HairStyle = "crop" | "curls" | "bun" | "waves";
+export type FaceShape = "round" | "oval" | "square";
+export type GlassesStyle = "none" | "round" | "square";
 
 export type AvatarProfile = {
   type: CharacterType;
@@ -15,6 +17,12 @@ export type AvatarProfile = {
   accent: string;
   eye: string;
   hairStyle: HairStyle;
+  faceShape: FaceShape;
+  eyeScale: number;
+  eyeSpacing: number;
+  noseScale: number;
+  mouthScale: number;
+  glassesStyle: GlassesStyle;
   child: boolean;
   bodyScale: number;
   shoulderScale: number;
@@ -66,6 +74,12 @@ export const AVATAR_PROFILES: Record<CharacterType, AvatarProfile> = {
     accent: "#F7C948",
     eye: "#4B3428",
     hairStyle: "crop",
+    faceShape: "round",
+    eyeScale: 1.08,
+    eyeSpacing: 1,
+    noseScale: 0.92,
+    mouthScale: 1,
+    glassesStyle: "none",
     child: true,
     bodyScale: 0.92,
     shoulderScale: 0.88,
@@ -85,6 +99,12 @@ export const AVATAR_PROFILES: Record<CharacterType, AvatarProfile> = {
     accent: "#F4D35E",
     eye: "#51382E",
     hairStyle: "bun",
+    faceShape: "oval",
+    eyeScale: 1.1,
+    eyeSpacing: 0.98,
+    noseScale: 0.9,
+    mouthScale: 1.05,
+    glassesStyle: "none",
     child: true,
     bodyScale: 0.9,
     shoulderScale: 0.84,
@@ -104,6 +124,12 @@ export const AVATAR_PROFILES: Record<CharacterType, AvatarProfile> = {
     accent: "#46B5A7",
     eye: "#382A24",
     hairStyle: "curls",
+    faceShape: "square",
+    eyeScale: 0.96,
+    eyeSpacing: 1.04,
+    noseScale: 1.08,
+    mouthScale: 0.96,
+    glassesStyle: "none",
     child: false,
     bodyScale: 1.04,
     shoulderScale: 1.08,
@@ -123,6 +149,12 @@ export const AVATAR_PROFILES: Record<CharacterType, AvatarProfile> = {
     accent: "#E9B949",
     eye: "#47302A",
     hairStyle: "waves",
+    faceShape: "oval",
+    eyeScale: 1.02,
+    eyeSpacing: 1,
+    noseScale: 0.96,
+    mouthScale: 1.04,
+    glassesStyle: "none",
     child: false,
     bodyScale: 1,
     shoulderScale: 0.94,
