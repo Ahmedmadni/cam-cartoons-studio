@@ -71,7 +71,7 @@ function Eye({
   profile: AvatarProfile;
 }) {
   return (
-    <group position={[x, 0, 0]}>
+    <group position={[x, 0, 0]} scale={profile.eyeScale}>
       <mesh scale={[1, 1.07, 0.52]}>
         <sphereGeometry args={[0.105, 28, 28]} />
         <meshPhysicalMaterial color="#FCFAF6" roughness={0.25} clearcoat={0.8} />
@@ -189,6 +189,61 @@ function Hair({ profile }: { profile: AvatarProfile }) {
           {mat}
         </mesh>
       ))}
+    </group>
+  );
+}
+
+function SquareGlassesFrame({ x, scale }: { x: number; scale: number }) {
+  const material = <meshPhysicalMaterial color="#2D2D33" roughness={0.42} clearcoat={0.35} />;
+  return (
+    <group position={[x, 0, 0]} scale={scale}>
+      <mesh position={[0, 0.115, 0]}>
+        <boxGeometry args={[0.25, 0.018, 0.018]} />
+        {material}
+      </mesh>
+      <mesh position={[0, -0.115, 0]}>
+        <boxGeometry args={[0.25, 0.018, 0.018]} />
+        {material}
+      </mesh>
+      <mesh position={[-0.116, 0, 0]}>
+        <boxGeometry args={[0.018, 0.23, 0.018]} />
+        {material}
+      </mesh>
+      <mesh position={[0.116, 0, 0]}>
+        <boxGeometry args={[0.018, 0.23, 0.018]} />
+        {material}
+      </mesh>
+    </group>
+  );
+}
+
+function Glasses({ profile }: { profile: AvatarProfile }) {
+  if (profile.glassesStyle === "none") return null;
+
+  const eyeX = 0.165 * profile.eyeSpacing;
+  const bridgeWidth = Math.max(0.055, eyeX * 2 - 0.23 * profile.eyeScale);
+
+  return (
+    <group position={[0, 0.055, 0.492]}>
+      {profile.glassesStyle === "round" ? (
+        <>
+          {[-eyeX, eyeX].map((x) => (
+            <mesh key={x} position={[x, 0, 0]} scale={profile.eyeScale}>
+              <torusGeometry args={[0.122, 0.014, 10, 36]} />
+              <meshPhysicalMaterial color="#2D2D33" roughness={0.42} clearcoat={0.35} />
+            </mesh>
+          ))}
+        </>
+      ) : (
+        <>
+          <SquareGlassesFrame x={-eyeX} scale={profile.eyeScale} />
+          <SquareGlassesFrame x={eyeX} scale={profile.eyeScale} />
+        </>
+      )}
+      <mesh position={[0, 0, 0]}>
+        <boxGeometry args={[bridgeWidth, 0.018, 0.018]} />
+        <meshPhysicalMaterial color="#2D2D33" roughness={0.42} clearcoat={0.35} />
+      </mesh>
     </group>
   );
 }
