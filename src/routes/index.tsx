@@ -1,8 +1,9 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
-import { BookOpen as Camera, Sparkles } from "lucide-react";
+import { BookOpen as Camera, Palette, Sparkles } from "lucide-react";
 import CharacterStage from "@/components/characters/CharacterStage";
 import { usesReadyPlayerMe } from "@/lib/avatarCatalog";
+import { useAvatarCustomizationStore } from "@/lib/avatarCustomization";
 import { CHARACTER_LABELS, useStudioStore, type CharacterType } from "@/lib/store";
 
 export const Route = createFileRoute("/")({
@@ -35,6 +36,8 @@ function Index() {
   const navigate = useNavigate();
   const selectedCharacter = useStudioStore((s) => s.selectedCharacter);
   const setSelectedCharacter = useStudioStore((s) => s.setSelectedCharacter);
+  const customizations = useAvatarCustomizationStore((s) => s.customizations);
+  const renderModes = useAvatarCustomizationStore((s) => s.renderModes);
   const [hovered, setHovered] = useState<CharacterType | null>(null);
 
   return (
@@ -56,6 +59,17 @@ function Index() {
         <div className="mt-10 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
           {CHARACTERS.map(({ type, emoji }) => {
             const isSelected = selectedCharacter === type;
+            const hasExternalModel = Boolean(
+              customizations[type]?.modelUrl?.trim() || usesReadyPlayerMe(type),
+            );
+            const mode = renderModes[type];
+            const sourceLabel =
+              mode === "custom"
+                ? "شخصية قابلة للتخصيص"
+                : hasExternalModel
+                  ? "Ready Player Me"
+                  : "نموذج كرتوني مدمج";
+
             return (
               <button
                 key={type}
@@ -77,7 +91,7 @@ function Index() {
                   {emoji} {CHARACTER_LABELS[type]}
                 </span>
                 <span className="mt-2 rounded-full bg-muted px-3 py-1 text-[11px] font-black text-muted-foreground">
-                  {usesReadyPlayerMe(type) ? "نموذج 3D متقدم" : "نموذج كرتوني مدمج"}
+                  {sourceLabel}
                 </span>
                 <span
                   className={`mt-2 text-sm font-bold ${
@@ -91,14 +105,23 @@ function Index() {
           })}
         </div>
 
-        <div className="mt-12 flex justify-center">
+        <div className="mt-12 flex flex-wrap justify-center gap-3">
+          <button
+            type="button"
+            disabled={!selectedCharacter}
+            onClick={() => navigate({ to: "/customize" })}
+            className="inline-flex items-center gap-3 rounded-full bg-secondary px-8 py-5 text-xl font-black text-secondary-foreground shadow-lg transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            <Palette className="size-7" />
+            صمّم الشخصية
+          </button>
           <button
             type="button"
             disabled={!selectedCharacter}
             onClick={() => navigate({ to: "/story" })}
-            className="inline-flex items-center gap-3 rounded-full bg-primary px-12 py-6 text-2xl font-black text-primary-foreground shadow-xl transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-40"
+            className="inline-flex items-center gap-3 rounded-full bg-primary px-10 py-5 text-xl font-black text-primary-foreground shadow-xl transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-40"
           >
-            <Camera className="size-8" />
+            <Camera className="size-7" />
             ابدأ القصة
           </button>
         </div>

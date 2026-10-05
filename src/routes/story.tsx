@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ArrowRight, Play, Square, Video, Wand2 } from "lucide-react";
+import { ArrowRight, Palette, Play, Square, Video, Wand2 } from "lucide-react";
 
 import CharacterStage from "@/components/characters/CharacterStage";
 import { faceState } from "@/lib/faceState";
@@ -318,14 +318,24 @@ function StoryPage() {
           <h1 className="text-3xl font-black text-foreground sm:text-4xl">
             اكتب قصة لـ {CHARACTER_LABELS[selectedCharacter]} 📖
           </h1>
-          <button
-            type="button"
-            onClick={() => navigate({ to: "/" })}
-            className="inline-flex items-center gap-2 rounded-full bg-muted px-5 py-2.5 font-bold text-foreground"
-          >
-            <ArrowRight className="size-5" />
-            تغيير الشخصية
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => navigate({ to: "/customize" })}
+              className="inline-flex items-center gap-2 rounded-full bg-secondary px-5 py-2.5 font-bold text-secondary-foreground"
+            >
+              <Palette className="size-5" />
+              تعديل الشخصية
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate({ to: "/" })}
+              className="inline-flex items-center gap-2 rounded-full bg-muted px-5 py-2.5 font-bold text-foreground"
+            >
+              <ArrowRight className="size-5" />
+              تغيير الشخصية
+            </button>
+          </div>
         </header>
 
         <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_1.2fr]">
