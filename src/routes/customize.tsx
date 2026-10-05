@@ -127,7 +127,7 @@ function CustomizePage() {
 
   const update = (patch: AvatarCustomization) => {
     updateCustomization(selectedCharacter, patch);
-    if (renderMode === "readyplayerme") setRenderMode(selectedCharacter, "custom");
+    if (renderMode !== "custom") setRenderMode(selectedCharacter, "custom");
   };
 
   return (
