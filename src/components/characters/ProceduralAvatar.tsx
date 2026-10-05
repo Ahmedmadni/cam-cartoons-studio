@@ -1,5 +1,5 @@
 import { useFrame } from "@react-three/fiber";
-import { useMemo, useRef } from "react";
+import { useMemo, useRef, type RefObject } from "react";
 import { MathUtils } from "three";
 import type { Group, Mesh } from "three";
 
@@ -14,11 +14,11 @@ type Props = {
 };
 
 type JointRefs = {
-  head: React.RefObject<Group | null>;
-  eyes: React.RefObject<Group | null>;
-  mouth: React.RefObject<Mesh | null>;
-  leftArm: React.RefObject<Group | null>;
-  rightArm: React.RefObject<Group | null>;
+  head: RefObject<Group | null>;
+  eyes: RefObject<Group | null>;
+  mouth: RefObject<Mesh | null>;
+  leftArm: RefObject<Group | null>;
+  rightArm: RefObject<Group | null>;
 };
 
 function SkinMaterial({ color }: { color: string }) {
@@ -199,9 +199,9 @@ function Head({
   mouthRef,
 }: {
   profile: AvatarProfile;
-  headRef: React.RefObject<Group | null>;
-  eyesRef: React.RefObject<Group | null>;
-  mouthRef: React.RefObject<Mesh | null>;
+  headRef: RefObject<Group | null>;
+  eyesRef: RefObject<Group | null>;
+  mouthRef: RefObject<Mesh | null>;
 }) {
   const headScale = profile.headScale;
   const cheekColor = profile.child ? "#E99786" : "#D98978";
@@ -279,7 +279,7 @@ function Arm({
 }: {
   side: -1 | 1;
   profile: AvatarProfile;
-  jointRef: React.RefObject<Group | null>;
+  jointRef: RefObject<Group | null>;
   shoulderY: number;
 }) {
   return (
