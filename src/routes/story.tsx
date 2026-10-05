@@ -83,29 +83,32 @@ function StoryPage() {
   /** ينفّذ حركة واحدة (مكتبة الحركات) لمدة محددة */
   const performAction = useCallback((next: AnimationType) => setAction(next), []);
 
-  const speak = useCallback(
+  const speakBrowser = useCallback(
     (line: string) =>
       new Promise<void>((resolve) => {
         if (typeof window === "undefined" || !("speechSynthesis" in window)) {
-          setTimeout(resolve, 1200);
+          window.setTimeout(resolve, 1200);
           return;
         }
+
         const utter = new SpeechSynthesisUtterance(line);
+        const preset = VOICE_PRESETS[selectedVoice];
+        const semitones = preset.semitones + voicePitch;
         utter.lang = "ar-SA";
         utter.rate = 0.95;
-        utter.pitch = 1.25;
+        utter.pitch = Math.max(0.5, Math.min(2, 1 + (semitones / 12) * 0.45));
         const arabic = window.speechSynthesis.getVoices().find((v) => v.lang.startsWith("ar"));
         if (arabic) utter.voice = arabic;
 
-        // مزامنة الفم عبر أحداث onboundary: نبضة فتح لكل كلمة بطول يتناسب مع طولها
         let gotBoundary = false;
         let rafId = 0;
         let target = 0;
         const animate = () => {
           faceState.mouthOpen += (target - faceState.mouthOpen) * 0.35;
-          target *= 0.88; // إغلاق تدريجي بين الكلمات
+          target *= 0.88;
           rafId = requestAnimationFrame(animate);
         };
+
         utter.onstart = () => {
           rafId = requestAnimationFrame(animate);
         };
@@ -113,17 +116,17 @@ function StoryPage() {
           if (e.name && e.name !== "word") return;
           if (!gotBoundary) {
             gotBoundary = true;
-            stopMouth(); // إيقاف الحركة العشوائية الاحتياطية
+            stopMouth();
           }
-          const len = e.charLength || line.slice(e.charIndex).split(/\s/)[0]?.length || 3;
+          const len = e.charLength || line.slice(e.charIndex).split(/\\s/)[0]?.length || 3;
           target = Math.min(1, 0.45 + len * 0.07);
-          // نبضة ثانية للكلمات الطويلة (مقاطع متعددة)
           if (len > 4) {
             window.setTimeout(() => {
               target = Math.max(target, 0.55 + Math.random() * 0.3);
             }, 140);
           }
         };
+
         const done = () => {
           cancelAnimationFrame(rafId);
           faceState.mouthOpen = 0;
@@ -133,7 +136,43 @@ function StoryPage() {
         utter.onerror = done;
         window.speechSynthesis.speak(utter);
       }),
-    [stopMouth],
+    [selectedVoice, stopMouth, voicePitch],
+  );
+
+  const speak = useCallback(
+    async (line: string) => {
+      if (remoteVoiceConfigured) {
+        try {
+          const audio = await synthesizeRemoteVoice(line, selectedVoice, {
+            language: "ar-SA",
+            pitch: voicePitch,
+            tone: voiceTone,
+          });
+
+          if (audio) {
+            stopMouth();
+            const bus = getVoiceBus();
+            await bus.play(audio, (level) => {
+              faceState.mouthOpen = Math.max(0, Math.min(1, level));
+            });
+            return;
+          }
+        } catch {
+          setNote("تعذّر محرك الصوت الذكي؛ تم استخدام صوت الجهاز كبديل. قد لا يُسجَّل الصوت البديل داخل الفيديو.");
+        }
+      }
+
+      await speakBrowser(line);
+    },
+    [
+      getVoiceBus,
+      remoteVoiceConfigured,
+      selectedVoice,
+      speakBrowser,
+      stopMouth,
+      voicePitch,
+      voiceTone,
+    ],
   );
 
   const runStory = useCallback(
