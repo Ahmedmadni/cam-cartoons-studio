@@ -1,9 +1,9 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { ArrowRight, Check, RotateCcw, Sparkles } from "lucide-react";
+import { ArrowRight, Check, Link2, RotateCcw, Sparkles } from "lucide-react";
 import { useEffect } from "react";
 
 import CharacterStage from "@/components/characters/CharacterStage";
-import { getAvatarProfile, usesReadyPlayerMe, type HairStyle } from "@/lib/avatarCatalog";
+import { getAvatarProfile, type HairStyle } from "@/lib/avatarCatalog";
 import {
   ACCENT_COLORS,
   BOTTOM_COLORS,
@@ -122,7 +122,8 @@ function CustomizePage() {
     shoulderScale: customization?.shoulderScale ?? base.shoulderScale,
     headScale: customization?.headScale ?? base.headScale,
   };
-  const hasReadyPlayerMe = usesReadyPlayerMe(selectedCharacter);
+  const currentModelUrl = customization?.modelUrl ?? base.modelUrl ?? "";
+  const hasReadyPlayerMe = Boolean(currentModelUrl.trim());
 
   const update = (patch: AvatarCustomization) => {
     updateCustomization(selectedCharacter, patch);
@@ -217,6 +218,31 @@ function CustomizePage() {
                   );
                 })}
               </div>
+              <div className="mt-4">
+                <label htmlFor="avatar-model-url" className="text-sm font-black text-foreground">
+                  رابط GLB / Ready Player Me
+                </label>
+                <div className="mt-2 flex items-center gap-2 rounded-2xl border-2 border-border bg-background px-3">
+                  <Link2 className="size-5 shrink-0 text-muted-foreground" />
+                  <input
+                    id="avatar-model-url"
+                    type="url"
+                    value={currentModelUrl}
+                    onChange={(event) => {
+                      const modelUrl = event.target.value;
+                      updateCustomization(selectedCharacter, { modelUrl });
+                      if (modelUrl.trim()) setRenderMode(selectedCharacter, "readyplayerme");
+                    }}
+                    placeholder="https://models.readyplayer.me/...glb"
+                    dir="ltr"
+                    className="min-w-0 flex-1 bg-transparent py-3 text-sm font-semibold text-foreground outline-none"
+                  />
+                </div>
+                <p className="mt-2 text-xs font-semibold text-muted-foreground">
+                  يمكن لصق رابط Ready Player Me مباشرة؛ سيضيف النظام إعدادات تعابير الوجه تلقائيًا.
+                </p>
+              </div>
+
               {renderMode === "readyplayerme" && hasReadyPlayerMe && (
                 <p className="mt-3 rounded-xl bg-muted px-3 py-2 text-xs font-bold text-muted-foreground">
                   تخصيص الألوان والشعر أدناه يخص النموذج الكرتوني المدمج. عند تغيير أي منها
