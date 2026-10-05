@@ -87,7 +87,7 @@ function StoryPage() {
     (line: string) =>
       new Promise<void>((resolve) => {
         if (typeof window === "undefined" || !("speechSynthesis" in window)) {
-          window.setTimeout(resolve, 1200);
+          setTimeout(resolve, 1200);
           return;
         }
 
