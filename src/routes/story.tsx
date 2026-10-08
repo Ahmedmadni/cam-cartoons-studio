@@ -1,10 +1,18 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ArrowRight, Palette, Play, Square, Video, Wand2 } from "lucide-react";
+import { ArrowRight, Palette, Play, Sparkles, Square, Video, Wand2 } from "lucide-react";
 
 import CharacterStage from "@/components/characters/CharacterStage";
 import { faceState } from "@/lib/faceState";
-import { BACKGROUNDS, parseStory, type StoryStep } from "@/lib/story";
+import {
+  BACKGROUND_FILTER_LABELS,
+  BACKGROUND_FILTERS,
+  BACKGROUNDS,
+  filterBackgrounds,
+  parseStory,
+  type BackgroundFilter,
+  type StoryStep,
+} from "@/lib/story";
 import { ANIMATION_LABELS, CHARACTER_LABELS, useStudioStore, type AnimationType } from "@/lib/store";
 import { VOICE_PRESETS } from "@/lib/voiceChanger";
 import { VoicePlaybackBus, isRemoteVoiceConfigured, synthesizeRemoteVoice } from "@/lib/voiceEngine";
@@ -41,6 +49,7 @@ function StoryPage() {
 
   const [text, setText] = useState(EXAMPLE);
   const [bgId, setBgId] = useState(BACKGROUNDS[0]!.id);
+  const [bgFilter, setBgFilter] = useState<BackgroundFilter>("premium");
   const [action, setAction] = useState<AnimationType>("idle");
   const [playing, setPlaying] = useState(false);
   const [recording, setRecording] = useState(false);
@@ -57,6 +66,7 @@ function StoryPage() {
 
   const remoteVoiceConfigured = isRemoteVoiceConfigured();
   const background = BACKGROUNDS.find((b) => b.id === bgId) ?? BACKGROUNDS[0]!;
+  const visibleBackgrounds = filterBackgrounds(bgFilter);
 
   useEffect(() => {
     if (!selectedCharacter) navigate({ to: "/" });
@@ -367,26 +377,70 @@ function StoryPage() {
               </span>
             </div>
 
-            <p className="mt-4 text-sm font-bold text-muted-foreground">الخلفية</p>
-            <div className="mt-2 grid grid-cols-5 gap-2">
-              {BACKGROUNDS.map((b) => (
+            <div className="mt-5 flex items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-black text-foreground">الخلفية</p>
+                <p className="mt-0.5 text-xs font-semibold text-muted-foreground">
+                  اختر مشهدًا سينمائيًا مناسبًا للقصة.
+                </p>
+              </div>
+              {background.premium && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-primary/15 px-3 py-1 text-xs font-black text-primary">
+                  <Sparkles className="size-3.5" />
+                  احترافية
+                </span>
+              )}
+            </div>
+
+            <div className="mt-3 flex flex-wrap gap-2">
+              {BACKGROUND_FILTERS.map((filter) => (
+                <button
+                  key={filter}
+                  type="button"
+                  onClick={() => setBgFilter(filter)}
+                  className={`rounded-full px-3 py-1.5 text-xs font-black transition ${
+                    bgFilter === filter
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {BACKGROUND_FILTER_LABELS[filter]}
+                </button>
+              ))}
+            </div>
+
+            <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
+              {visibleBackgrounds.map((b) => (
                 <button
                   key={b.id}
                   type="button"
                   onClick={() => setBgId(b.id)}
-                  className={`overflow-hidden rounded-xl border-4 ${
-                    b.id === bgId ? "border-primary" : "border-transparent"
+                  className={`overflow-hidden rounded-2xl border-4 bg-background text-right transition hover:-translate-y-0.5 hover:shadow-md ${
+                    b.id === bgId
+                      ? "border-primary shadow-md"
+                      : "border-transparent hover:border-border"
                   }`}
                   title={b.label}
                 >
-                  <img
-                    src={b.src}
-                    alt={b.label}
-                    loading="lazy"
-                    width={1536}
-                    height={1024}
-                    className="h-14 w-full object-cover"
-                  />
+                  <div className="relative aspect-video overflow-hidden bg-muted">
+                    <img
+                      src={b.src}
+                      alt={b.label}
+                      loading="lazy"
+                      width={960}
+                      height={540}
+                      className="h-full w-full object-cover"
+                    />
+                    {b.premium && (
+                      <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-full bg-black/60 px-2 py-1 text-[10px] font-black text-white backdrop-blur">
+                        <Sparkles className="size-3" />
+                        Premium
+                      </span>
+                    )}
+                  </div>
+                  <span className="block truncate px-2.5 py-2 text-xs font-black text-foreground">
+                    {b.label}
+                  </span>
                 </button>
               ))}
             </div>
