@@ -40,6 +40,7 @@ function formatTime(seconds: number) {
 function StudioPage() {
   const navigate = useNavigate();
   const selectedCharacter = useStudioStore((s) => s.selectedCharacter);
+  const selectedCharacterModelUrl = useStudioStore((s) => s.selectedCharacterModelUrl);
   const animation = useStudioStore((s) => s.animation);
   const nextAnimation = useStudioStore((s) => s.nextAnimation);
   const isRecording = useStudioStore((s) => s.isRecording);
@@ -232,6 +233,7 @@ function StudioPage() {
       <div className="pointer-events-none absolute bottom-24 left-1/2 h-[55%] w-[70%] max-w-md -translate-x-1/2">
         <CharacterStage
           type={selectedCharacter}
+          modelUrl={selectedCharacterModelUrl}
           animation={animation}
           spin={false}
           transparent
