@@ -41,8 +41,19 @@ export const CHARACTER_LABELS: Record<CharacterType, string> = {
   woman: "فتاة",
 };
 
+export type CharacterSelection = {
+  id: string;
+  name: string;
+  baseType: CharacterType;
+  modelUrl?: string | null;
+  voicePreset?: VoiceType;
+};
+
 type StudioState = {
   selectedCharacter: CharacterType | null;
+  selectedCharacterId: string | null;
+  selectedCharacterName: string | null;
+  selectedCharacterModelUrl: string | null;
   animation: AnimationType;
   isRecording: boolean;
   recordedVideo: Blob | null;
@@ -54,6 +65,7 @@ type StudioState = {
   voiceTone: number;
   isFaceTrackingEnabled: boolean;
   setSelectedCharacter: (character: CharacterType) => void;
+  selectCharacter: (character: CharacterSelection) => void;
   setAnimation: (animation: AnimationType) => void;
   nextAnimation: () => void;
   setIsRecording: (value: boolean) => void;
@@ -69,6 +81,9 @@ type StudioState = {
 
 export const useStudioStore = create<StudioState>((set, get) => ({
   selectedCharacter: null,
+  selectedCharacterId: null,
+  selectedCharacterName: null,
+  selectedCharacterModelUrl: null,
   animation: "idle",
   isRecording: false,
   recordedVideo: null,
@@ -77,7 +92,21 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   voicePitch: 0,
   voiceTone: 0.5,
   isFaceTrackingEnabled: false,
-  setSelectedCharacter: (character) => set({ selectedCharacter: character }),
+  setSelectedCharacter: (character) =>
+    set({
+      selectedCharacter: character,
+      selectedCharacterId: `builtin-${character}`,
+      selectedCharacterName: CHARACTER_LABELS[character],
+      selectedCharacterModelUrl: null,
+    }),
+  selectCharacter: (character) =>
+    set({
+      selectedCharacter: character.baseType,
+      selectedCharacterId: character.id,
+      selectedCharacterName: character.name,
+      selectedCharacterModelUrl: character.modelUrl?.trim() || null,
+      selectedVoice: character.voicePreset ?? get().selectedVoice,
+    }),
   setAnimation: (animation) => set({ animation }),
   nextAnimation: () => {
     const current = get().animation;
@@ -95,6 +124,9 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   reset: () =>
     set({
       selectedCharacter: null,
+      selectedCharacterId: null,
+      selectedCharacterName: null,
+      selectedCharacterModelUrl: null,
       animation: "idle",
       isRecording: false,
       recordedVideo: null,
