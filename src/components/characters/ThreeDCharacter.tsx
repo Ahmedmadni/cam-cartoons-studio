@@ -51,30 +51,50 @@ function Avatar({
   type,
   animation,
   spin,
+  modelUrl,
 }: {
   type: CharacterType;
   animation: AnimationType;
   spin: boolean;
+  modelUrl?: string | null;
 }) {
   const customization = useAvatarCustomizationStore((state) => state.customizations[type]);
   const profile = mergeAvatarProfile(type, customization);
   const renderMode = useAvatarCustomizationStore((state) => state.renderModes[type]);
   const fallback = <ProceduralAvatar type={type} animation={animation} spin={spin} />;
+  const importedModelUrl = modelUrl?.trim() || null;
+  const resolvedModelUrl = importedModelUrl ?? profile.modelUrl;
+
+  // مكتبة الشخصيات الخارجية لها الأولوية على إعدادات الـfallback الأربعة.
+  if (importedModelUrl) {
+    return (
+      <AvatarErrorBoundary resetKey={importedModelUrl} fallback={fallback}>
+        <Suspense fallback={fallback}>
+          <ReadyPlayerMeAvatar
+            type={type}
+            url={importedModelUrl}
+            animation={animation}
+            spin={spin}
+          />
+        </Suspense>
+      </AvatarErrorBoundary>
+    );
+  }
 
   if (renderMode === "custom") return fallback;
-  if (!profile.modelUrl) return fallback;
+  if (!resolvedModelUrl) return fallback;
   if (renderMode === "readyplayerme" || renderMode === "auto") {
     return (
-    <AvatarErrorBoundary resetKey={profile.modelUrl} fallback={fallback}>
-      <Suspense fallback={fallback}>
-        <ReadyPlayerMeAvatar
-          type={type}
-          url={profile.modelUrl}
-          animation={animation}
-          spin={spin}
-        />
-      </Suspense>
-    </AvatarErrorBoundary>
+      <AvatarErrorBoundary resetKey={resolvedModelUrl} fallback={fallback}>
+        <Suspense fallback={fallback}>
+          <ReadyPlayerMeAvatar
+            type={type}
+            url={resolvedModelUrl}
+            animation={animation}
+            spin={spin}
+          />
+        </Suspense>
+      </AvatarErrorBoundary>
     );
   }
 
@@ -87,6 +107,8 @@ export type ThreeDCharacterProps = {
   spin?: boolean;
   transparent?: boolean;
   className?: string;
+  /** نموذج GLB خارجي من مكتبة الشخصيات. */
+  modelUrl?: string | null;
   /** صورة خلفية تُرسم داخل المشهد وتظهر أيضاً في الفيديو المسجل. */
   backgroundUrl?: string;
   onCanvasReady?: (canvas: HTMLCanvasElement) => void;
@@ -98,6 +120,7 @@ export default function ThreeDCharacter({
   spin = true,
   transparent = false,
   className,
+  modelUrl,
   backgroundUrl,
   onCanvasReady,
 }: ThreeDCharacterProps) {
@@ -144,7 +167,7 @@ export default function ThreeDCharacter({
       />
 
       <Suspense fallback={null}>
-        <Avatar type={type} animation={animation} spin={spin} />
+        <Avatar type={type} animation={animation} spin={spin} modelUrl={modelUrl} />
       </Suspense>
 
       {!transparent && (
