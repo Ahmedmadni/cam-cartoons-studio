@@ -31,5 +31,10 @@ jobs:
       - name: Production build
         run: bun run build
 
+      - name: Premium background assets
+        run: |
+          test "$(find public/backgrounds/premium -type f -name '*.avif' | wc -l)" -eq 8
+          find public/backgrounds/premium -type f -name '*.avif' -size +1k | grep -q .
+
       - name: Python syntax
         run: python -m py_compile services/voice-api/app.py
