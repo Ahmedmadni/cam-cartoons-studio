@@ -331,14 +331,16 @@ function StoryPage() {
             اكتب قصة لـ {selectedCharacterName ?? CHARACTER_LABELS[selectedCharacter]} 📖
           </h1>
           <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={() => navigate({ to: "/customize" })}
-              className="inline-flex items-center gap-2 rounded-full bg-secondary px-5 py-2.5 font-bold text-secondary-foreground"
-            >
-              <Palette className="size-5" />
-              تعديل الشخصية
-            </button>
+            {!selectedCharacterModelUrl && (
+              <button
+                type="button"
+                onClick={() => navigate({ to: "/customize" })}
+                className="inline-flex items-center gap-2 rounded-full bg-secondary px-5 py-2.5 font-bold text-secondary-foreground"
+              >
+                <Palette className="size-5" />
+                تعديل الشخصية
+              </button>
+            )}
             <button
               type="button"
               onClick={() => navigate({ to: "/" })}
