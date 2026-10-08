@@ -86,7 +86,6 @@ type AddCharacterDialogProps = {
 
 function AddCharacterDialog({ onClose, onAdded }: AddCharacterDialogProps) {
   const addCharacter = useCharacterLibraryStore((state) => state.addCharacter);
-  const characters = useCharacterLibraryStore((state) => state.characters);
   const [name, setName] = useState("شخصية جديدة");
   const [baseType, setBaseType] = useState<CharacterType>("man");
   const [category, setCategory] = useState<CharacterCategory>("teens");
@@ -107,6 +106,16 @@ function AddCharacterDialog({ onClose, onAdded }: AddCharacterDialogProps) {
     }
     if (!cleanUrl) {
       setError("أضف رابط GLB صالحًا.");
+      return;
+    }
+
+    try {
+      const parsed = new URL(cleanUrl);
+      if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
+        throw new Error("unsupported protocol");
+      }
+    } catch {
+      setError("رابط النموذج غير صالح. استخدم رابط HTTP أو HTTPS مباشرًا.");
       return;
     }
 
