@@ -101,6 +101,7 @@ const MODE_LABELS: Record<AvatarRenderMode, { label: string; hint: string }> = {
 function CustomizePage() {
   const navigate = useNavigate();
   const selectedCharacter = useStudioStore((state) => state.selectedCharacter);
+  const selectedCharacterModelUrl = useStudioStore((state) => state.selectedCharacterModelUrl);
   const customization = useAvatarCustomizationStore((state) =>
     selectedCharacter ? state.customizations[selectedCharacter] : undefined,
   );
@@ -116,8 +117,8 @@ function CustomizePage() {
   );
 
   useEffect(() => {
-    if (!selectedCharacter) navigate({ to: "/" });
-  }, [navigate, selectedCharacter]);
+    if (!selectedCharacter || selectedCharacterModelUrl) navigate({ to: "/" });
+  }, [navigate, selectedCharacter, selectedCharacterModelUrl]);
 
   const handleReadyPlayerMeExport = useCallback(
     (modelUrl: string) => {
@@ -129,7 +130,7 @@ function CustomizePage() {
     [selectedCharacter, setRenderMode, updateCustomization],
   );
 
-  if (!selectedCharacter) return null;
+  if (!selectedCharacter || selectedCharacterModelUrl) return null;
 
   const base = getAvatarProfile(selectedCharacter);
   const current: AvatarCustomization = {
