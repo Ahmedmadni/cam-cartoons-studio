@@ -42,6 +42,8 @@ const EXAMPLE = "قل مرحبا بفرح، ثم ارفع يدك، ثم قفز،
 function StoryPage() {
   const navigate = useNavigate();
   const selectedCharacter = useStudioStore((s) => s.selectedCharacter);
+  const selectedCharacterName = useStudioStore((s) => s.selectedCharacterName);
+  const selectedCharacterModelUrl = useStudioStore((s) => s.selectedCharacterModelUrl);
   const setRecordedVideo = useStudioStore((s) => s.setRecordedVideo);
   const selectedVoice = useStudioStore((s) => s.selectedVoice);
   const voicePitch = useStudioStore((s) => s.voicePitch);
@@ -326,7 +328,7 @@ function StoryPage() {
       <div className="mx-auto max-w-6xl">
         <header className="flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-3xl font-black text-foreground sm:text-4xl">
-            اكتب قصة لـ {CHARACTER_LABELS[selectedCharacter]} 📖
+            اكتب قصة لـ {selectedCharacterName ?? CHARACTER_LABELS[selectedCharacter]} 📖
           </h1>
           <div className="flex flex-wrap gap-2">
             <button
@@ -495,6 +497,7 @@ function StoryPage() {
             <div className="aspect-video w-full">
               <CharacterStage
                 type={selectedCharacter}
+                modelUrl={selectedCharacterModelUrl}
                 animation={action}
                 spin={false}
                 backgroundUrl={background.src}
