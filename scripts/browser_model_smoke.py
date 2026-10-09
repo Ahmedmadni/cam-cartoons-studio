@@ -49,7 +49,7 @@ def await_gltf_ready(page, name):
     # The diagnostics appear only when Three.js GLTF loader actually mounts.
     try:
         expect(page.get_by_role("heading", name="تقرير جاهزية نموذج GLB")).to_be_visible(timeout=25000)
-        expect(page.get_by_text(re.compile(r"العظام:\s*0"))).to_be_visible(timeout=25000)
+        page.wait_for_function("() => document.body.innerText.includes('العظام: 0')", timeout=25000)
         assert page.get_by_text("تعذر تحميل النموذج:", exact=False).count() == 0, (
             f"{name}: GLB load failed and the app displayed the procedural fallback"
         )
