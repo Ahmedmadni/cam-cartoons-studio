@@ -69,7 +69,7 @@ const rpmUrl = (value: string | undefined) => prepareReadyPlayerMeUrl(value);
 export const AVATAR_PROFILES: Record<LegacyCharacterType, AvatarProfile> = {
   boy: {
     type: "boy",
-    label: "ولد",
+    label: "يوسف",
     modelUrl: rpmUrl(import.meta.env["VITE_RPM_BOY_URL"]),
     skin: "#D8A078",
     hair: "#3A251D",
@@ -96,7 +96,7 @@ export const AVATAR_PROFILES: Record<LegacyCharacterType, AvatarProfile> = {
   },
   girl: {
     type: "girl",
-    label: "بنت",
+    label: "نور",
     modelUrl: rpmUrl(import.meta.env["VITE_RPM_GIRL_URL"]),
     skin: "#E6B08A",
     hair: "#4A2C25",
@@ -123,7 +123,7 @@ export const AVATAR_PROFILES: Record<LegacyCharacterType, AvatarProfile> = {
   },
   man: {
     type: "man",
-    label: "شاب",
+    label: "أحمد",
     modelUrl: rpmUrl(import.meta.env["VITE_RPM_MAN_URL"]),
     skin: "#C98E68",
     hair: "#2B211E",
@@ -150,7 +150,7 @@ export const AVATAR_PROFILES: Record<LegacyCharacterType, AvatarProfile> = {
   },
   woman: {
     type: "woman",
-    label: "فتاة",
+    label: "مريم",
     modelUrl: rpmUrl(import.meta.env["VITE_RPM_WOMAN_URL"]),
     skin: "#E1A37D",
     hair: "#3A2724",
@@ -183,6 +183,7 @@ export function getAvatarProfile(type: CharacterType): AvatarProfile {
   return {
     ...base,
     type,
+    label: definition?.name ?? base.label,
     rpmScale: definition?.scale ?? base.rpmScale,
     rpmYOffset: definition?.yOffset ?? base.rpmYOffset,
   };
