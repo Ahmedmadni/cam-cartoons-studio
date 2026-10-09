@@ -48,11 +48,13 @@ def wait_for_server(proc):
     raise RuntimeError("Local Vite server was not ready within 90 seconds")
 
 
-def await_gltf_ready(page, name):
+def await_gltf_ready(page, name, expected_zero_bones=True):
     # The diagnostics appear only when Three.js GLTF loader actually mounts.
     try:
         expect(page.get_by_role("heading", name="تقرير جاهزية نموذج GLB")).to_be_visible(timeout=25000)
-        page.wait_for_function("() => document.body.innerText.includes('العظام: 0')", timeout=25000)
+        page.wait_for_function("() => document.body.innerText.includes('العظام: ')", timeout=25000)
+        if expected_zero_bones:
+            page.wait_for_function("() => document.body.innerText.includes('العظام: 0')", timeout=25000)
         assert page.get_by_text("تعذر تحميل النموذج:", exact=False).count() == 0, (
             f"{name}: GLB load failed and the app displayed the procedural fallback"
         )
@@ -69,7 +71,7 @@ def await_gltf_ready(page, name):
         raise
 
 
-def add_character(page, name, *, local_file=None):
+def add_character(page, name, *, local_file=None, model_url=None, expected_zero_bones=True):
     page.get_by_role("button", name="إضافة شخصية").click()
     dialog = page.get_by_role("dialog")
     try:
@@ -82,10 +84,10 @@ def add_character(page, name, *, local_file=None):
     if local_file:
         dialog.locator('input[type="file"]').set_input_files(local_file)
     else:
-        dialog.get_by_placeholder("https://example.com/avatar.glb").fill("/__qa__/model.glb")
+        dialog.get_by_placeholder("https://example.com/avatar.glb").fill(model_url or "/__qa__/model.glb")
     dialog.get_by_role("button", name="حفظ الشخصية").click()
     expect(dialog).to_have_count(0, timeout=15000)
-    await_gltf_ready(page, name)
+    await_gltf_ready(page, name, expected_zero_bones=expected_zero_bones)
 
 
 def main():
@@ -134,6 +136,22 @@ def main():
                 expect(page.get_by_role("heading", name="مكتبة الشخصيات المفتوحة")).to_be_visible()
                 page.get_by_role("button", name=re.compile(r"اختبار الملف")).first.dispatch_event("click")
                 await_gltf_ready(page, "اختبار الملف بعد تحديث الصفحة")
+                # Real featured GLB files, fetched only if the upstream source is alive.
+                # The synthetic fixture remains the mandatory offline regression check.
+                featured_files = sorted(Path("public/__qa__/featured").glob("featured-*.glb"))
+                verified_count = 0
+                for featured_path in featured_files:
+                    name = "فحص " + featured_path.stem
+                    page.goto(URL, wait_until="networkidle", timeout=60000)
+                    add_character(
+                        page, name,
+                        model_url="/__qa__/featured/" + featured_path.name,
+                        expected_zero_bones=False,
+                    )
+                    assert "المجسمات:" in page.locator("body").inner_text()
+                    verified_count += 1
+                    print(f"PASS: real hosted model binary loaded in WebGL: {featured_path.name}", flush=True)
+                print(f"Real publisher-hosted GLB models exercised: {verified_count}/4", flush=True)
                 context.close()
                 browser.close()
             print("PASS: hosted GLB, model controls, mobile WebGL, IndexedDB import and reload")
