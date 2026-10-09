@@ -48,25 +48,25 @@ export const PROVIDER_LABELS: Record<CharacterProvider, string> = {
  */
 export const FEATURED_CHARACTERS: CharacterDefinition[] = [
   {
-    id: "featured-cinematic-female", name: "مايا — شخصية سينمائية", category: "women",
+    id: "featured-cinematic-female", name: "سارة", category: "women",
     provider: "imported-glb", modelUrl: "https://three.ws/avatars/realistic-female.glb",
     voicePreset: "woman", basePreset: "woman", tags: ["Premium", "شبه واقعية", "مصدر خارجي"],
     isDefault: true, scale: 1, yOffset: -1.62,
   },
   {
-    id: "featured-cinematic-male", name: "آدم — شخصية سينمائية", category: "men",
+    id: "featured-cinematic-male", name: "عمر", category: "men",
     provider: "imported-glb", modelUrl: "https://three.ws/avatars/realistic-male.glb",
     voicePreset: "man", basePreset: "man", tags: ["Premium", "شبه واقعية", "مصدر خارجي"],
     isDefault: true, scale: 1, yOffset: -1.62,
   },
   {
-    id: "featured-selfie-girl", name: "لينا — استايل ثلاثي الأبعاد", category: "youth",
+    id: "featured-selfie-girl", name: "ليلى", category: "youth",
     provider: "imported-glb", modelUrl: "https://three.ws/avatars/selfie-girl.glb",
     voicePreset: "girl", basePreset: "woman", tags: ["Premium", "تعبيرات الوجه", "مصدر خارجي"],
     isDefault: true, scale: 1, yOffset: -1.62,
   },
   {
-    id: "featured-michelle", name: "ميشيل — شخصية متحركة", category: "women",
+    id: "featured-michelle", name: "هند", category: "women",
     provider: "imported-glb", modelUrl: "https://three.ws/avatars/michelle.glb",
     voicePreset: "woman", basePreset: "woman", tags: ["3D", "متحركة", "مصدر خارجي"],
     isDefault: true, scale: 1, yOffset: -1.62,
@@ -79,12 +79,38 @@ export function migrateFeaturedCharacters(previous: CharacterDefinition[]): Char
 }
 
 export const DEFAULT_CHARACTERS: CharacterDefinition[] = [
-  { id: "boy", name: "ولد", category: "children", provider: "procedural", tags: ["مدمج"], basePreset: "boy", voicePreset: "boy", isDefault: true },
-  { id: "girl", name: "بنت", category: "children", provider: "procedural", tags: ["مدمج"], basePreset: "girl", voicePreset: "girl", isDefault: true },
-  { id: "man", name: "شاب", category: "youth", provider: "procedural", tags: ["مدمج"], basePreset: "man", voicePreset: "man", isDefault: true },
-  { id: "woman", name: "فتاة", category: "women", provider: "procedural", tags: ["مدمج"], basePreset: "woman", voicePreset: "woman", isDefault: true },
+  { id: "boy", name: "يوسف", category: "children", provider: "procedural", tags: ["مدمج"], basePreset: "boy", voicePreset: "boy", isDefault: true },
+  { id: "girl", name: "نور", category: "children", provider: "procedural", tags: ["مدمج"], basePreset: "girl", voicePreset: "girl", isDefault: true },
+  { id: "man", name: "أحمد", category: "youth", provider: "procedural", tags: ["مدمج"], basePreset: "man", voicePreset: "man", isDefault: true },
+  { id: "woman", name: "مريم", category: "women", provider: "procedural", tags: ["مدمج"], basePreset: "woman", voicePreset: "woman", isDefault: true },
   ...FEATURED_CHARACTERS,
 ];
+
+/**
+ * Only rename untouched stock labels. Preserve all user-created names,
+ * custom edits and deleted characters across the version 2 migration.
+ */
+export const PREVIOUS_DEFAULT_NAMES: Record<string, string> = {
+  boy: "ولد",
+  girl: "بنت",
+  man: "شاب",
+  woman: "فتاة",
+  "featured-cinematic-female": "مايا — شخصية سينمائية",
+  "featured-cinematic-male": "آدم — شخصية سينمائية",
+  "featured-selfie-girl": "لينا — استايل ثلاثي الأبعاد",
+  "featured-michelle": "ميشيل — شخصية متحركة",
+};
+
+export function upgradeDefaultCharacterNames(characters: CharacterDefinition[]): CharacterDefinition[] {
+  const nextNames = new Map(DEFAULT_CHARACTERS.map(({ id, name }) => [id, name]));
+  return characters.map((character) => {
+    const previousName = PREVIOUS_DEFAULT_NAMES[character.id];
+    const nextName = nextNames.get(character.id);
+    return previousName && nextName && character.isDefault && character.name === previousName
+      ? { ...character, name: nextName }
+      : character;
+  });
+}
 
 export function isSafeAssetUrl(value: string, extension: "glb" | "image") {
   const trimmed = value.trim();
@@ -173,8 +199,8 @@ export const useCharacterLibrary = create<CharacterLibraryState>()(
     }),
     {
       name: "cam-cartoons-character-library-v1",
-      version: 1,
-      migrate: (oldState: unknown) => {
+      version: 2,
+      migrate: (oldState: unknown, previousVersion: number) => {
         const persisted = oldState && typeof oldState === "object"
           ? oldState as { characters?: unknown }
           : {};
@@ -182,7 +208,10 @@ export const useCharacterLibrary = create<CharacterLibraryState>()(
           ? persisted.characters.filter((item): item is CharacterDefinition =>
               Boolean(item && typeof item === "object" && typeof item.id === "string"))
           : DEFAULT_CHARACTERS;
-        return { characters: migrateFeaturedCharacters(characters) };
+        // The version-1 migration already seeded featured characters. Re-seeding
+        // them would resurrect avatars that users intentionally deleted.
+        const prior = previousVersion < 1 ? migrateFeaturedCharacters(characters) : characters;
+        return { characters: upgradeDefaultCharacterNames(prior) };
       },
       partialize: (state) => ({ characters: state.characters }),
     },
