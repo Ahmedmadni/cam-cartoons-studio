@@ -54,3 +54,15 @@ The character-library cards use short, familiar **human names**, not placeholder
 | featured-michelle | ميشيل — شخصية متحركة | هند |
 
 The version 2 library migration updates an entry **only when its name still exactly equals the earlier stock name** and \`isDefault\` is true. It never renames user-created characters, overwrites personally edited names, or resurrects deleted entries. Favorite status, local GLB asset IDs, thumbnails, source URLs and customizations stay unchanged. IDs deliberately remain stable for Story and Studio compatibility.
+
+
+## Phase 14 — Adaptive camera & browser QA
+
+- The camera now derives distance from each loaded GLB's measured dimensions, normalized display scale, actual viewport aspect ratio, perspective FOV and mesh depth. Wider rig poses and portrait-mode screens get extra camera distance, reducing cut-off arms/heads.
+- The camera targets the actual vertical center of the normalized character, preserving the character's configured ground offset. On a procedural fallback or GLB error the camera returns to its original framing.
+- The selected character panel offers quick real-time checks for idle, waving, happy, nodding and dancing, plus an independent rotation toggle. These animation controls change the **preview**, not global Story/Studio settings.
+- A pure test suite checks responsive framing on narrow/mobile, tablet and desktop aspect ratios, depth, invalid bounds and failures.
+- GitHub Actions additionally generates a **tiny synthetic GLB test fixture** (not a production avatar), starts the actual app in Vite and runs Chromium with WebGL enabled. It asserts GLB load diagnostics, tests review controls, records mobile and desktop screenshots, imports the GLB file into IndexedDB and verifies that the character reloads successfully.
+- The CI run uploads full-page screenshots and Vite logs under the **model-review-screenshots** artifact for manual visual inspection.
+
+**Important distinction:** The local synthetic fixture tests the WebGL pipeline and storage. It is **not** a cinematic-quality avatar and does not certify that the four third-party-hosted real models match the visual references. Real assets still require separate per-character browser visual QA, stable source/permissions review and potentially improved rig/speech adapters.
