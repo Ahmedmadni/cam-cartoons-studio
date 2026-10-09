@@ -49,6 +49,11 @@ export const DEFAULT_CHARACTERS: CharacterDefinition[] = [
 export function isSafeAssetUrl(value: string, extension: "glb" | "image") {
   const trimmed = value.trim();
   if (!trimmed) return false;
+  // WebP data URLs can only be produced by the local thumbnail capture UI.
+  // Keep size bounded to avoid exhausting the browser's persistent storage.
+  if (extension === "image" && trimmed.startsWith("data:")) {
+    return trimmed.length <= 300000 && /^data:image\/webp;base64,[A-Za-z0-9+/=]+$/.test(trimmed);
+  }
   if (!trimmed.startsWith("https://") && !trimmed.startsWith("/")) return false;
   if (trimmed.startsWith("//")) return false;
   try {
