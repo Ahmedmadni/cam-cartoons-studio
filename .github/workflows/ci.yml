@@ -41,3 +41,28 @@ jobs:
 
       - name: Python syntax
         run: python -m py_compile services/voice-api/app.py
+
+
+      - name: Set up Python browser tooling
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install headless Chromium for WebGL QA
+        run: |
+          python -m pip install playwright==1.56.0
+          python -m playwright install --with-deps chromium
+
+      - name: Generate deterministic GLB browser fixture
+        run: python scripts/generate_qa_glb.py
+
+      - name: Chromium 3D character smoke
+        run: python scripts/browser_model_smoke.py
+
+      - name: Upload browser QA evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: model-review-screenshots
+          path: artifacts/model-review/
+          if-no-files-found: ignore
