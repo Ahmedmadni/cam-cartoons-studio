@@ -1,12 +1,14 @@
-import { Center, useGLTF } from "@react-three/drei";
+import { useGLTF } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
 import { useEffect, useMemo, useRef } from "react";
-import { MathUtils } from "three";
+import { Box3, MathUtils, Vector3 } from "three";
 import type { Bone, Euler, Group, Mesh, Object3D } from "three";
 import { clone as cloneSkeleton } from "three/examples/jsm/utils/SkeletonUtils.js";
 
 import { getAvatarProfile } from "@/lib/avatarCatalog";
 import { faceState } from "@/lib/faceState";
+import { calculateModelFit, detectFaceCapabilities, type AvatarDiagnostics } from "@/lib/modelPresentation";
+import { useStudioStore } from "@/lib/store";
 import type { AnimationType, CharacterType } from "@/lib/store";
 
 type Props = {
@@ -14,6 +16,7 @@ type Props = {
   url: string;
   animation: AnimationType;
   spin: boolean;
+  onDiagnostics?: ((details: AvatarDiagnostics) => void) | undefined;
 };
 
 type MorphMesh = Mesh & {
@@ -120,11 +123,11 @@ function setMorph(meshes: MorphMesh[], aliases: string[], value: number) {
   }
 }
 
-function applyFaceMorphs(rig: Rig, animation: AnimationType) {
+function applyFaceMorphs(rig: Rig, animation: AnimationType, autoBlink: number) {
   const open = faceState.mouthOpen > 0.06 ? faceState.mouthOpen : 0;
   const smile = Math.max(faceState.smile, animation === "happy" ? 0.72 : 0);
-  const blinkLeft = MathUtils.clamp(faceState.blinkLeft, 0, 1);
-  const blinkRight = MathUtils.clamp(faceState.blinkRight, 0, 1);
+  const blinkLeft = MathUtils.clamp(Math.max(faceState.blinkLeft, autoBlink), 0, 1);
+  const blinkRight = MathUtils.clamp(Math.max(faceState.blinkRight, autoBlink), 0, 1);
   const browUp = MathUtils.clamp(faceState.browUp, 0, 1);
 
   setMorph(rig.morphMeshes, ["mouthOpen", "jawOpen", "visemeAA", "viseme_aa"], open);
@@ -156,13 +159,50 @@ function dampBone(
   bone.rotation.z = MathUtils.damp(bone.rotation.z, base.z + (target.z ?? 0), speed, delta);
 }
 
-export default function ReadyPlayerMeAvatar({ type, url, animation, spin }: Props) {
+export default function ReadyPlayerMeAvatar({ type, url, animation, spin, onDiagnostics }: Props) {
   const profile = getAvatarProfile(type);
   const root = useRef<Group>(null);
   const gltf = useGLTF(url);
   const avatar = useMemo(() => cloneSkeleton(gltf.scene), [gltf.scene]);
   const rig = useMemo(() => collectRig(avatar), [avatar]);
   const basePose = useRef<BonePose>(capturePose(rig));
+
+  // Read the geometry in its bind pose, not after runtime animations change the bones.
+  const presentation = useMemo(() => {
+    const bounds = new Box3().setFromObject(avatar);
+    const size = bounds.getSize(new Vector3());
+    const center = bounds.getCenter(new Vector3());
+    const dimensions = { width: size.x, height: size.y, depth: size.z };
+    const fit = calculateModelFit(dimensions, profile.rpmScale);
+    const morphNames = [...new Set(rig.morphMeshes.flatMap((mesh) => Object.keys(mesh.morphTargetDictionary ?? {})))];
+    const boneNames: string[] = [];
+    avatar.traverse((object) => { if (object.type === "Bone") boneNames.push(object.name); });
+    const capability = detectFaceCapabilities(morphNames);
+    const diagnostics: AvatarDiagnostics = {
+      status: "ready",
+      modelUrl: url,
+      dimensions,
+      normalizedScale: fit.scale,
+      boneCount: boneNames.length,
+      morphCount: morphNames.length,
+      hasHeadRig: Boolean(rig.head),
+      hasArmRig: Boolean(rig.leftArm && rig.rightArm),
+      hasLipSync: capability.hasLipSync,
+      hasBlink: capability.hasBlink,
+      boneNames: boneNames.slice(0, 36),
+      morphNames: morphNames.slice(0, 36),
+      ...(!fit.valid ? { message: "تعذر قراءة أبعاد النموذج؛ تم استخدام المقياس الافتراضي." } : {}),
+    };
+    return {
+      scale: fit.valid ? fit.scale : profile.rpmScale,
+      offset: [-center.x, -bounds.min.y, -center.z] as [number, number, number],
+      diagnostics,
+    };
+  }, [avatar, rig, profile.rpmScale, url]);
+
+  useEffect(() => {
+    onDiagnostics?.(presentation.diagnostics);
+  }, [onDiagnostics, presentation]);
 
   useEffect(() => {
     basePose.current = capturePose(rig);
@@ -201,6 +241,14 @@ export default function ReadyPlayerMeAvatar({ type, url, animation, spin }: Prop
     let headX = faceState.pitch * 0.45;
     let headY = -faceState.yaw * 0.58;
     let headZ = -faceState.roll * 0.46;
+
+    const tracking = useStudioStore.getState().isFaceTrackingEnabled;
+    // Micro-movements only while face tracking is disabled; never fight MediaPipe.
+    if (!tracking && animation === "idle") {
+      headX += Math.sin(t * 0.83) * 0.014;
+      headY += Math.sin(t * 0.52 + 0.5) * 0.026;
+      headZ += Math.sin(t * 0.74) * 0.012;
+    }
 
     if (animation === "nod") headX += Math.sin(t * 5.1) * 0.2;
     if (animation === "sad") headX += 0.18;
@@ -245,18 +293,22 @@ export default function ReadyPlayerMeAvatar({ type, url, animation, spin }: Prop
     dampBone(rig.leftForeArm, pose.leftForeArm, leftForeArm, delta);
     dampBone(rig.rightForeArm, pose.rightForeArm, rightForeArm, delta);
 
-    applyFaceMorphs(rig, animation);
+    const blinkPhase = t % 4.9;
+    const autoBlink = !tracking && blinkPhase >= 3.48 && blinkPhase <= 3.72
+      ? Math.sin(((blinkPhase - 3.48) / 0.24) * Math.PI)
+      : 0;
+    applyFaceMorphs(rig, animation, autoBlink);
   });
 
   return (
     <group
       ref={root}
       position={[0, profile.rpmYOffset, 0]}
-      scale={profile.rpmScale}
+      scale={presentation.scale}
     >
-      <Center bottom>
+      <group position={presentation.offset}>
         <primitive object={avatar} />
-      </Center>
+      </group>
     </group>
   );
 }

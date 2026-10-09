@@ -3,6 +3,7 @@ import { Canvas } from "@react-three/fiber";
 import { Component, Suspense, type ReactNode } from "react";
 
 import { mergeAvatarProfile } from "@/lib/avatarCatalog";
+import type { AvatarDiagnostics } from "@/lib/modelPresentation";
 import { useAvatarCustomizationStore } from "@/lib/avatarCustomization";
 import type { AnimationType, CharacterType } from "@/lib/store";
 
@@ -22,6 +23,7 @@ function Backdrop({ url }: { url: string }) {
 type BoundaryProps = {
   resetKey: string;
   fallback: ReactNode;
+  onError?: (error: Error) => void;
   children: ReactNode;
 };
 
@@ -34,6 +36,10 @@ class AvatarErrorBoundary extends Component<BoundaryProps, BoundaryState> {
 
   static getDerivedStateFromError() {
     return { failed: true };
+  }
+
+  override componentDidCatch(error: Error) {
+    this.props.onError?.(error);
   }
 
   override componentDidUpdate(previous: BoundaryProps) {
@@ -51,27 +57,37 @@ function Avatar({
   type,
   animation,
   spin,
+  onDiagnostics,
 }: {
   type: CharacterType;
   animation: AnimationType;
   spin: boolean;
+  onDiagnostics?: ((details: AvatarDiagnostics) => void) | undefined;
 }) {
   const customization = useAvatarCustomizationStore((state) => state.customizations[type]);
   const profile = mergeAvatarProfile(type, customization);
-  const renderMode = useAvatarCustomizationStore((state) => state.renderModes[type]);
+  const renderMode = useAvatarCustomizationStore((state) => state.renderModes[type]) ?? "auto";
   const fallback = <ProceduralAvatar type={type} animation={animation} spin={spin} />;
 
   if (renderMode === "custom") return fallback;
   if (!profile.modelUrl) return fallback;
   if (renderMode === "readyplayerme" || renderMode === "auto") {
     return (
-    <AvatarErrorBoundary resetKey={profile.modelUrl} fallback={fallback}>
+    <AvatarErrorBoundary
+      resetKey={type + ":" + profile.modelUrl}
+      fallback={fallback}
+      onError={(error) => onDiagnostics?.({
+        status: "error", modelUrl: profile.modelUrl ?? "",
+        message: error.message || "تعذر تحميل أو قراءة ملف GLB.",
+      })}
+    >
       <Suspense fallback={fallback}>
         <ReadyPlayerMeAvatar
           type={type}
           url={profile.modelUrl}
           animation={animation}
           spin={spin}
+          onDiagnostics={onDiagnostics}
         />
       </Suspense>
     </AvatarErrorBoundary>
@@ -90,6 +106,7 @@ export type ThreeDCharacterProps = {
   /** صورة خلفية تُرسم داخل المشهد وتظهر أيضاً في الفيديو المسجل. */
   backgroundUrl?: string;
   onCanvasReady?: (canvas: HTMLCanvasElement) => void;
+  onDiagnostics?: ((details: AvatarDiagnostics) => void) | undefined;
 };
 
 export default function ThreeDCharacter({
@@ -100,6 +117,7 @@ export default function ThreeDCharacter({
   className,
   backgroundUrl,
   onCanvasReady,
+  onDiagnostics,
 }: ThreeDCharacterProps) {
   return (
     <Canvas
@@ -144,7 +162,7 @@ export default function ThreeDCharacter({
       />
 
       <Suspense fallback={null}>
-        <Avatar type={type} animation={animation} spin={spin} />
+        <Avatar type={type} animation={animation} spin={spin} onDiagnostics={onDiagnostics} />
       </Suspense>
 
       {!transparent && (

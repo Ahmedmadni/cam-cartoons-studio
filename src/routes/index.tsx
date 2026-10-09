@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { BookOpen, Camera, Edit3, Heart, Plus, Search, Sparkles, Trash2, X } from "lucide-react";
 import CharacterStage from "@/components/characters/CharacterStage";
 import {
@@ -7,6 +7,7 @@ import {
   type CharacterDefinition, type CharacterDraft, type CharacterCategory, type CharacterProvider,
 } from "@/lib/characterLibrary";
 import { useStudioStore, VOICES, type VoiceType } from "@/lib/store";
+import type { AvatarDiagnostics } from "@/lib/modelPresentation";
 
 export const Route = createFileRoute("/")({
   head: () => ({ meta: [
@@ -129,6 +130,14 @@ function LibraryPage() {
   const [filter, setFilter] = useState("all");
   const [search, setSearch] = useState("");
   const [editor, setEditor] = useState<CharacterDefinition | "new" | null>(null);
+  const [diagnostics, setDiagnostics] = useState<AvatarDiagnostics | null>(null);
+  const [captureError, setCaptureError] = useState<string | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  useEffect(() => {
+    setDiagnostics(null);
+    setCaptureError(null);
+    canvasRef.current = null;
+  }, [selectedCharacter]);
   const selected = characters.find((item) => item.id === selectedCharacter);
   const filters = [
     { value: "all", label: "الكل" }, { value: "imported-glb", label: "Premium GLB" },
@@ -142,6 +151,38 @@ function LibraryPage() {
     return matchesFilter && (!q || [item.name, ...item.tags, item.provider].some((s) => s.toLocaleLowerCase().includes(q)));
   }).sort((a, b) => Number(Boolean(b.isFavorite)) - Number(Boolean(a.isFavorite)) ||
     Number(b.provider === "imported-glb") - Number(a.provider === "imported-glb")), [characters, filter, search]);
+
+  const captureThumbnail = () => {
+    if (!selected) return;
+    try {
+      const source = canvasRef.current;
+      if (!source || !source.width || !source.height) throw new Error("المعاينة لم تجهز بعد.");
+      const output = document.createElement("canvas");
+      output.width = 480;
+      output.height = 360;
+      const ctx = output.getContext("2d");
+      if (!ctx) throw new Error("تعذر تجهيز صورة المعاينة.");
+      const gradient = ctx.createLinearGradient(0, 0, 480, 360);
+      gradient.addColorStop(0, "#203251");
+      gradient.addColorStop(1, "#556d86");
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, 480, 360);
+      const srcRatio = source.width / source.height;
+      const cropW = srcRatio > 4 / 3 ? source.height * 4 / 3 : source.width;
+      const cropH = srcRatio > 4 / 3 ? source.height : source.width * 3 / 4;
+      ctx.drawImage(source, (source.width - cropW) / 2, (source.height - cropH) / 2,
+        cropW, cropH, 0, 0, 480, 360);
+      const image = output.toDataURL("image/webp", 0.72);
+      if (!image.startsWith("data:image/webp;base64,") || image.length > 300000) {
+        throw new Error("صورة المعاينة كبيرة جدًا أو الصيغة غير مدعومة.");
+      }
+      const { id: _id, isFavorite: _favorite, isDefault: _default, ...draft } = selected;
+      updateCharacter(selected.id, { ...draft, thumbnail: image });
+      setCaptureError(null);
+    } catch (error) {
+      setCaptureError(error instanceof Error ? error.message : "تعذر التقاط صورة المعاينة.");
+    }
+  };
 
   const choose = (item: CharacterDefinition) => {
     setSelectedCharacter(item.id);
@@ -214,10 +255,37 @@ function LibraryPage() {
           لا توجد شخصيات مطابقة. استخدم «إضافة شخصية» أو غيّر البحث والتصفية.
         </p>}
         {selected && <section className="mt-8 grid gap-5 rounded-3xl border-2 border-primary/40 bg-card p-5 md:grid-cols-2">
-          <div className="h-80 overflow-hidden rounded-2xl bg-muted"><CharacterStage type={selected.id} animation="idle" spin /></div>
+          <div className="h-80 overflow-hidden rounded-2xl bg-muted">
+            <CharacterStage type={selected.id} animation="idle" spin
+              onCanvasReady={(canvas) => { canvasRef.current = canvas; }}
+              onDiagnostics={setDiagnostics} />
+          </div>
           <div className="flex flex-col justify-center gap-3">
             <h2 className="text-3xl font-black">{selected.name}</h2>
             <p className="font-semibold text-muted-foreground">معاينة مباشرة داخل الاستوديو — {PROVIDER_LABELS[selected.provider]}</p>
+            <button type="button" onClick={captureThumbnail}
+              disabled={selected.provider !== "procedural" && diagnostics?.status !== "ready"}
+              className="rounded-full border-2 border-primary px-6 py-3 font-bold text-foreground disabled:cursor-not-allowed disabled:opacity-40">
+              التقاط صورة معاينة من النموذج
+            </button>
+            {captureError && <p role="alert" className="text-sm font-bold text-destructive">{captureError}</p>}
+            {selected.provider !== "procedural" && <div className="rounded-2xl border border-border bg-background p-4 text-sm">
+              <h3 className="font-black">تقرير جاهزية نموذج GLB</h3>
+              {!diagnostics && <p className="mt-2 text-muted-foreground">جارٍ فحص النموذج وتحميله...</p>}
+              {diagnostics?.status === "error" && <p role="alert" className="mt-2 text-destructive">
+                تعذر تحميل النموذج: {diagnostics.message}. يتم عرض الشخصية الاحتياطية.
+              </p>}
+              {diagnostics?.status === "ready" && <div className="mt-2 space-y-1 font-semibold text-muted-foreground">
+                <p>العظام: {diagnostics.boneCount ?? 0} · تعابير Morph: {diagnostics.morphCount ?? 0}</p>
+                <p>تحريك الرأس: {diagnostics.hasHeadRig ? "متاح" : "غير مدعوم"} · الذراعان: {diagnostics.hasArmRig ? "متاحان" : "غير مدعومين"}</p>
+                <p>تحريك الفم: {diagnostics.hasLipSync ? "مدعوم" : "غير مدعوم"} · رمش العين: {diagnostics.hasBlink ? "مدعوم" : "غير مدعوم"}</p>
+                {diagnostics.dimensions && <p>
+                  أبعاد الأصل: {diagnostics.dimensions.width.toFixed(2)} × {diagnostics.dimensions.height.toFixed(2)} × {diagnostics.dimensions.depth.toFixed(2)}
+                </p>}
+                {diagnostics.message && <p className="text-amber-700">{diagnostics.message}</p>}
+                {!diagnostics.hasLipSync && <p>يحتاج النموذج إلى Morph Targets مناسبة ليتحرك فمه أثناء الكلام.</p>}
+              </div>}
+            </div>}
             <button type="button" onClick={() => navigate({ to: "/customize" })} className="rounded-full bg-secondary px-6 py-3 font-black">تخصيص الشخصية</button>
             <button type="button" onClick={() => navigate({ to: "/story" })} className="inline-flex items-center justify-center gap-2 rounded-full bg-primary px-6 py-3 font-black text-primary-foreground"><BookOpen className="size-5" /> ابدأ القصة</button>
             <button type="button" onClick={() => navigate({ to: "/studio" })} className="inline-flex items-center justify-center gap-2 rounded-full border-2 border-border px-6 py-3 font-black"><Camera className="size-5" /> استوديو التصوير</button>
