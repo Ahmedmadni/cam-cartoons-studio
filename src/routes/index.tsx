@@ -6,7 +6,7 @@ import {
   CHARACTER_CATEGORIES, PROVIDER_LABELS, useCharacterLibrary,
   type CharacterDefinition, type CharacterDraft, type CharacterCategory, type CharacterProvider,
 } from "@/lib/characterLibrary";
-import { useStudioStore, VOICES, type VoiceType } from "@/lib/store";
+import { useStudioStore, VOICES, ANIMATION_LABELS, type AnimationType, type VoiceType } from "@/lib/store";
 import type { AvatarDiagnostics } from "@/lib/modelPresentation";
 import { cacheRemoteGlb, deleteGlbAsset, saveGlbAsset, MAX_GLB_BYTES } from "@/lib/localGlbStorage";
 
@@ -160,11 +160,15 @@ function LibraryPage() {
   const [captureError, setCaptureError] = useState<string | null>(null);
   const [offlineSavingId, setOfflineSavingId] = useState<string | null>(null);
   const [offlineError, setOfflineError] = useState<string | null>(null);
+  const [reviewAnimation, setReviewAnimation] = useState<AnimationType>("idle");
+  const [reviewSpin, setReviewSpin] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   useEffect(() => {
     setDiagnostics(null);
     setCaptureError(null);
     setOfflineError(null);
+    setReviewAnimation("idle");
+    setReviewSpin(false);
     canvasRef.current = null;
   }, [selectedCharacter]);
   const selected = characters.find((item) => item.id === selectedCharacter);
@@ -315,12 +319,30 @@ function LibraryPage() {
         </p>}
         {selected && <section className="mt-8 grid gap-5 rounded-3xl border-2 border-primary/40 bg-card p-5 md:grid-cols-2">
           <div className="h-80 overflow-hidden rounded-2xl bg-muted">
-            <CharacterStage type={selected.id} animation="idle" spin
+            <CharacterStage type={selected.id} animation={reviewAnimation} spin={reviewSpin}
               onCanvasReady={(canvas) => { canvasRef.current = canvas; }}
               onDiagnostics={setDiagnostics} />
           </div>
           <div className="flex flex-col justify-center gap-3">
             <h2 className="text-3xl font-black">{selected.name}</h2>
+            <div className="rounded-2xl border border-border bg-muted/40 p-3">
+              <p className="text-sm font-black">اختبار الشخصية قبل استخدامها</p>
+              <p className="mt-1 text-xs text-muted-foreground">شاهد الوجه والذراعين أثناء الحركة. يمكن إيقاف الدوران لتقييم ملامح الوجه أماميًا.</p>
+              <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label="حركات فحص الشخصية">
+                {(["idle", "wave", "happy", "nod", "dance"] as AnimationType[]).map((animation) =>
+                  <button key={animation} type="button" aria-pressed={reviewAnimation === animation}
+                    onClick={() => setReviewAnimation(animation)}
+                    className={"rounded-full px-3 py-2 text-xs font-bold " + (reviewAnimation === animation
+                      ? "bg-primary text-primary-foreground" : "bg-card text-foreground")}>
+                    {ANIMATION_LABELS[animation]}
+                  </button>)}
+                <button type="button" aria-pressed={reviewSpin} onClick={() => setReviewSpin(!reviewSpin)}
+                  className={"rounded-full border px-3 py-2 text-xs font-bold " + (reviewSpin
+                    ? "border-primary bg-primary text-primary-foreground" : "border-border bg-card")}>
+                  {reviewSpin ? "إيقاف الدوران" : "تدوير الشخصية"}
+                </button>
+              </div>
+            </div>
             <p className="font-semibold text-muted-foreground">معاينة مباشرة داخل الاستوديو — {PROVIDER_LABELS[selected.provider]}</p>
             {selected.provider === "imported-glb" && (
               <div className="rounded-2xl border border-border bg-muted/40 p-3 text-sm">
