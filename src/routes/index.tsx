@@ -22,7 +22,7 @@ const emptyDraft: CharacterDraft = {
 };
 
 function Editor({ initial, onClose, onSave }: {
-  initial?: CharacterDefinition;
+  initial?: CharacterDefinition | undefined;
   onClose: () => void;
   onSave: (draft: CharacterDraft) => void;
 }) {
