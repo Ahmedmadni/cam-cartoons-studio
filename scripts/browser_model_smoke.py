@@ -97,9 +97,12 @@ def main():
                 expect(page.get_by_role("heading", name="مكتبة الشخصيات المفتوحة")).to_be_visible(timeout=30000)
 
                 add_character(page, "اختبار الجودة")
-                page.get_by_role("button", name="تلويح").click()
+                page.screenshot(path=str(ARTIFACTS / "desktop-loaded-glb.png"), full_page=True)
+                # Dispatch actual DOM clicks to verify React controls without waiting on
+                # unrelated Vite dev-server navigation/network tasks in Playwright.
+                page.get_by_role("button", name="تلويح").dispatch_event("click")
                 expect(page.get_by_role("button", name="تلويح")).to_have_attribute("aria-pressed", "true")
-                page.get_by_role("button", name="تدوير الشخصية").click()
+                page.get_by_role("button", name="تدوير الشخصية").dispatch_event("click")
                 expect(page.get_by_role("button", name="إيقاف الدوران")).to_have_attribute("aria-pressed", "true")
                 page.screenshot(path=str(ARTIFACTS / "desktop-glb.png"), full_page=True)
 
