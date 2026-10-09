@@ -56,6 +56,12 @@ jobs:
       - name: Generate deterministic GLB browser fixture
         run: python scripts/generate_qa_glb.py
 
+      - name: Deterministic glTF 2.0 audit parser tests
+        run: python -m unittest discover -s scripts -p 'test_featured_glb_audit.py'
+
+      - name: Audit actual hosted featured GLBs
+        run: python scripts/audit_featured_glbs.py --live --download-tests
+
       - name: Chromium 3D character smoke
         run: python scripts/browser_model_smoke.py
 
