@@ -4,6 +4,7 @@
 Run in CI after generate_qa_glb.py and Playwright installation.
 Screenshots and dev-server logs are stored as GitHub Actions artifacts.
 """
+import os
 import re
 import subprocess
 import time
@@ -19,7 +20,9 @@ ARTIFACTS.mkdir(parents=True, exist_ok=True)
 
 
 def capture_evidence(page, filename):
-    """Optional screenshot: Chromium software GPU may stall on WebGL readback."""
+    """Opt-in screenshot: CI's software GPU can hang on WebGL readback."""
+    if os.environ.get("MODEL_QA_CAPTURE") != "1":
+        return
     try:
         page.screenshot(
             path=str(ARTIFACTS / filename),
