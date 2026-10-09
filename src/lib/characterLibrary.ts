@@ -12,6 +12,8 @@ export type CharacterDefinition = {
   category: CharacterCategory;
   provider: CharacterProvider;
   modelUrl?: string | undefined;
+  /** IndexedDB key for a privately imported binary GLB (not a URL). */
+  assetId?: string | undefined;
   thumbnail?: string | undefined;
   voicePreset?: VoiceType;
   tags: string[];
@@ -70,8 +72,11 @@ function normalizeDraft(draft: CharacterDraft): CharacterDraft {
   const name = draft.name.trim();
   if (!name || name.length > 80) throw new Error("أدخل اسمًا للشخصية لا يتجاوز 80 حرفًا.");
   const modelUrl = draft.modelUrl?.trim() || undefined;
-  if (draft.provider !== "procedural" && (!modelUrl || !isSafeAssetUrl(modelUrl, "glb"))) {
-    throw new Error("لشخصيات GLB وReady Player Me أدخل رابط HTTPS صالحًا ينتهي بامتداد .glb (أو مسارًا محليًا).");
+  const assetId = draft.assetId?.trim() || undefined;
+  if (assetId && !/^glb-[a-z0-9-]{8,}$/i.test(assetId)) throw new Error("معرف ملف الشخصية غير صالح.");
+  if (modelUrl && !isSafeAssetUrl(modelUrl, "glb")) throw new Error("رابط GLB غير صالح.");
+  if (draft.provider !== "procedural" && !modelUrl && !assetId) {
+    throw new Error("أدخل رابط GLB أو استورد ملف .glb من جهازك.");
   }
   const thumbnail = draft.thumbnail?.trim() || undefined;
   if (thumbnail && !isSafeAssetUrl(thumbnail, "image")) {
@@ -85,6 +90,7 @@ function normalizeDraft(draft: CharacterDraft): CharacterDraft {
     ...draft,
     name,
     modelUrl: draft.provider === "procedural" ? undefined : modelUrl,
+    assetId: draft.provider === "procedural" ? undefined : assetId,
     thumbnail,
     tags: [...new Set(draft.tags.map((tag) => tag.trim()).filter(Boolean))].slice(0, 12),
     scale,
