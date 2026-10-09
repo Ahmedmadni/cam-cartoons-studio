@@ -77,3 +77,60 @@ export async function deleteGlbAsset(id: string): Promise<void> {
   if (!/^glb-[a-z0-9-]{8,}$/i.test(id)) return;
   await transact<void>("readwrite", (store) => { store.delete(id); });
 }
+
+
+/**
+ * Copies a publisher-hosted HTTPS GLB into the user's browser-local IndexedDB.
+ * Streaming enforces the same file limit even if Content-Length is absent.
+ * If CORS is disallowed, the operation fails visibly instead of masquerading as offline.
+ */
+export async function cacheRemoteGlb(url: string): Promise<string> {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    throw new Error("رابط النموذج غير صالح.");
+  }
+  if (parsed.protocol !== "https:" || !/\.glb$/i.test(parsed.pathname)) {
+    throw new Error("يمكن حفظ روابط HTTPS المباشرة لملفات GLB فقط.");
+  }
+  let response: Response;
+  try {
+    response = await fetch(parsed.toString(), { mode: "cors", credentials: "omit" });
+  } catch {
+    throw new Error("تعذر الوصول إلى مصدر GLB، ربما بسبب الشبكة أو إعدادات CORS لدى المصدر.");
+  }
+  if (!response.ok) throw new Error("تعذر تنزيل GLB: رمز الاستجابة " + response.status);
+  const length = Number(response.headers.get("content-length"));
+  if (length > MAX_GLB_BYTES) {
+    await response.body?.cancel().catch(() => {});
+    throw new Error("حجم نموذج GLB يتجاوز الحد المسموح (60 ميجابايت).");
+  }
+  const chunks: Uint8Array<ArrayBuffer>[] = [];
+  let bytes = 0;
+  if (response.body) {
+    const reader = response.body.getReader();
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        bytes += value.byteLength;
+        if (bytes > MAX_GLB_BYTES) {
+          await reader.cancel().catch(() => {});
+          throw new Error("تجاوز حجم GLB الحد المسموح أثناء التنزيل.");
+        }
+        chunks.push(new Uint8Array(value));
+      }
+    } finally {
+      reader.releaseLock();
+    }
+  } else {
+    const data = await response.arrayBuffer();
+    bytes = data.byteLength;
+    if (bytes > MAX_GLB_BYTES) throw new Error("حجم النموذج أكبر من 60 ميجابايت.");
+    chunks.push(new Uint8Array(data));
+  }
+  const filename = (parsed.pathname.split("/").pop() ?? "character.glb").replace(/[^a-zA-Z0-9._-]/g, "");
+  const file = new File(chunks, filename, { type: "model/gltf-binary" });
+  return saveGlbAsset(file);
+}

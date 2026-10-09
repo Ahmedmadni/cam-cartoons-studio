@@ -41,11 +41,49 @@ export const PROVIDER_LABELS: Record<CharacterProvider, string> = {
   procedural: "مدمجة (احتياطية)",
 };
 
+/**
+ * Featured, real rigged GLB files from the upstream three.ws public asset catalog.
+ * These are hosted at the publisher origin (not bundled as repo binary assets).
+ * The selected user can save copies to IndexedDB for stable browser-local playback.
+ */
+export const FEATURED_CHARACTERS: CharacterDefinition[] = [
+  {
+    id: "featured-cinematic-female", name: "مايا — شخصية سينمائية", category: "women",
+    provider: "imported-glb", modelUrl: "https://three.ws/avatars/realistic-female.glb",
+    voicePreset: "woman", basePreset: "woman", tags: ["Premium", "شبه واقعية", "مصدر خارجي"],
+    isDefault: true, scale: 1, yOffset: -1.62,
+  },
+  {
+    id: "featured-cinematic-male", name: "آدم — شخصية سينمائية", category: "men",
+    provider: "imported-glb", modelUrl: "https://three.ws/avatars/realistic-male.glb",
+    voicePreset: "man", basePreset: "man", tags: ["Premium", "شبه واقعية", "مصدر خارجي"],
+    isDefault: true, scale: 1, yOffset: -1.62,
+  },
+  {
+    id: "featured-selfie-girl", name: "لينا — استايل ثلاثي الأبعاد", category: "youth",
+    provider: "imported-glb", modelUrl: "https://three.ws/avatars/selfie-girl.glb",
+    voicePreset: "girl", basePreset: "woman", tags: ["Premium", "تعبيرات الوجه", "مصدر خارجي"],
+    isDefault: true, scale: 1, yOffset: -1.62,
+  },
+  {
+    id: "featured-michelle", name: "ميشيل — شخصية متحركة", category: "women",
+    provider: "imported-glb", modelUrl: "https://three.ws/avatars/michelle.glb",
+    voicePreset: "woman", basePreset: "woman", tags: ["3D", "متحركة", "مصدر خارجي"],
+    isDefault: true, scale: 1, yOffset: -1.62,
+  },
+];
+
+export function migrateFeaturedCharacters(previous: CharacterDefinition[]): CharacterDefinition[] {
+  const existingIds = new Set(previous.map((character) => character.id));
+  return [...previous, ...FEATURED_CHARACTERS.filter((character) => !existingIds.has(character.id))];
+}
+
 export const DEFAULT_CHARACTERS: CharacterDefinition[] = [
   { id: "boy", name: "ولد", category: "children", provider: "procedural", tags: ["مدمج"], basePreset: "boy", voicePreset: "boy", isDefault: true },
   { id: "girl", name: "بنت", category: "children", provider: "procedural", tags: ["مدمج"], basePreset: "girl", voicePreset: "girl", isDefault: true },
   { id: "man", name: "شاب", category: "youth", provider: "procedural", tags: ["مدمج"], basePreset: "man", voicePreset: "man", isDefault: true },
   { id: "woman", name: "فتاة", category: "women", provider: "procedural", tags: ["مدمج"], basePreset: "woman", voicePreset: "woman", isDefault: true },
+  ...FEATURED_CHARACTERS,
 ];
 
 export function isSafeAssetUrl(value: string, extension: "glb" | "image") {
@@ -133,7 +171,21 @@ export const useCharacterLibrary = create<CharacterLibraryState>()(
           ),
         })),
     }),
-    { name: "cam-cartoons-character-library-v1", partialize: (state) => ({ characters: state.characters }) },
+    {
+      name: "cam-cartoons-character-library-v1",
+      version: 1,
+      migrate: (oldState: unknown) => {
+        const persisted = oldState && typeof oldState === "object"
+          ? oldState as { characters?: unknown }
+          : {};
+        const characters = Array.isArray(persisted.characters)
+          ? persisted.characters.filter((item): item is CharacterDefinition =>
+              Boolean(item && typeof item === "object" && typeof item.id === "string"))
+          : DEFAULT_CHARACTERS;
+        return { characters: migrateFeaturedCharacters(characters) };
+      },
+      partialize: (state) => ({ characters: state.characters }),
+    },
   ),
 );
 

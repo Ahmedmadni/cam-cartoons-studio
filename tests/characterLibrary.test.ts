@@ -9,7 +9,7 @@ import {
 
 describe("Open Character Library", () => {
   test("starts with backward-compatible legacy characters", () => {
-    expect(DEFAULT_CHARACTERS.map((item) => item.id)).toEqual(["boy", "girl", "man", "woman"]);
+    expect(DEFAULT_CHARACTERS.slice(0, 4).map((item) => item.id)).toEqual(["boy", "girl", "man", "woman"]);
   });
 
   test("only accepts HTTPS or local GLB and safe image formats", () => {
