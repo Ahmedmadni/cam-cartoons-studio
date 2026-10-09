@@ -97,7 +97,7 @@ def inspect_glb(data: bytes) -> dict:
     }
 
 
-def read_limited(url: str, timeout: int = 22) -> bytes:
+def read_limited(url: str, timeout: int = 22) -> tuple[bytes, dict]:
     if not url.startswith("https://"):
         raise ValueError("Only HTTPS model hosts are permitted")
     req = urllib.request.Request(url, headers={"User-Agent": "CamCartoonsStudioAssetQA/1.0"})
@@ -106,9 +106,14 @@ def read_limited(url: str, timeout: int = 22) -> bytes:
         if size_header and int(size_header) > MAX_BYTES:
             raise ValueError("Model exceeds 32 MiB audit ceiling")
         data = res.read(MAX_BYTES + 1)
+        headers = {
+            "content_type": res.headers.get("Content-Type", ""),
+            "cors_allow_origin": res.headers.get("Access-Control-Allow-Origin", ""),
+            "final_url": res.url,
+        }
     if len(data) > MAX_BYTES:
         raise ValueError("Model exceeds 32 MiB audit ceiling")
-    return data
+    return data, headers
 
 
 def featured_urls() -> dict[str, str]:
@@ -124,13 +129,19 @@ def featured_urls() -> dict[str, str]:
     return featured
 
 
-def audit_live() -> int:
+def audit_live(save_browser_fixtures: bool = False) -> int:
     report = {"models": {}, "note": "Structural audit only; not a visual-art or CORS certification"}
     for identity, source in featured_urls().items():
         print(f"Inspecting {source['name']}: {source['url']}", flush=True)
         try:
-            details = inspect_glb(read_limited(source["url"]))
-            report["models"][identity] = {**source, "status": "verified", **details}
+            binary, headers = read_limited(source["url"])
+            details = inspect_glb(binary)
+            if save_browser_fixtures:
+                path = Path("public/__qa__/featured") / (identity + ".glb")
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(binary)
+            report["models"][identity] = {**source, **headers,
+                                          "status": "verified", **details}
             print(f"  verified {details['bytes']} bytes; meshes={details['mesh_count']}; "
                   f"joints={details['joints']}; morphs={details['morph_count']}", flush=True)
         except (ValueError, OSError, TimeoutError, urllib.error.URLError) as exc:
@@ -150,9 +161,10 @@ def main():
     p = argparse.ArgumentParser()
     p.add_argument("glb", nargs="?", type=Path)
     p.add_argument("--live", action="store_true")
+    p.add_argument("--download-tests", action="store_true")
     args = p.parse_args()
     if args.live:
-        return audit_live()
+        return audit_live(save_browser_fixtures=args.download_tests)
     if args.glb is None:
         p.error("Pass a local .glb path or --live")
     print(json.dumps(inspect_glb(args.glb.read_bytes()), ensure_ascii=False, indent=2))
