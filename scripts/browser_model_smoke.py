@@ -44,7 +44,13 @@ def await_gltf_ready(page, name):
 def add_character(page, name, *, local_file=None):
     page.get_by_role("button", name="إضافة شخصية").click()
     dialog = page.get_by_role("dialog")
-    dialog.get_by_label("اسم الشخصية").fill(name)
+    try:
+        expect(dialog).to_be_visible(timeout=12000)
+    except AssertionError:
+        page.screenshot(path=str(ARTIFACTS / "form-open-failure.png"), full_page=True)
+        print("Editor failed to open. Page text:", page.locator("body").inner_text()[:2400])
+        raise
+    dialog.locator("#character-editor-name").fill(name)
     if local_file:
         dialog.locator('input[type="file"]').set_input_files(local_file)
     else:
@@ -75,7 +81,7 @@ def main():
                 )
                 context = browser.new_context(viewport={"width": 1366, "height": 900})
                 page = context.new_page()
-                page.goto(URL, wait_until="domcontentloaded", timeout=60000)
+                page.goto(URL, wait_until="networkidle", timeout=60000)
                 expect(page.get_by_role("heading", name="مكتبة الشخصيات المفتوحة")).to_be_visible(timeout=30000)
 
                 add_character(page, "اختبار الجودة")
