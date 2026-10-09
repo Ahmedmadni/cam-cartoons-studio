@@ -1,8 +1,10 @@
 import { ContactShadows, Environment, Lightformer, useTexture } from "@react-three/drei";
 import { Canvas } from "@react-three/fiber";
-import { Component, Suspense, type ReactNode } from "react";
+import { Component, Suspense, useEffect, type ReactNode } from "react";
 
 import { mergeAvatarProfile } from "@/lib/avatarCatalog";
+import { useCharacterLibrary } from "@/lib/characterLibrary";
+import { useLocalGlbUrl } from "@/lib/useLocalGlbUrl";
 import type { AvatarDiagnostics } from "@/lib/modelPresentation";
 import { useAvatarCustomizationStore } from "@/lib/avatarCustomization";
 import type { AnimationType, CharacterType } from "@/lib/store";
@@ -66,25 +68,38 @@ function Avatar({
 }) {
   const customization = useAvatarCustomizationStore((state) => state.customizations[type]);
   const profile = mergeAvatarProfile(type, customization);
+  const assetId = useCharacterLibrary((s) => s.characters.find((item) => item.id === type)?.assetId);
+  const localAsset = useLocalGlbUrl(assetId);
+  // Local geometry has priority; do not accidentally show the old remote preset while loading.
+  const modelUrl = assetId ? localAsset.url : profile.modelUrl;
+  useEffect(() => {
+    if (assetId && localAsset.error) {
+      onDiagnostics?.({
+        status: "error",
+        modelUrl: "local:" + assetId,
+        message: localAsset.error,
+      });
+    }
+  }, [assetId, localAsset.error, onDiagnostics]);
   const renderMode = useAvatarCustomizationStore((state) => state.renderModes[type]) ?? "auto";
   const fallback = <ProceduralAvatar type={type} animation={animation} spin={spin} />;
 
   if (renderMode === "custom") return fallback;
-  if (!profile.modelUrl) return fallback;
+  if (!modelUrl) return fallback;
   if (renderMode === "readyplayerme" || renderMode === "auto") {
     return (
     <AvatarErrorBoundary
-      resetKey={type + ":" + profile.modelUrl}
+      resetKey={type + ":" + modelUrl}
       fallback={fallback}
       onError={(error) => onDiagnostics?.({
-        status: "error", modelUrl: profile.modelUrl ?? "",
+        status: "error", modelUrl,
         message: error.message || "تعذر تحميل أو قراءة ملف GLB.",
       })}
     >
       <Suspense fallback={fallback}>
         <ReadyPlayerMeAvatar
           type={type}
-          url={profile.modelUrl}
+          url={modelUrl}
           animation={animation}
           spin={spin}
           onDiagnostics={onDiagnostics}
