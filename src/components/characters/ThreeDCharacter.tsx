@@ -1,8 +1,10 @@
 import { ContactShadows, Environment, Lightformer, useTexture } from "@react-three/drei";
-import { Canvas } from "@react-three/fiber";
-import { Component, Suspense, useEffect, type ReactNode } from "react";
+import { Canvas, useThree } from "@react-three/fiber";
+import { PerspectiveCamera } from "three";
+import { Component, Suspense, useCallback, useEffect, useState, type ReactNode } from "react";
 
-import { mergeAvatarProfile } from "@/lib/avatarCatalog";
+import { getAvatarProfile, mergeAvatarProfile } from "@/lib/avatarCatalog";
+import { calculateCameraShot } from "@/lib/cameraComposition";
 import { useCharacterLibrary } from "@/lib/characterLibrary";
 import { useLocalGlbUrl } from "@/lib/useLocalGlbUrl";
 import type { AvatarDiagnostics } from "@/lib/modelPresentation";
@@ -11,6 +13,29 @@ import type { AnimationType, CharacterType } from "@/lib/store";
 
 import ProceduralAvatar from "./ProceduralAvatar";
 import ReadyPlayerMeAvatar from "./ReadyPlayerMeAvatar";
+
+function ResponsiveCharacterCamera({
+  diagnostics,
+  type,
+}: {
+  diagnostics: AvatarDiagnostics | null;
+  type: CharacterType;
+}) {
+  const { camera, size, invalidate } = useThree();
+  const yOffset = getAvatarProfile(type).rpmYOffset;
+
+  useEffect(() => {
+    if (!(camera instanceof PerspectiveCamera)) return;
+    const shot = calculateCameraShot(diagnostics, size.width / Math.max(size.height, 1), yOffset);
+    camera.fov = shot.fov;
+    camera.position.set(0, shot.targetY, shot.distance);
+    camera.lookAt(0, shot.targetY, 0);
+    camera.updateProjectionMatrix();
+    invalidate();
+  }, [camera, diagnostics, invalidate, size.height, size.width, yOffset]);
+
+  return null;
+}
 
 function Backdrop({ url }: { url: string }) {
   const texture = useTexture(url);
@@ -134,6 +159,23 @@ export default function ThreeDCharacter({
   onCanvasReady,
   onDiagnostics,
 }: ThreeDCharacterProps) {
+  const [cameraDiagnostics, setCameraDiagnostics] = useState<AvatarDiagnostics | null>(null);
+
+  useEffect(() => {
+    setCameraDiagnostics(null);
+  }, [type]);
+
+  const handleDiagnostics = useCallback((details: AvatarDiagnostics) => {
+    setCameraDiagnostics((previous) => {
+      if (previous?.modelUrl === details.modelUrl &&
+          previous.status === details.status &&
+          previous.normalizedScale === details.normalizedScale &&
+          previous.message === details.message) return previous;
+      return details;
+    });
+    onDiagnostics?.(details);
+  }, [onDiagnostics]);
+
   return (
     <Canvas
       className={className}
@@ -151,6 +193,7 @@ export default function ThreeDCharacter({
         onCanvasReady?.(gl.domElement);
       }}
     >
+      <ResponsiveCharacterCamera type={type} diagnostics={cameraDiagnostics} />
       {backgroundUrl && (
         <Suspense fallback={null}>
           <Backdrop url={backgroundUrl} />
@@ -177,7 +220,7 @@ export default function ThreeDCharacter({
       />
 
       <Suspense fallback={null}>
-        <Avatar type={type} animation={animation} spin={spin} onDiagnostics={onDiagnostics} />
+        <Avatar type={type} animation={animation} spin={spin} onDiagnostics={handleDiagnostics} />
       </Suspense>
 
       {!transparent && (
