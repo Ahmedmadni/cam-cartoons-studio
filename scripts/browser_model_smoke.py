@@ -18,6 +18,19 @@ ARTIFACTS = Path("artifacts/model-review")
 ARTIFACTS.mkdir(parents=True, exist_ok=True)
 
 
+def capture_evidence(page, filename):
+    """Optional screenshot: Chromium software GPU may stall on WebGL readback."""
+    try:
+        page.screenshot(
+            path=str(ARTIFACTS / filename),
+            full_page=False,
+            animations="disabled",
+            timeout=8000,
+        )
+    except Exception as error:
+        print(f"Non-blocking screenshot unavailable ({filename}): {error}")
+
+
 def wait_for_server(proc):
     for _ in range(90):
         if proc.poll() is not None:
@@ -41,7 +54,7 @@ def await_gltf_ready(page, name):
             f"{name}: GLB load failed and the app displayed the procedural fallback"
         )
     except Exception:
-        page.screenshot(path=str(ARTIFACTS / "model-ready-failure.png"), full_page=True)
+        capture_evidence(page, "model-ready-failure.png")
         print("QA FAILED PAGE TEXT:", page.locator("body").inner_text()[-5000:])
         print("QA FAILED GLB response:", page.evaluate("""async () => {
             const resp = await fetch('/__qa__/model.glb');
@@ -59,7 +72,7 @@ def add_character(page, name, *, local_file=None):
     try:
         expect(dialog).to_be_visible(timeout=12000)
     except AssertionError:
-        page.screenshot(path=str(ARTIFACTS / "form-open-failure.png"), full_page=True)
+        capture_evidence(page, "form-open-failure.png")
         print("Editor failed to open. Page text:", page.locator("body").inner_text()[:2400])
         raise
     dialog.locator("#character-editor-name").fill(name)
@@ -97,26 +110,26 @@ def main():
                 expect(page.get_by_role("heading", name="مكتبة الشخصيات المفتوحة")).to_be_visible(timeout=30000)
 
                 add_character(page, "اختبار الجودة")
-                page.screenshot(path=str(ARTIFACTS / "desktop-loaded-glb.png"), full_page=True)
+                capture_evidence(page, "desktop-loaded-glb.png")
                 # Dispatch actual DOM clicks to verify React controls without waiting on
                 # unrelated Vite dev-server navigation/network tasks in Playwright.
                 page.get_by_role("button", name="تلويح").dispatch_event("click")
                 expect(page.get_by_role("button", name="تلويح")).to_have_attribute("aria-pressed", "true")
                 page.get_by_role("button", name="تدوير الشخصية").dispatch_event("click")
                 expect(page.get_by_role("button", name="إيقاف الدوران")).to_have_attribute("aria-pressed", "true")
-                page.screenshot(path=str(ARTIFACTS / "desktop-glb.png"), full_page=True)
+                capture_evidence(page, "desktop-glb.png")
 
                 page.set_viewport_size({"width": 390, "height": 844})
                 expect(page.get_by_role("heading", name="اختبار الجودة").last).to_be_visible()
                 expect(page.get_by_text(re.compile(r"العظام:\s*0"))).to_be_visible()
-                page.screenshot(path=str(ARTIFACTS / "mobile-glb.png"), full_page=True)
+                capture_evidence(page, "mobile-glb.png")
 
                 page.set_viewport_size({"width": 1366, "height": 900})
                 add_character(page, "اختبار الملف", local_file="public/__qa__/model.glb")
-                page.screenshot(path=str(ARTIFACTS / "indexeddb-import.png"), full_page=True)
-                page.reload(wait_until="domcontentloaded")
+                capture_evidence(page, "indexeddb-import.png")
+                page.reload(wait_until="networkidle")
                 expect(page.get_by_role("heading", name="مكتبة الشخصيات المفتوحة")).to_be_visible()
-                page.get_by_role("button", name=re.compile(r"اختبار الملف")).first.click()
+                page.get_by_role("button", name=re.compile(r"اختبار الملف")).first.dispatch_event("click")
                 await_gltf_ready(page, "اختبار الملف بعد تحديث الصفحة")
                 context.close()
                 browser.close()
