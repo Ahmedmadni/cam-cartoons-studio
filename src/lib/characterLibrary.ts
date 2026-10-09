@@ -11,13 +11,13 @@ export type CharacterDefinition = {
   name: string;
   category: CharacterCategory;
   provider: CharacterProvider;
-  modelUrl?: string;
-  thumbnail?: string;
+  modelUrl?: string | undefined;
+  thumbnail?: string | undefined;
   voicePreset?: VoiceType;
   tags: string[];
   isFavorite?: boolean;
   isDefault?: boolean;
-  basePreset?: LegacyCharacterType;
+  basePreset?: LegacyCharacterType | undefined;
   scale?: number;
   yOffset?: number;
 };
