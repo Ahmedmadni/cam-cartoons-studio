@@ -31,3 +31,15 @@ Entries, favorites, and definitions persist in **this browser's local storage** 
 - Confirm any custom voice preset is selected with that character.
 - Test a CORS-blocked or missing GLB: fallback should appear rather than a crashing page.
 - Test skeleton bone naming, ARKit mouth/eyes/blinks, camera scale and skin/cloth materials for each imported model.
+
+
+## Phase 10 — Premium presentation
+
+- The old bug where a new GLB-backed entry (missing a stored render-mode key) silently used the procedural fallback is fixed. New entries default to \`auto\` mode.
+- Loaded GLBs are automatically centered and fitted to the studio frame from their measured bounding box, with width/height/depth safeguards. The **Scale** setting in the character editor is an extra multiplier applied after automatic fit. The Y Offset continues to move the character vertically.
+- Imported models have subtle idle head movement and automatic eye blinking when camera-based face tracking is disabled. When tracking is active, these procedural movements do not compete with MediaPipe face movement.
+- The selected character panel now reports load errors and model diagnostics: source dimensions, bone count, morph count, head and arms, basic lip-sync and eye-blink capability.
+- Select a loaded GLB and use **التقاط صورة معاينة من النموذج** to save a WebP portrait captured from the real 3D canvas. Captures are bounded (300 KB data URL) and stored with the character in this browser's local storage. Browser GLB textures should be loaded from CORS-enabled sources.
+- Rendering stays compatible with older Ready Player Me models and legacy avatars.
+
+**Important:** This update does not ship any new premium GLB geometry or guarantee that every imported skeleton is compatible. The diagnostics show what the model exposes; per-character animation and visual quality still require real-world model testing. Cloud asset upload and cross-device sync are not included.
