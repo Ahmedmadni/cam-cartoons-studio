@@ -4,10 +4,10 @@ The app now seeds four **actual, third-party-hosted GLB models**, not procedural
 
 | ID | Arabic label | Upstream model | Notes |
 |---|---|---|---|
-| \`featured-cinematic-female\` | مايا | \`realistic-female.glb\` | Semi-realistic female base |
-| \`featured-cinematic-male\` | آدم | \`realistic-male.glb\` | Semi-realistic male base |
-| \`featured-selfie-girl\` | لينا | \`selfie-girl.glb\` | Stylized girl avatar |
-| \`featured-michelle\` | ميشيل | \`michelle.glb\` | Animated sample avatar |
+| \`featured-cinematic-female\` | سارة | \`realistic-female.glb\` | Semi-realistic female base |
+| \`featured-cinematic-male\` | عمر | \`realistic-male.glb\` | Semi-realistic male base |
+| \`featured-selfie-girl\` | ليلى | \`selfie-girl.glb\` | Stylized girl avatar |
+| \`featured-michelle\` | هند | \`michelle.glb\` | Animated sample avatar |
 
 All four URLs point to \`https://three.ws/avatars/\`, which publishes these exact GLB assets in its public [GitHub repository](https://github.com/nirholas/three.ws/tree/main/public/avatars) and documents their rigged-avatar usage. Our source links refer to the originating host; we do not copy or redistribute model bytes in this repository, and their existence in the open-source project should **not** be treated as a separate guarantee of license rights for each model.
 
@@ -36,3 +36,21 @@ If the publisher disables cross-origin requests, is offline, or moves the URL, t
 - Attribution and redistribution permissions must be confirmed for any separate offline distribution of those files.
 - Verify in a real browser: GLB renders instead of fallback, each screenshot is actually the chosen model, motion bones don't twist, morph targets match the diagnostic report, animations work in Story and Studio, CORS permits caching, refresh retains IndexedDB models, and browser-storage resets produce the expected notice.
 - Re-render/crop portraits only after the actual 3D models load; do not mistake generic emojis or unrelated photographs for real character thumbnails.
+
+
+## Phase 13 — Clear Arabic names and safe migration
+
+The character-library cards use short, familiar **human names**, not placeholder descriptions or technical labels. Character age/category and GLB provider stay visible as separate metadata.
+
+| Stable ID | Previous stock label | New display name |
+|---|---|---|
+| boy | ولد | يوسف |
+| girl | بنت | نور |
+| man | شاب | أحمد |
+| woman | فتاة | مريم |
+| featured-cinematic-female | مايا — شخصية سينمائية | سارة |
+| featured-cinematic-male | آدم — شخصية سينمائية | عمر |
+| featured-selfie-girl | لينا — استايل ثلاثي الأبعاد | ليلى |
+| featured-michelle | ميشيل — شخصية متحركة | هند |
+
+The version 2 library migration updates an entry **only when its name still exactly equals the earlier stock name** and \`isDefault\` is true. It never renames user-created characters, overwrites personally edited names, or resurrects deleted entries. Favorite status, local GLB asset IDs, thumbnails, source URLs and customizations stay unchanged. IDs deliberately remain stable for Story and Studio compatibility.
