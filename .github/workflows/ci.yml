@@ -28,6 +28,9 @@ jobs:
       - name: TypeScript
         run: bun x tsc --noEmit
 
+      - name: Character catalog tests
+        run: bun test src/lib/characterLibrary.test.ts
+
       - name: Production build
         run: bun run build
 
