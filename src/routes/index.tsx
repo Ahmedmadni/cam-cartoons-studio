@@ -390,7 +390,7 @@ function LibraryPage() {
                     {readiness.limitations.map((message) => <li key={message}>{message}</li>)}
                   </ul>
                 </div>}
-                <p className="text-xs font-normal">هذا فحص تقني للتوافق فقط، ولا يُعد تقييمًا لجودة الوجه أو الملابس أو مطابقة المراجع.</p>}
+                <p className="text-xs font-normal">هذا فحص تقني للتوافق فقط، ولا يُعد تقييمًا لجودة الوجه أو الملابس أو مطابقة المراجع.</p>
               </div>}
             </div>}
             <button type="button" onClick={() => navigate({ to: "/customize" })} className="rounded-full bg-secondary px-6 py-3 font-black">تخصيص الشخصية</button>
