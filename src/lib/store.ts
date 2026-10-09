@@ -35,10 +35,10 @@ export const ANIMATION_LABELS: Record<AnimationType, string> = {
 };
 
 export const CHARACTER_LABELS: Record<CharacterType, string> = {
-  boy: "ولد",
-  girl: "بنت",
-  man: "شاب",
-  woman: "فتاة",
+  boy: "يوسف",
+  girl: "نور",
+  man: "أحمد",
+  woman: "مريم",
 };
 
 type StudioState = {
