@@ -176,7 +176,18 @@ export default function ReadyPlayerMeAvatar({ type, url, animation, spin, onDiag
     const fit = calculateModelFit(dimensions, profile.rpmScale);
     const morphNames = [...new Set(rig.morphMeshes.flatMap((mesh) => Object.keys(mesh.morphTargetDictionary ?? {})))];
     const boneNames: string[] = [];
-    avatar.traverse((object) => { if (object.type === "Bone") boneNames.push(object.name); });
+    let meshCount = 0;
+    let skinnedMeshCount = 0;
+    const materialIds = new Set<string>();
+    avatar.traverse((object) => {
+      if (object.type === "Bone") boneNames.push(object.name);
+      const mesh = object as Mesh;
+      if (!mesh.isMesh) return;
+      meshCount++;
+      if (object.type === "SkinnedMesh") skinnedMeshCount++;
+      const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+      for (const material of materials) if (material) materialIds.add(material.uuid);
+    });
     const capability = detectFaceCapabilities(morphNames);
     const diagnostics: AvatarDiagnostics = {
       status: "ready",
@@ -185,6 +196,10 @@ export default function ReadyPlayerMeAvatar({ type, url, animation, spin, onDiag
       normalizedScale: fit.scale,
       boneCount: boneNames.length,
       morphCount: morphNames.length,
+      meshCount,
+      skinnedMeshCount,
+      materialCount: materialIds.size,
+      animationClipCount: gltf.animations.length,
       hasHeadRig: Boolean(rig.head),
       hasArmRig: Boolean(rig.leftArm && rig.rightArm),
       hasLipSync: capability.hasLipSync,
@@ -198,7 +213,7 @@ export default function ReadyPlayerMeAvatar({ type, url, animation, spin, onDiag
       offset: [-center.x, -bounds.min.y, -center.z] as [number, number, number],
       diagnostics,
     };
-  }, [avatar, rig, profile.rpmScale, url]);
+  }, [avatar, rig, profile.rpmScale, gltf.animations.length, url]);
 
   useEffect(() => {
     onDiagnostics?.(presentation.diagnostics);

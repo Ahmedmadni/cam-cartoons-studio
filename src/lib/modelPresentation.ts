@@ -24,6 +24,10 @@ export type AvatarDiagnostics = {
   normalizedScale?: number;
   boneCount?: number;
   morphCount?: number;
+  meshCount?: number;
+  skinnedMeshCount?: number;
+  materialCount?: number;
+  animationClipCount?: number;
   hasHeadRig?: boolean;
   hasArmRig?: boolean;
   hasLipSync?: boolean;
@@ -37,9 +41,39 @@ export function detectFaceCapabilities(names: string[]) {
   const normalized = names.map(normalizeName);
   return {
     hasLipSync: normalized.some((name) =>
-      ["jawopen", "mouthopen", "visemeaa", "mouthopen"].some((alias) => name.endsWith(alias))),
+      ["jawopen", "mouthopen", "visemeaa", "visemea"].some((alias) => name.endsWith(alias))),
     hasBlink: normalized.some((name) =>
       ["eyeblinkleft", "eyeblinkright", "eyesclosed", "blinkleft", "blinkright"].some((alias) =>
         name.endsWith(alias))),
   };
+}
+
+
+export type AnimationReadiness = {
+  grade: "animated" | "limited" | "static" | "unavailable";
+  title: string;
+  limitations: string[];
+};
+
+/** This is feature support, NOT an artistic rating or proof of model quality. */
+export function assessAnimationReadiness(details: AvatarDiagnostics | null): AnimationReadiness {
+  if (!details || details.status === "error") {
+    return {
+      grade: "unavailable", title: "لا يمكن فحص النموذج",
+      limitations: ["لم يكتمل تحميل ملف الشخصية؛ افحص مصدر GLB أو أعد استيراده."],
+    };
+  }
+  const limitations: string[] = [];
+  const bodyRig = Boolean(details.skinnedMeshCount && details.boneCount);
+  if (!bodyRig) limitations.push("المجسم لا يحتوي على هيكل عظمي متحرك متكامل؛ بعض الحركات لن تعمل.");
+  if (!details.hasHeadRig) limitations.push("لا توجد عظمة رأس معروفة يمكن التحكم بها.");
+  if (!details.hasArmRig) limitations.push("عظام الذراعين غير متوافقة مع حركات الإيماء والتلويح.");
+  if (!details.hasLipSync) limitations.push("لا توجد تعابير فم متوافقة مع تحريك الشفاه أثناء الكلام.");
+  if (!details.hasBlink) limitations.push("لا توجد تعابير رمش متوافقة مع الحركة التلقائية للعين.");
+  if (!details.materialCount) limitations.push("لم تُكتشف خامات واضحة للنموذج.");
+  if (!bodyRig && !details.hasLipSync && !details.hasBlink) {
+    return { grade: "static", title: "مجسم للعرض فقط", limitations };
+  }
+  if (limitations.length) return { grade: "limited", title: "حركات مدعومة جزئيًا", limitations };
+  return { grade: "animated", title: "بنية الحركة والتعبيرات متوافقة", limitations };
 }

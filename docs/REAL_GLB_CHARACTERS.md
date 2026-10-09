@@ -66,3 +66,31 @@ The version 2 library migration updates an entry **only when its name still exac
 - The CI run always uploads Vite logs under the **model-review-screenshots** artifact. WebGL screenshots are **optional**: set `MODEL_QA_CAPTURE=1` on a workstation with a capable GPU for desktop/mobile capture. GitHub-hosted SwiftShader runners sometimes stall indefinitely on framebuffer readback, so screenshots are disabled by default there; the actual GLB and IndexedDB functional checks remain mandatory.
 
 **Important distinction:** The local synthetic fixture tests the WebGL pipeline and storage. It is **not** a cinematic-quality avatar and does not certify that the four third-party-hosted real models match the visual references. Real assets still require separate per-character browser visual QA, stable source/permissions review and potentially improved rig/speech adapters.
+
+
+## Phase 15 — Real-source GLB audit and truthful animation report
+
+We now distinguish four things that were often conflated:
+
+1. **A valid GLB link**: an HTTPS address in the character catalog. A link alone does not prove the file is downloadable.
+2. **A genuine GLB binary**: the source responds with a binary glTF 2.0 model with valid header, chunk boundaries, JSON and POSITION geometry.
+3. **Animation/face compatibility**: actual skinned meshes, bones, materials, embedded animation clips, mouth morphs and blinking morphs. A GLB with a visible mesh is not automatically a talking character.
+4. **Visual/artistic quality**: similarity to the supplied reference images, realistic face/hair/clothes, proper skin/hair shading and convincing expressions; **not** measurable from structural metadata alone.
+
+### Automated validation
+
+Run:
+
+- \`python -m unittest discover -s scripts -p 'test_featured_glb_audit.py'\`: local deterministic malformed/valid GLB tests
+- \`python scripts/audit_featured_glbs.py --live\`: fetch the four hosted models and write the actual availability, Content-Type, CORS header, size, SHA256, meshes, skins/joints, morph target names, materials, textures and animation clips to \`artifacts/model-review/featured-asset-audit.json\`
+- \`python scripts/audit_featured_glbs.py --live --download-tests\`: same audit plus temporary downloaded GLBs under \`public/__qa__/featured\` for the Chromium smoke tests
+
+GitHub Actions runs all three parts of the quality gate: deterministic binary inspection, independent hosted-asset audit, and actual Three.js WebGL rendering of every verified publisher-hosted model alongside its always-required synthetic fixture.
+
+**Caveat:** External hosting is subject to upstream outages, so the live audit records unavailable/invalid models clearly without making a transient network outage fail otherwise healthy local regression tests. If upstream models are unavailable, the browser checks of those models cannot run and must not be reported as passed. This workflow does not establish whether the third-party source permits commercial redistribution. Browser CORS may still differ from server-side network fetch.
+
+### In-app GLB compatibility report
+
+When a real GLB loads, the library now reports skinned mesh count, mesh count, material count, bone count, morph targets, source animation clips, and whether known face/arm/head drivers are available. It identifies **fully compatible**, **partially compatible**, and **static display-only** cases. The category is compatibility, *not* a claim of premium artistic quality or automatic lip-sync on an arbitrary model.
+
+The report uses the same names as the users see: سارة، عمر، ليلى، هند. All preexisting custom character names and IndexedDB model imports are preserved.

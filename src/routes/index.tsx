@@ -7,7 +7,7 @@ import {
   type CharacterDefinition, type CharacterDraft, type CharacterCategory, type CharacterProvider,
 } from "@/lib/characterLibrary";
 import { useStudioStore, VOICES, ANIMATION_LABELS, type AnimationType, type VoiceType } from "@/lib/store";
-import type { AvatarDiagnostics } from "@/lib/modelPresentation";
+import { assessAnimationReadiness, type AvatarDiagnostics } from "@/lib/modelPresentation";
 import { cacheRemoteGlb, deleteGlbAsset, saveGlbAsset, MAX_GLB_BYTES } from "@/lib/localGlbStorage";
 
 export const Route = createFileRoute("/")({
@@ -172,6 +172,7 @@ function LibraryPage() {
     canvasRef.current = null;
   }, [selectedCharacter]);
   const selected = characters.find((item) => item.id === selectedCharacter);
+  const readiness = assessAnimationReadiness(diagnostics);
   const filters = [
     { value: "all", label: "الكل" }, { value: "imported-glb", label: "Premium GLB" },
     { value: "readyplayerme", label: "Ready Player Me" }, { value: "favorites", label: "المفضلة" },
@@ -374,14 +375,22 @@ function LibraryPage() {
                 تعذر تحميل النموذج: {diagnostics.message}. يتم عرض الشخصية الاحتياطية.
               </p>}
               {diagnostics?.status === "ready" && <div className="mt-2 space-y-1 font-semibold text-muted-foreground">
-                <p>العظام: {diagnostics.boneCount ?? 0} · تعابير Morph: {diagnostics.morphCount ?? 0}</p>
+                <p className="font-black text-foreground">حالة التوافق: {readiness.title}</p>
+                <p>المجسمات: {diagnostics.meshCount ?? 0} · الخامات: {diagnostics.materialCount ?? 0} · المجسمات المرتبطة بالعظام: {diagnostics.skinnedMeshCount ?? 0}</p>
+                <p>العظام: {diagnostics.boneCount ?? 0} · تعابير Morph: {diagnostics.morphCount ?? 0} · مقاطع الحركة المرفقة: {diagnostics.animationClipCount ?? 0}</p>
                 <p>تحريك الرأس: {diagnostics.hasHeadRig ? "متاح" : "غير مدعوم"} · الذراعان: {diagnostics.hasArmRig ? "متاحان" : "غير مدعومين"}</p>
                 <p>تحريك الفم: {diagnostics.hasLipSync ? "مدعوم" : "غير مدعوم"} · رمش العين: {diagnostics.hasBlink ? "مدعوم" : "غير مدعوم"}</p>
                 {diagnostics.dimensions && <p>
                   أبعاد الأصل: {diagnostics.dimensions.width.toFixed(2)} × {diagnostics.dimensions.height.toFixed(2)} × {diagnostics.dimensions.depth.toFixed(2)}
                 </p>}
                 {diagnostics.message && <p className="text-amber-700">{diagnostics.message}</p>}
-                {!diagnostics.hasLipSync && <p>يحتاج النموذج إلى Morph Targets مناسبة ليتحرك فمه أثناء الكلام.</p>}
+                {readiness.limitations.length > 0 && <div className="mt-3 rounded-xl border border-border p-3">
+                  <p className="font-bold text-foreground">ملاحظات التوافق مع الحركة:</p>
+                  <ul className="mt-2 list-disc space-y-1 pr-5">
+                    {readiness.limitations.map((message) => <li key={message}>{message}</li>)}
+                  </ul>
+                </div>}
+                <p className="text-xs font-normal">هذا فحص تقني للتوافق فقط، ولا يُعد تقييمًا لجودة الوجه أو الملابس أو مطابقة المراجع.</p>
               </div>}
             </div>}
             <button type="button" onClick={() => navigate({ to: "/customize" })} className="rounded-full bg-secondary px-6 py-3 font-black">تخصيص الشخصية</button>
