@@ -8,6 +8,7 @@ import {
 } from "@/lib/characterLibrary";
 import { useStudioStore, VOICES, type VoiceType } from "@/lib/store";
 import type { AvatarDiagnostics } from "@/lib/modelPresentation";
+import { deleteGlbAsset, saveGlbAsset, MAX_GLB_BYTES } from "@/lib/localGlbStorage";
 
 export const Route = createFileRoute("/")({
   head: () => ({ meta: [
@@ -25,35 +26,38 @@ const emptyDraft: CharacterDraft = {
 function Editor({ initial, onClose, onSave }: {
   initial?: CharacterDefinition | undefined;
   onClose: () => void;
-  onSave: (draft: CharacterDraft) => void;
+  onSave: (draft: CharacterDraft, file: File | null) => Promise<void>;
 }) {
   const [draft, setDraft] = useState<CharacterDraft>(() => initial ? {
     name: initial.name, category: initial.category, provider: initial.provider,
-    modelUrl: initial.modelUrl ?? "", thumbnail: initial.thumbnail ?? "",
+    modelUrl: initial.modelUrl ?? "", assetId: initial.assetId, thumbnail: initial.thumbnail ?? "",
     voicePreset: initial.voicePreset ?? "normal", tags: initial.tags,
     basePreset: initial.basePreset ?? "man", scale: initial.scale ?? 1.02,
     yOffset: initial.yOffset ?? -1.62,
   } : { ...emptyDraft });
   const [tags, setTags] = useState(initial?.tags.join("، ") ?? "");
+  const [file, setFile] = useState<File | null>(null);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const patch = (change: Partial<CharacterDraft>) => setDraft((current) => ({ ...current, ...change }));
   const inputClass = "mt-1 block w-full rounded-xl border border-border bg-background px-3 py-2.5 font-semibold text-foreground outline-none focus:border-primary";
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={() => { if (!saving) onClose(); }}>
       <section role="dialog" aria-modal="true" aria-labelledby="editor-title" dir="rtl"
         className="max-h-full w-full max-w-xl overflow-y-auto rounded-3xl border border-border bg-card p-6 shadow-2xl"
         onClick={(event) => event.stopPropagation()}>
         <div className="flex items-center justify-between gap-3">
           <h2 id="editor-title" className="text-2xl font-black text-foreground">{initial ? "تعديل الشخصية" : "إضافة شخصية GLB"}</h2>
-          <button type="button" onClick={onClose} aria-label="إغلاق"><X className="size-6" /></button>
+          <button type="button" disabled={saving} onClick={onClose} aria-label="إغلاق"><X className="size-6" /></button>
         </div>
         <form className="mt-4 space-y-3" onSubmit={(event) => {
           event.preventDefault();
-          try {
-            onSave({ ...draft, tags: tags.split(/[,،]/).map((tag) => tag.trim()).filter(Boolean) });
-          } catch (caught) {
-            setError(caught instanceof Error ? caught.message : "تعذّر الحفظ.");
-          }
+          if (saving) return;
+          setSaving(true);
+          setError("");
+          void onSave({ ...draft, tags: tags.split(/[,،]/).map((tag) => tag.trim()).filter(Boolean) }, file)
+            .catch((caught: unknown) => setError(caught instanceof Error ? caught.message : "تعذّر الحفظ."))
+            .finally(() => setSaving(false));
         }}>
           <label className="block text-sm font-bold">اسم الشخصية
             <input required maxLength={80} className={inputClass} value={draft.name} onChange={(e) => patch({ name: e.target.value })} />
@@ -70,12 +74,34 @@ function Editor({ initial, onClose, onSave }: {
               </select>
             </label>
           </div>
-          {draft.provider !== "procedural" && <label className="block text-sm font-bold">
-            رابط نموذج GLB (HTTPS أو مسار محلي)
-            <input dir="ltr" required className={inputClass} value={draft.modelUrl ?? ""} onChange={(e) => patch({ modelUrl: e.target.value })}
-              placeholder="https://example.com/characters/avatar.glb" />
-            <span className="mt-1 block text-xs font-normal text-muted-foreground">يلزم رابط ينتهي بـ .glb ومصدر يدعم CORS.</span>
-          </label>}
+          {draft.provider !== "procedural" && <div className="space-y-3 rounded-2xl border border-primary/25 bg-primary/5 p-3">
+            <label className="block text-sm font-black text-foreground">
+              استيراد شخصية 3D من جهازك — GLB
+              <input type="file" accept=".glb,model/gltf-binary" className={inputClass}
+                onChange={(e) => {
+                  const chosen = e.target.files?.[0] ?? null;
+                  setFile(chosen);
+                  if (chosen) patch({ assetId: undefined, modelUrl: "" });
+                }} />
+            </label>
+            {file && <p className="text-xs font-bold text-primary">
+              {file.name} · {(file.size / 1024 / 1024).toFixed(1)} MB
+            </p>}
+            {!file && draft.assetId && <p className="text-xs font-bold text-primary">
+              النموذج محفوظ داخل هذا المتصفح. يمكنك استبداله بملف جديد.
+            </p>}
+            <p className="text-xs font-semibold text-muted-foreground">
+              يقبل ملف GLB 2.0 حتى {(MAX_GLB_BYTES / 1024 / 1024).toFixed(0)} ميجابايت ويخزّنه على هذا الجهاز دون رفعه لخادم.
+            </p>
+            <label className="block text-sm font-bold">أو رابط GLB مباشر (HTTPS أو مسار محلي)
+              <input dir="ltr" className={inputClass} value={draft.modelUrl ?? ""}
+                onChange={(e) => {
+                  setFile(null);
+                  patch({ modelUrl: e.target.value, assetId: undefined });
+                }}
+                placeholder="https://example.com/avatar.glb" />
+            </label>
+          </div>}
           <label className="block text-sm font-bold">رابط صورة المعاينة (اختياري)
             <input dir="ltr" className={inputClass} value={draft.thumbnail ?? ""} onChange={(e) => patch({ thumbnail: e.target.value })}
               placeholder="https://example.com/avatar.webp" />
@@ -108,8 +134,8 @@ function Editor({ initial, onClose, onSave }: {
           </label>
           {error && <p role="alert" className="rounded-xl bg-destructive/10 p-3 text-sm font-bold text-destructive">{error}</p>}
           <div className="flex justify-end gap-3 pt-2">
-            <button type="button" onClick={onClose} className="rounded-full bg-muted px-5 py-3 font-bold">إلغاء</button>
-            <button type="submit" className="rounded-full bg-primary px-6 py-3 font-black text-primary-foreground">حفظ الشخصية</button>
+            <button type="button" disabled={saving} onClick={onClose} className="rounded-full bg-muted px-5 py-3 font-bold">إلغاء</button>
+            <button type="submit" disabled={saving} className="rounded-full bg-primary px-6 py-3 font-black text-primary-foreground disabled:opacity-50">{saving ? "جارٍ حفظ ملف الشخصية..." : "حفظ الشخصية"}</button>
           </div>
         </form>
       </section>
@@ -245,6 +271,9 @@ function LibraryPage() {
                 <button type="button" aria-label={"حذف " + item.name} onClick={() => {
                   if (!window.confirm("حذف الشخصية " + item.name + " من المكتبة؟")) return;
                   deleteCharacter(item.id);
+                  if (item.assetId) void deleteGlbAsset(item.assetId).catch(() => {
+                    setCaptureError("تم حذف الشخصية، لكن تعذر حذف ملفها المحلي من مساحة الجهاز.");
+                  });
                   if (selectedCharacter === item.id) setSelectedCharacter("");
                 }} className="rounded-full p-2 text-destructive hover:bg-destructive/10"><Trash2 className="size-5" /></button>
               </div>
@@ -294,14 +323,27 @@ function LibraryPage() {
       </div>
       {editor && <Editor key={editor === "new" ? "new" : editor.id}
         initial={editor === "new" ? undefined : editor} onClose={() => setEditor(null)}
-        onSave={(draft) => {
+        onSave={async (draft, file) => {
+          const previousAsset = editor === "new" ? undefined : editor.assetId;
+          const importedAsset = file ? await saveGlbAsset(file) : undefined;
+          const saved = file ? { ...draft, assetId: importedAsset, modelUrl: undefined } : draft;
+          try {
           if (editor === "new") {
-            const id = addCharacter(draft);
+            const id = addCharacter(saved);
             const added = useCharacterLibrary.getState().characters.find((item) => item.id === id);
             if (added) choose(added);
             setFilter("all"); setSearch("");
-          } else updateCharacter(editor.id, draft);
+          } else updateCharacter(editor.id, saved);
+          if (previousAsset && previousAsset !== saved.assetId) {
+            void deleteGlbAsset(previousAsset).catch(() => {
+              setCaptureError("تم حفظ التعديل، لكن تعذر تنظيف الملف السابق من مساحة الجهاز.");
+            });
+          }
           setEditor(null);
+          } catch (caught) {
+            if (importedAsset) await deleteGlbAsset(importedAsset).catch(() => {});
+            throw caught;
+          }
         }} />}
     </main>
   );

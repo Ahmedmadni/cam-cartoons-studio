@@ -43,3 +43,24 @@ Entries, favorites, and definitions persist in **this browser's local storage** 
 - Rendering stays compatible with older Ready Player Me models and legacy avatars.
 
 **Important:** This update does not ship any new premium GLB geometry or guarantee that every imported skeleton is compatible. The diagnostics show what the model exposes; per-character animation and visual quality still require real-world model testing. Cloud asset upload and cross-device sync are not included.
+
+
+## Phase 11 — Import GLB from your device (browser-local)
+
+You can now add or edit a library character, select **استيراد شخصية 3D من جهازك — GLB**, and save a local \`.glb\` file, with no remote GLB URL and no cloud account. The browser validates the glTF 2.0 header and reported byte length and enforces a 60 MiB maximum before storing the original binary in **IndexedDB**.
+
+- Character metadata and the opaque \`assetId\` persist in the existing \`cam-cartoons-character-library-v1\` localStorage store.
+- The GLB bytes reside in the separate \`cam-cartoons-glb-assets\` IndexedDB database; the app creates temporary \`blob:\` URLs only while rendering, revoking them on unmount.
+- Selecting a locally imported character renders its real GLB across the Library, Customize, Story and Studio routes. Existing framing and rig diagnostics continue to apply.
+- Replacing an imported asset or removing its library entry deletes the old browser-local binary. If the deletion fails, metadata still changes and the UI explains that cleanup failed.
+- If the IndexedDB file was cleared but the metadata remains, the renderer reports the missing asset and uses the old procedural fallback.
+- IndexedDB is browser/profile-specific. Clearing site data deletes the GLB. It is **not** a shared online library, backup, remote upload, nor synchronization across devices.
+- The file picker supports binary \`.glb\` only, not loose \`.gltf\` + textures, FBX, VRM, ZIP, or GLB files larger than 60 MiB. The rig diagnostics help determine whether face morphs and humanoid motions are available.
+
+### Ready Player Me retirement
+
+Ready Player Me shut down its public creator service on **2026-01-31**. We removed the no-longer-functional embedded avatar creator from Customize. The existing GLB animation adapter remains for previously exported RPM files. Bring those files into the local GLB importer (or host them yourself) for long-term reliability. New characters are provider-neutral imported GLBs.
+
+### Current visual limitations
+
+The import pathway accepts real character geometry; it **does not bundle new cinematic-quality humanoid models**, certify any third-party source, or automatically add missing blend shapes, skeletons and animations. Visual fidelity depends on the actual GLB file being imported.

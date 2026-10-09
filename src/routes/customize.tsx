@@ -1,9 +1,8 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { ArrowRight, Check, ExternalLink, Link2, RotateCcw, Sparkles } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { ArrowRight, Check, Link2, RotateCcw, Sparkles } from "lucide-react";
+import { useEffect } from "react";
 
 import CharacterStage from "@/components/characters/CharacterStage";
-import ReadyPlayerMeCreator from "@/components/characters/ReadyPlayerMeCreator";
 import { getAvatarProfile, type FaceShape, type GlassesStyle, type HairStyle, type HeadwearStyle, type OutfitStyle } from "@/lib/avatarCatalog";
 import {
   ACCENT_COLORS,
@@ -87,14 +86,14 @@ const OUTFIT_STYLES: OutfitStyle[] = ["casual", "hoodie", "formal"];
 const MODE_LABELS: Record<AvatarRenderMode, { label: string; hint: string }> = {
   auto: {
     label: "تلقائي",
-    hint: "يستخدم Ready Player Me عند توفره، وإلا الشخصية المدمجة.",
+    hint: "يستخدم نموذج GLB من المكتبة (ملف محلي أو رابط)، ويستعين بالنموذج المدمج عند الحاجة.",
   },
   custom: {
     label: "قابل للتخصيص",
     hint: "يستخدم الشخصية المدمجة ويطبق كل اختياراتك مباشرة.",
   },
   readyplayerme: {
-    label: "Ready Player Me",
+    label: "شخصية GLB مستوردة",
     hint: "يستخدم نموذج GLB الخارجي بكامل الـrig وتعابير الوجه.",
   },
 };
@@ -111,24 +110,9 @@ function CustomizePage() {
   const updateCustomization = useAvatarCustomizationStore((state) => state.updateCustomization);
   const resetCustomization = useAvatarCustomizationStore((state) => state.resetCustomization);
   const setRenderMode = useAvatarCustomizationStore((state) => state.setRenderMode);
-  const [showReadyPlayerMe, setShowReadyPlayerMe] = useState(false);
-  const [readyPlayerMeSubdomain, setReadyPlayerMeSubdomain] = useState(
-    import.meta.env["VITE_RPM_SUBDOMAIN"]?.trim() || "demo",
-  );
-
   useEffect(() => {
     if (!selectedCharacter) navigate({ to: "/" });
   }, [navigate, selectedCharacter]);
-
-  const handleReadyPlayerMeExport = useCallback(
-    (modelUrl: string) => {
-      if (!selectedCharacter) return;
-      updateCustomization(selectedCharacter, { modelUrl });
-      setRenderMode(selectedCharacter, "readyplayerme");
-      setShowReadyPlayerMe(false);
-    },
-    [selectedCharacter, setRenderMode, updateCustomization],
-  );
 
   if (!selectedCharacter) return null;
 
@@ -155,7 +139,7 @@ function CustomizePage() {
     headScale: customization?.headScale ?? base.headScale,
   };
   const currentModelUrl = customization?.modelUrl ?? getCharacterDefinition(selectedCharacter)?.modelUrl ?? base.modelUrl ?? "";
-  const hasReadyPlayerMe = Boolean(currentModelUrl.trim());
+  const hasReadyPlayerMe = Boolean(currentModelUrl.trim() || getCharacterDefinition(selectedCharacter)?.assetId);
   const definition = getCharacterDefinition(selectedCharacter);
 
   const update = (patch: AvatarCustomization) => {
@@ -254,68 +238,39 @@ function CustomizePage() {
               </div>
               <div className="mt-4">
                 <label htmlFor="avatar-model-url" className="text-sm font-black text-foreground">
-                  رابط GLB / Ready Player Me
+                  رابط GLB الحالي
                 </label>
                 <div className="mt-2 flex items-center gap-2 rounded-2xl border-2 border-border bg-background px-3">
                   <Link2 className="size-5 shrink-0 text-muted-foreground" />
                   <input
                     id="avatar-model-url"
                     type="url"
+                    disabled={Boolean(definition?.assetId)}
                     value={currentModelUrl}
                     onChange={(event) => {
                       const modelUrl = event.target.value;
                       updateCustomization(selectedCharacter, { modelUrl });
                       if (modelUrl.trim()) setRenderMode(selectedCharacter, "readyplayerme");
                     }}
-                    placeholder="https://models.readyplayer.me/...glb"
+                    placeholder="https://example.com/model.glb"
                     dir="ltr"
                     className="min-w-0 flex-1 bg-transparent py-3 text-sm font-semibold text-foreground outline-none"
                   />
                 </div>
                 <p className="mt-2 text-xs font-semibold text-muted-foreground">
-                  يمكن لصق رابط Ready Player Me مباشرة؛ سيضيف النظام إعدادات تعابير الوجه تلقائيًا.
+                  {definition?.assetId ? "الشخصية مستوردة من ملف محلي؛ استبدل الملف أو رابطه من شاشة المكتبة." : "يمكن استخدام رابط مباشر. لإضافة ملف GLB على جهازك افتح «تعديل الشخصية» في المكتبة."}
                 </p>
               </div>
 
-              <div className="mt-4 rounded-2xl border-2 border-primary/20 bg-primary/5 p-4">
-                <div className="flex items-start gap-3">
-                  <ExternalLink className="mt-0.5 size-5 shrink-0 text-primary" />
-                  <div className="min-w-0 flex-1">
-                    <p className="font-black text-foreground">أنشئ الشخصية داخل Ready Player Me</p>
-                    <p className="mt-1 text-xs font-semibold text-muted-foreground">
-                      افتح المصمم داخل التطبيق، ثم عند إنهاء الشخصية سيتم استيراد رابط GLB تلقائيًا.
-                    </p>
-                  </div>
-                </div>
-
-                <label
-                  htmlFor="rpm-subdomain"
-                  className="mt-3 block text-xs font-black text-foreground"
-                >
-                  Ready Player Me Subdomain
-                </label>
-                <div className="mt-1 flex items-center rounded-xl border border-border bg-background px-3">
-                  <span className="text-xs font-bold text-muted-foreground">https://</span>
-                  <input
-                    id="rpm-subdomain"
-                    type="text"
-                    value={readyPlayerMeSubdomain}
-                    onChange={(event) => setReadyPlayerMeSubdomain(event.target.value)}
-                    dir="ltr"
-                    spellCheck={false}
-                    className="min-w-0 flex-1 bg-transparent px-1 py-2.5 text-sm font-semibold text-foreground outline-none"
-                    placeholder="demo"
-                  />
-                  <span className="text-xs font-bold text-muted-foreground">.readyplayer.me</span>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => setShowReadyPlayerMe(true)}
-                  className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-full bg-primary px-5 py-3 font-black text-primary-foreground shadow transition hover:brightness-105"
-                >
-                  <ExternalLink className="size-5" />
-                  فتح المصمم المتقدم
+              <div className="mt-4 rounded-2xl border border-primary/20 bg-primary/5 p-4">
+                <p className="font-black text-foreground">استيراد الشخصيات الحديثة</p>
+                <p className="mt-1 text-xs font-semibold text-muted-foreground">
+                  توقفت خدمة إنشاء Ready Player Me في 31 يناير 2026. يمكنك استخدام ملفات GLB
+                  المُصدّرة سابقًا أو استيراد ملف جديد وتخزينه محليًا من مكتبة الشخصيات.
+                </p>
+                <button type="button" onClick={() => navigate({ to: "/" })}
+                  className="mt-3 w-full rounded-full bg-primary px-5 py-3 font-black text-primary-foreground">
+                  العودة إلى مكتبة الشخصيات
                 </button>
               </div>
 
@@ -612,13 +567,7 @@ function CustomizePage() {
         </div>
       </div>
 
-      {showReadyPlayerMe && (
-        <ReadyPlayerMeCreator
-          subdomain={readyPlayerMeSubdomain}
-          onAvatarExported={handleReadyPlayerMeExport}
-          onClose={() => setShowReadyPlayerMe(false)}
-        />
-      )}
+
     </main>
   );
 }
