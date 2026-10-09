@@ -126,7 +126,7 @@ def main():
 
                 page.set_viewport_size({"width": 390, "height": 844})
                 expect(page.get_by_role("heading", name="اختبار الجودة").last).to_be_visible()
-                expect(page.get_by_text(re.compile(r"العظام:\s*0"))).to_be_visible()
+                page.wait_for_function("() => document.body.innerText.includes('العظام: 0 · تعابير Morph')", timeout=15000)
                 capture_evidence(page, "mobile-glb.png")
 
                 page.set_viewport_size({"width": 1366, "height": 900})
