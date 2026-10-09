@@ -13,7 +13,8 @@ import {
   type BackgroundFilter,
   type StoryStep,
 } from "@/lib/story";
-import { ANIMATION_LABELS, CHARACTER_LABELS, useStudioStore, type AnimationType } from "@/lib/store";
+import { ANIMATION_LABELS, useStudioStore, type AnimationType } from "@/lib/store";
+import { getCharacterLabel } from "@/lib/characterLibrary";
 import { VOICE_PRESETS } from "@/lib/voiceChanger";
 import { VoicePlaybackBus, isRemoteVoiceConfigured, synthesizeRemoteVoice } from "@/lib/voiceEngine";
 
@@ -326,7 +327,7 @@ function StoryPage() {
       <div className="mx-auto max-w-6xl">
         <header className="flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-3xl font-black text-foreground sm:text-4xl">
-            اكتب قصة لـ {CHARACTER_LABELS[selectedCharacter]} 📖
+            اكتب قصة لـ {getCharacterLabel(selectedCharacter)} 📖
           </h1>
           <div className="flex flex-wrap gap-2">
             <button

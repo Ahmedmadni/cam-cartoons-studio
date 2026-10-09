@@ -1,131 +1,240 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
-import { BookOpen as Camera, Palette, Sparkles } from "lucide-react";
+import { useMemo, useState } from "react";
+import { BookOpen, Camera, Edit3, Heart, Plus, Search, Sparkles, Trash2, X } from "lucide-react";
 import CharacterStage from "@/components/characters/CharacterStage";
-import { usesReadyPlayerMe } from "@/lib/avatarCatalog";
-import { useAvatarCustomizationStore } from "@/lib/avatarCustomization";
-import { CHARACTER_LABELS, useStudioStore, type CharacterType } from "@/lib/store";
+import {
+  CHARACTER_CATEGORIES, PROVIDER_LABELS, useCharacterLibrary,
+  type CharacterDefinition, type CharacterDraft, type CharacterCategory, type CharacterProvider,
+} from "@/lib/characterLibrary";
+import { useStudioStore, VOICES, type VoiceType } from "@/lib/store";
 
 export const Route = createFileRoute("/")({
-  head: () => ({
-    meta: [
-      { title: "اختر شخصيتك — استوديو الشخصيات 3D" },
-      {
-        name: "description",
-        content: "اختر واحدة من أربع شخصيات كرتونية ثلاثية الأبعاد وابدأ التصوير معها.",
-      },
-      { property: "og:title", content: "اختر شخصيتك — استوديو الشخصيات 3D" },
-      {
-        property: "og:description",
-        content: "اختر واحدة من أربع شخصيات كرتونية ثلاثية الأبعاد وابدأ التصوير معها.",
-      },
-    ],
-  }),
-  component: Index,
+  head: () => ({ meta: [
+    { title: "مكتبة الشخصيات — Cam Cartoons Studio" },
+    { name: "description", content: "استوديو مفتوح لشخصيات Premium GLB وReady Player Me مع تخصيص كل شخصية." },
+  ] }),
+  component: LibraryPage,
 });
 
-const CHARACTERS: { type: CharacterType; emoji: string }[] = [
-  { type: "boy", emoji: "👦" },
-  { type: "girl", emoji: "👧" },
-  { type: "man", emoji: "👨" },
-  { type: "woman", emoji: "👩" },
-];
+const emptyDraft: CharacterDraft = {
+  name: "", category: "other", provider: "imported-glb", modelUrl: "", thumbnail: "",
+  voicePreset: "normal", tags: [], basePreset: "man", scale: 1.02, yOffset: -1.62,
+};
 
+function Editor({ initial, onClose, onSave }: {
+  initial?: CharacterDefinition | undefined;
+  onClose: () => void;
+  onSave: (draft: CharacterDraft) => void;
+}) {
+  const [draft, setDraft] = useState<CharacterDraft>(() => initial ? {
+    name: initial.name, category: initial.category, provider: initial.provider,
+    modelUrl: initial.modelUrl ?? "", thumbnail: initial.thumbnail ?? "",
+    voicePreset: initial.voicePreset ?? "normal", tags: initial.tags,
+    basePreset: initial.basePreset ?? "man", scale: initial.scale ?? 1.02,
+    yOffset: initial.yOffset ?? -1.62,
+  } : { ...emptyDraft });
+  const [tags, setTags] = useState(initial?.tags.join("، ") ?? "");
+  const [error, setError] = useState("");
+  const patch = (change: Partial<CharacterDraft>) => setDraft((current) => ({ ...current, ...change }));
+  const inputClass = "mt-1 block w-full rounded-xl border border-border bg-background px-3 py-2.5 font-semibold text-foreground outline-none focus:border-primary";
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={onClose}>
+      <section role="dialog" aria-modal="true" aria-labelledby="editor-title" dir="rtl"
+        className="max-h-full w-full max-w-xl overflow-y-auto rounded-3xl border border-border bg-card p-6 shadow-2xl"
+        onClick={(event) => event.stopPropagation()}>
+        <div className="flex items-center justify-between gap-3">
+          <h2 id="editor-title" className="text-2xl font-black text-foreground">{initial ? "تعديل الشخصية" : "إضافة شخصية GLB"}</h2>
+          <button type="button" onClick={onClose} aria-label="إغلاق"><X className="size-6" /></button>
+        </div>
+        <form className="mt-4 space-y-3" onSubmit={(event) => {
+          event.preventDefault();
+          try {
+            onSave({ ...draft, tags: tags.split(/[,،]/).map((tag) => tag.trim()).filter(Boolean) });
+          } catch (caught) {
+            setError(caught instanceof Error ? caught.message : "تعذّر الحفظ.");
+          }
+        }}>
+          <label className="block text-sm font-bold">اسم الشخصية
+            <input required maxLength={80} className={inputClass} value={draft.name} onChange={(e) => patch({ name: e.target.value })} />
+          </label>
+          <div className="grid grid-cols-2 gap-3">
+            <label className="text-sm font-bold">المصدر
+              <select className={inputClass} value={draft.provider} onChange={(e) => patch({ provider: e.target.value as CharacterProvider })}>
+                {Object.entries(PROVIDER_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+              </select>
+            </label>
+            <label className="text-sm font-bold">التصنيف
+              <select className={inputClass} value={draft.category} onChange={(e) => patch({ category: e.target.value as CharacterCategory })}>
+                {CHARACTER_CATEGORIES.map(({ value, label }) => <option key={value} value={value}>{label}</option>)}
+              </select>
+            </label>
+          </div>
+          {draft.provider !== "procedural" && <label className="block text-sm font-bold">
+            رابط نموذج GLB (HTTPS أو مسار محلي)
+            <input dir="ltr" required className={inputClass} value={draft.modelUrl ?? ""} onChange={(e) => patch({ modelUrl: e.target.value })}
+              placeholder="https://example.com/characters/avatar.glb" />
+            <span className="mt-1 block text-xs font-normal text-muted-foreground">يلزم رابط ينتهي بـ .glb ومصدر يدعم CORS.</span>
+          </label>}
+          <label className="block text-sm font-bold">رابط صورة المعاينة (اختياري)
+            <input dir="ltr" className={inputClass} value={draft.thumbnail ?? ""} onChange={(e) => patch({ thumbnail: e.target.value })}
+              placeholder="https://example.com/avatar.webp" />
+          </label>
+          <div className="grid grid-cols-2 gap-3">
+            <label className="text-sm font-bold">الصوت
+              <select className={inputClass} value={draft.voicePreset ?? "normal"} onChange={(e) => patch({ voicePreset: e.target.value as VoiceType })}>
+                {VOICES.map((voice) => <option key={voice} value={voice}>{voice}</option>)}
+              </select>
+            </label>
+            <label className="text-sm font-bold">شكل احتياطي
+              <select className={inputClass} value={draft.basePreset ?? "man"} onChange={(e) => patch({ basePreset: e.target.value as CharacterDraft["basePreset"] })}>
+                <option value="boy">ولد</option><option value="girl">بنت</option>
+                <option value="man">شاب</option><option value="woman">فتاة</option>
+              </select>
+            </label>
+          </div>
+          {draft.provider !== "procedural" && <div className="grid grid-cols-2 gap-3">
+            <label className="text-sm font-bold">المقياس
+              <input type="number" className={inputClass} min={0.1} max={4} step={0.01}
+                value={draft.scale ?? 1.02} onChange={(e) => patch({ scale: Number(e.target.value) })} />
+            </label>
+            <label className="text-sm font-bold">الإزاحة الرأسية
+              <input type="number" className={inputClass} min={-5} max={5} step={0.01}
+                value={draft.yOffset ?? -1.62} onChange={(e) => patch({ yOffset: Number(e.target.value) })} />
+            </label>
+          </div>}
+          <label className="block text-sm font-bold">وسوم (مفصولة بفاصلة)
+            <input className={inputClass} value={tags} onChange={(e) => setTags(e.target.value)} placeholder="سينمائي، قصص، أطفال" />
+          </label>
+          {error && <p role="alert" className="rounded-xl bg-destructive/10 p-3 text-sm font-bold text-destructive">{error}</p>}
+          <div className="flex justify-end gap-3 pt-2">
+            <button type="button" onClick={onClose} className="rounded-full bg-muted px-5 py-3 font-bold">إلغاء</button>
+            <button type="submit" className="rounded-full bg-primary px-6 py-3 font-black text-primary-foreground">حفظ الشخصية</button>
+          </div>
+        </form>
+      </section>
+    </div>
+  );
+}
 
-function Index() {
+function LibraryPage() {
   const navigate = useNavigate();
+  const characters = useCharacterLibrary((s) => s.characters);
+  const addCharacter = useCharacterLibrary((s) => s.addCharacter);
+  const updateCharacter = useCharacterLibrary((s) => s.updateCharacter);
+  const deleteCharacter = useCharacterLibrary((s) => s.deleteCharacter);
+  const toggleFavorite = useCharacterLibrary((s) => s.toggleFavorite);
   const selectedCharacter = useStudioStore((s) => s.selectedCharacter);
   const setSelectedCharacter = useStudioStore((s) => s.setSelectedCharacter);
-  const customizations = useAvatarCustomizationStore((s) => s.customizations);
-  const renderModes = useAvatarCustomizationStore((s) => s.renderModes);
-  const [hovered, setHovered] = useState<CharacterType | null>(null);
+  const setSelectedVoice = useStudioStore((s) => s.setSelectedVoice);
+  const [filter, setFilter] = useState("all");
+  const [search, setSearch] = useState("");
+  const [editor, setEditor] = useState<CharacterDefinition | "new" | null>(null);
+  const selected = characters.find((item) => item.id === selectedCharacter);
+  const filters = [
+    { value: "all", label: "الكل" }, { value: "imported-glb", label: "Premium GLB" },
+    { value: "readyplayerme", label: "Ready Player Me" }, { value: "favorites", label: "المفضلة" },
+    ...CHARACTER_CATEGORIES, { value: "procedural", label: "المدمجة" },
+  ];
+  const visible = useMemo(() => characters.filter((item) => {
+    const matchesFilter = filter === "all" || (filter === "favorites" ? item.isFavorite :
+      item.provider === filter || item.category === filter);
+    const q = search.trim().toLocaleLowerCase();
+    return matchesFilter && (!q || [item.name, ...item.tags, item.provider].some((s) => s.toLocaleLowerCase().includes(q)));
+  }).sort((a, b) => Number(Boolean(b.isFavorite)) - Number(Boolean(a.isFavorite)) ||
+    Number(b.provider === "imported-glb") - Number(a.provider === "imported-glb")), [characters, filter, search]);
+
+  const choose = (item: CharacterDefinition) => {
+    setSelectedCharacter(item.id);
+    if (item.voicePreset) setSelectedVoice(item.voicePreset);
+  };
 
   return (
-    <main className="min-h-screen bg-background px-4 py-10">
-      <div className="mx-auto max-w-5xl">
-        <header className="text-center">
-          <span className="inline-flex items-center gap-2 rounded-full bg-accent px-4 py-1.5 text-sm font-bold text-accent-foreground">
-            <Sparkles className="size-4" />
-            استوديو المرح
-          </span>
-          <h1 className="mt-4 text-4xl font-black text-foreground sm:text-5xl">
-            اختر شخصيتك الكرتونية!
-          </h1>
-          <p className="mt-3 text-lg font-semibold text-muted-foreground">
-            اضغط على الشخصية التي تحبها، ثم اكتب لها قصة قصيرة.
-          </p>
+    <main dir="rtl" className="min-h-screen bg-background px-4 py-8">
+      <div className="mx-auto max-w-7xl">
+        <header className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <span className="inline-flex items-center gap-2 rounded-full bg-accent px-4 py-1.5 text-sm font-black"><Sparkles className="size-4" /> Cam Cartoons Studio</span>
+            <h1 className="mt-3 text-3xl font-black sm:text-5xl">مكتبة الشخصيات المفتوحة</h1>
+            <p className="mt-2 max-w-xl font-semibold text-muted-foreground">شخصيات GLB احترافية متعددة ومفضلة ووسوم وتصنيفات، بعيدًا عن قيد الأربع شخصيات.</p>
+          </div>
+          <button type="button" onClick={() => setEditor("new")}
+            className="inline-flex items-center gap-2 rounded-full bg-primary px-6 py-4 font-black text-primary-foreground shadow-lg">
+            <Plus className="size-5" /> إضافة شخصية
+          </button>
         </header>
-
-        <div className="mt-10 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
-          {CHARACTERS.map(({ type, emoji }) => {
-            const isSelected = selectedCharacter === type;
-            const hasExternalModel = Boolean(
-              customizations[type]?.modelUrl?.trim() || usesReadyPlayerMe(type),
-            );
-            const mode = renderModes[type];
-            const sourceLabel =
-              mode === "custom"
-                ? "شخصية قابلة للتخصيص"
-                : hasExternalModel
-                  ? "Ready Player Me"
-                  : "نموذج كرتوني مدمج";
-
-            return (
-              <button
-                key={type}
-                type="button"
-                onClick={() => setSelectedCharacter(type)}
-                onMouseEnter={() => setHovered(type)}
-                onMouseLeave={() => setHovered(null)}
-                aria-pressed={isSelected}
-                className={`group flex flex-col items-center rounded-3xl border-4 bg-card p-4 shadow-lg transition-transform duration-200 hover:-translate-y-1 ${
-                  isSelected
-                    ? "border-primary ring-4 ring-primary/25"
-                    : "border-border hover:border-secondary"
-                }`}
-              >
-                <div className="h-52 w-full overflow-hidden rounded-2xl bg-muted">
-                  <CharacterStage type={type} spin={hovered !== type} />
-                </div>
-                <span className="mt-4 text-2xl font-black text-foreground">
-                  {emoji} {CHARACTER_LABELS[type]}
-                </span>
-                <span className="mt-2 rounded-full bg-muted px-3 py-1 text-[11px] font-black text-muted-foreground">
-                  {sourceLabel}
-                </span>
-                <span
-                  className={`mt-2 text-sm font-bold ${
-                    isSelected ? "text-primary" : "text-muted-foreground"
-                  }`}
-                >
-                  {isSelected ? "تم الاختيار ✓" : "اضغط للاختيار"}
-                </span>
+        <section className="mt-7 rounded-3xl border border-border bg-card p-4">
+          <div className="relative">
+            <Search className="pointer-events-none absolute right-4 top-3 size-5 text-muted-foreground" />
+            <input type="search" aria-label="البحث عن شخصية" value={search} onChange={(e) => setSearch(e.target.value)}
+              placeholder="ابحث بالاسم أو الوسوم..." className="w-full rounded-2xl border border-border bg-background py-3 pl-4 pr-12 outline-none focus:border-primary" />
+          </div>
+          <div className="mt-4 flex flex-wrap gap-2">
+            {filters.map(({ value, label }) => <button type="button" key={value} onClick={() => setFilter(value)}
+              aria-pressed={filter === value}
+              className={"rounded-full px-4 py-2 text-sm font-bold " + (filter === value ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground")}>
+              {label}
+            </button>)}
+          </div>
+          <p className="mt-3 text-sm font-semibold text-muted-foreground">{visible.length} من {characters.length} شخصية</p>
+        </section>
+        <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {visible.map((item) => <article key={item.id} className={"overflow-hidden rounded-3xl border-2 bg-card shadow-sm " +
+            (selectedCharacter === item.id ? "border-primary ring-2 ring-primary/20" : "border-border")}>
+            <button type="button" onClick={() => choose(item)} aria-pressed={selectedCharacter === item.id} className="w-full text-right">
+              <div className="relative flex aspect-[4/3] items-center justify-center overflow-hidden bg-gradient-to-br from-muted to-secondary/20">
+                {item.thumbnail ? <img src={item.thumbnail} alt={"معاينة " + item.name} loading="lazy" className="h-full w-full object-cover" />
+                  : <span className="text-7xl" aria-hidden>{item.provider === "imported-glb" ? "🎬" : item.basePreset === "boy" ? "👦" : item.basePreset === "girl" ? "👧" : item.basePreset === "woman" ? "👩" : "👨"}</span>}
+                <span className="absolute right-3 top-3 rounded-full bg-background/90 px-2 py-1 text-xs font-black">{PROVIDER_LABELS[item.provider]}</span>
+              </div>
+              <div className="px-4 pt-3">
+                <h2 className="truncate text-xl font-black">{item.name}</h2>
+                <p className="mt-1 text-xs font-semibold text-muted-foreground">
+                  {CHARACTER_CATEGORIES.find((c) => c.value === item.category)?.label ?? "أخرى"} · {item.voicePreset ?? "normal"}
+                </p>
+                <p className="mt-2 min-h-5 truncate text-xs text-muted-foreground">{item.tags.join(" · ") || "بدون وسوم"}</p>
+              </div>
+            </button>
+            <div className="flex items-center justify-between px-3 pb-3 pt-2">
+              <button type="button" onClick={() => toggleFavorite(item.id)} aria-pressed={Boolean(item.isFavorite)}
+                aria-label={item.isFavorite ? "إزالة من المفضلة" : "إضافة للمفضلة"} className="rounded-full p-2 hover:bg-muted">
+                <Heart className={"size-5 " + (item.isFavorite ? "fill-red-500 text-red-500" : "")} />
               </button>
-            );
-          })}
+              <div className="flex gap-1">
+                <button type="button" aria-label={"تعديل " + item.name} onClick={() => setEditor(item)} className="rounded-full p-2 hover:bg-muted"><Edit3 className="size-5" /></button>
+                <button type="button" aria-label={"حذف " + item.name} onClick={() => {
+                  if (!window.confirm("حذف الشخصية " + item.name + " من المكتبة؟")) return;
+                  deleteCharacter(item.id);
+                  if (selectedCharacter === item.id) setSelectedCharacter("");
+                }} className="rounded-full p-2 text-destructive hover:bg-destructive/10"><Trash2 className="size-5" /></button>
+              </div>
+            </div>
+          </article>)}
         </div>
-
-        <div className="mt-12 flex flex-wrap justify-center gap-3">
-          <button
-            type="button"
-            disabled={!selectedCharacter}
-            onClick={() => navigate({ to: "/customize" })}
-            className="inline-flex items-center gap-3 rounded-full bg-secondary px-8 py-5 text-xl font-black text-secondary-foreground shadow-lg transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            <Palette className="size-7" />
-            صمّم الشخصية
-          </button>
-          <button
-            type="button"
-            disabled={!selectedCharacter}
-            onClick={() => navigate({ to: "/story" })}
-            className="inline-flex items-center gap-3 rounded-full bg-primary px-10 py-5 text-xl font-black text-primary-foreground shadow-xl transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            <Camera className="size-7" />
-            ابدأ القصة
-          </button>
-        </div>
+        {visible.length === 0 && <p className="mt-8 rounded-3xl border border-dashed border-border p-8 text-center font-bold">
+          لا توجد شخصيات مطابقة. استخدم «إضافة شخصية» أو غيّر البحث والتصفية.
+        </p>}
+        {selected && <section className="mt-8 grid gap-5 rounded-3xl border-2 border-primary/40 bg-card p-5 md:grid-cols-2">
+          <div className="h-80 overflow-hidden rounded-2xl bg-muted"><CharacterStage type={selected.id} animation="idle" spin /></div>
+          <div className="flex flex-col justify-center gap-3">
+            <h2 className="text-3xl font-black">{selected.name}</h2>
+            <p className="font-semibold text-muted-foreground">معاينة مباشرة داخل الاستوديو — {PROVIDER_LABELS[selected.provider]}</p>
+            <button type="button" onClick={() => navigate({ to: "/customize" })} className="rounded-full bg-secondary px-6 py-3 font-black">تخصيص الشخصية</button>
+            <button type="button" onClick={() => navigate({ to: "/story" })} className="inline-flex items-center justify-center gap-2 rounded-full bg-primary px-6 py-3 font-black text-primary-foreground"><BookOpen className="size-5" /> ابدأ القصة</button>
+            <button type="button" onClick={() => navigate({ to: "/studio" })} className="inline-flex items-center justify-center gap-2 rounded-full border-2 border-border px-6 py-3 font-black"><Camera className="size-5" /> استوديو التصوير</button>
+          </div>
+        </section>}
       </div>
+      {editor && <Editor key={editor === "new" ? "new" : editor.id}
+        initial={editor === "new" ? undefined : editor} onClose={() => setEditor(null)}
+        onSave={(draft) => {
+          if (editor === "new") {
+            const id = addCharacter(draft);
+            const added = useCharacterLibrary.getState().characters.find((item) => item.id === id);
+            if (added) choose(added);
+            setFilter("all"); setSearch("");
+          } else updateCharacter(editor.id, draft);
+          setEditor(null);
+        }} />}
     </main>
   );
 }

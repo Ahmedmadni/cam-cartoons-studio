@@ -1,6 +1,6 @@
 import { create } from "zustand";
 
-export type CharacterType = "boy" | "girl" | "man" | "woman";
+export type CharacterType = string;
 export type AnimationType =
   | "idle"
   | "jump"
