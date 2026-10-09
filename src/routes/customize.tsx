@@ -245,6 +245,7 @@ function CustomizePage() {
                   <input
                     id="avatar-model-url"
                     type="url"
+                    disabled={Boolean(definition?.assetId)}
                     value={currentModelUrl}
                     onChange={(event) => {
                       const modelUrl = event.target.value;
@@ -257,7 +258,7 @@ function CustomizePage() {
                   />
                 </div>
                 <p className="mt-2 text-xs font-semibold text-muted-foreground">
-                  للصق رابط جديد استخدم إعدادات النموذج، ولرفع ملف من جهازك افتح «تعديل الشخصية» في المكتبة.
+                  {definition?.assetId ? "الشخصية مستوردة من ملف محلي؛ استبدل الملف أو رابطه من شاشة المكتبة." : "يمكن استخدام رابط مباشر. لإضافة ملف GLB على جهازك افتح «تعديل الشخصية» في المكتبة."}
                 </p>
               </div>
 
