@@ -8,7 +8,7 @@ import {
 } from "@/lib/characterLibrary";
 import { useStudioStore, VOICES, type VoiceType } from "@/lib/store";
 import type { AvatarDiagnostics } from "@/lib/modelPresentation";
-import { deleteGlbAsset, saveGlbAsset, MAX_GLB_BYTES } from "@/lib/localGlbStorage";
+import { cacheRemoteGlb, deleteGlbAsset, saveGlbAsset, MAX_GLB_BYTES } from "@/lib/localGlbStorage";
 
 export const Route = createFileRoute("/")({
   head: () => ({ meta: [
@@ -158,10 +158,13 @@ function LibraryPage() {
   const [editor, setEditor] = useState<CharacterDefinition | "new" | null>(null);
   const [diagnostics, setDiagnostics] = useState<AvatarDiagnostics | null>(null);
   const [captureError, setCaptureError] = useState<string | null>(null);
+  const [offlineSavingId, setOfflineSavingId] = useState<string | null>(null);
+  const [offlineError, setOfflineError] = useState<string | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   useEffect(() => {
     setDiagnostics(null);
     setCaptureError(null);
+    setOfflineError(null);
     canvasRef.current = null;
   }, [selectedCharacter]);
   const selected = characters.find((item) => item.id === selectedCharacter);
@@ -207,6 +210,24 @@ function LibraryPage() {
       setCaptureError(null);
     } catch (error) {
       setCaptureError(error instanceof Error ? error.message : "تعذر التقاط صورة المعاينة.");
+    }
+  };
+
+  const saveOffline = async (item: CharacterDefinition) => {
+    if (!item.modelUrl || item.assetId || offlineSavingId) return;
+    setOfflineError(null);
+    setOfflineSavingId(item.id);
+    let copiedAsset: string | null = null;
+    try {
+      copiedAsset = await cacheRemoteGlb(item.modelUrl);
+      const { id: _id, isDefault: _default, isFavorite: _favorite, ...draft } = item;
+      updateCharacter(item.id, { ...draft, assetId: copiedAsset });
+      copiedAsset = null;
+    } catch (error) {
+      if (copiedAsset) await deleteGlbAsset(copiedAsset).catch(() => {});
+      setOfflineError(error instanceof Error ? error.message : "تعذر حفظ النسخة المحلية.");
+    } finally {
+      setOfflineSavingId(null);
     }
   };
 
@@ -292,6 +313,23 @@ function LibraryPage() {
           <div className="flex flex-col justify-center gap-3">
             <h2 className="text-3xl font-black">{selected.name}</h2>
             <p className="font-semibold text-muted-foreground">معاينة مباشرة داخل الاستوديو — {PROVIDER_LABELS[selected.provider]}</p>
+            {selected.provider === "imported-glb" && (
+              <div className="rounded-2xl border border-border bg-muted/40 p-3 text-sm">
+                {selected.assetId ? (
+                  <p className="font-bold text-primary">هذا النموذج محفوظ فعليًا داخل متصفحك، ويمكن عرضه دون إعادة تنزيله من المصدر.</p>
+                ) : selected.modelUrl ? (
+                  <>
+                    <p className="font-semibold text-muted-foreground">هذا النموذج مستضاف خارجيًا؛ يمكنك الاحتفاظ بنسخة محلية داخل التطبيق.</p>
+                    <button type="button" disabled={Boolean(offlineSavingId)}
+                      onClick={() => void saveOffline(selected)}
+                      className="mt-2 rounded-full bg-primary px-5 py-3 font-black text-primary-foreground disabled:opacity-50">
+                      {offlineSavingId === selected.id ? "جارٍ تنزيل وحفظ GLB..." : "حفظ الشخصية على هذا الجهاز"}
+                    </button>
+                  </>
+                ) : <p className="text-muted-foreground">لا يوجد ملف GLB لهذا النموذج.</p>}
+                {offlineError && <p role="alert" className="mt-2 font-bold text-destructive">{offlineError}</p>}
+              </div>
+            )}
             <button type="button" onClick={captureThumbnail}
               disabled={selected.provider !== "procedural" && diagnostics?.status !== "ready"}
               className="rounded-full border-2 border-primary px-6 py-3 font-bold text-foreground disabled:cursor-not-allowed disabled:opacity-40">
