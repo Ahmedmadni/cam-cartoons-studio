@@ -16,7 +16,7 @@ type Props = {
   url: string;
   animation: AnimationType;
   spin: boolean;
-  onDiagnostics?: (details: AvatarDiagnostics) => void;
+  onDiagnostics?: ((details: AvatarDiagnostics) => void) | undefined;
 };
 
 type MorphMesh = Mesh & {
