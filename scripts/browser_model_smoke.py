@@ -34,11 +34,23 @@ def wait_for_server(proc):
 
 def await_gltf_ready(page, name):
     # The diagnostics appear only when Three.js GLTF loader actually mounts.
-    expect(page.get_by_role("heading", name="تقرير جاهزية نموذج GLB")).to_be_visible(timeout=25000)
-    expect(page.get_by_text(re.compile(r"العظام:\s*0"))).to_be_visible(timeout=25000)
-    assert page.get_by_text("تعذر تحميل النموذج:", exact=False).count() == 0, (
-        f"{name}: GLB load failed and the app displayed the procedural fallback"
-    )
+    try:
+        expect(page.get_by_role("heading", name="تقرير جاهزية نموذج GLB")).to_be_visible(timeout=25000)
+        expect(page.get_by_text(re.compile(r"العظام:\s*0"))).to_be_visible(timeout=25000)
+        assert page.get_by_text("تعذر تحميل النموذج:", exact=False).count() == 0, (
+            f"{name}: GLB load failed and the app displayed the procedural fallback"
+        )
+    except Exception:
+        page.screenshot(path=str(ARTIFACTS / "model-ready-failure.png"), full_page=True)
+        print("QA FAILED PAGE TEXT:", page.locator("body").inner_text()[-5000:])
+        print("QA FAILED GLB response:", page.evaluate("""async () => {
+            const resp = await fetch('/__qa__/model.glb');
+            const buf = await resp.arrayBuffer();
+            return { status: resp.status, type: resp.headers.get('content-type'),
+              bytes: buf.byteLength,
+              signature: Array.from(new Uint8Array(buf.slice(0, 12))) };
+        }"""))
+        raise
 
 
 def add_character(page, name, *, local_file=None):
