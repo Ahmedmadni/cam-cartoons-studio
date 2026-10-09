@@ -59,8 +59,8 @@ function Editor({ initial, onClose, onSave }: {
             .catch((caught: unknown) => setError(caught instanceof Error ? caught.message : "تعذّر الحفظ."))
             .finally(() => setSaving(false));
         }}>
-          <label className="block text-sm font-bold">اسم الشخصية
-            <input required maxLength={80} className={inputClass} value={draft.name} onChange={(e) => patch({ name: e.target.value })} />
+          <label htmlFor="character-editor-name" className="block text-sm font-bold">اسم الشخصية
+            <input id="character-editor-name" required maxLength={80} className={inputClass} value={draft.name} onChange={(e) => patch({ name: e.target.value })} />
           </label>
           <div className="grid grid-cols-2 gap-3">
             <label className="text-sm font-bold">المصدر
