@@ -101,7 +101,7 @@ function Editor({ initial, onClose, onSave }: {
                 }}
                 placeholder="https://example.com/avatar.glb" />
             </label>
-          </div>
+          </div>}
           <label className="block text-sm font-bold">رابط صورة المعاينة (اختياري)
             <input dir="ltr" className={inputClass} value={draft.thumbnail ?? ""} onChange={(e) => patch({ thumbnail: e.target.value })}
               placeholder="https://example.com/avatar.webp" />
