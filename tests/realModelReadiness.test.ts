@@ -43,7 +43,7 @@ describe("Real model capability truthfulness", () => {
       ...rigged, morphCount: 0, hasBlink: false, hasLipSync: false,
     });
     expect(status.grade).toBe("limited");
-    expect(status.limitations.some((line) => line.includes("الفم"))).toBe(true);
+    expect(status.limitations.some((line) => line.includes("فم"))).toBe(true);
   });
   test("remote or malformed GLB loading errors are not misrepresented", () => {
     expect(assessAnimationReadiness(null).grade).toBe("unavailable");
