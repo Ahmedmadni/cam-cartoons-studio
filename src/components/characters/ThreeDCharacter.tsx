@@ -62,7 +62,7 @@ function Avatar({
   type: CharacterType;
   animation: AnimationType;
   spin: boolean;
-  onDiagnostics?: (details: AvatarDiagnostics) => void;
+  onDiagnostics?: ((details: AvatarDiagnostics) => void) | undefined;
 }) {
   const customization = useAvatarCustomizationStore((state) => state.customizations[type]);
   const profile = mergeAvatarProfile(type, customization);
@@ -106,7 +106,7 @@ export type ThreeDCharacterProps = {
   /** صورة خلفية تُرسم داخل المشهد وتظهر أيضاً في الفيديو المسجل. */
   backgroundUrl?: string;
   onCanvasReady?: (canvas: HTMLCanvasElement) => void;
-  onDiagnostics?: (details: AvatarDiagnostics) => void;
+  onDiagnostics?: ((details: AvatarDiagnostics) => void) | undefined;
 };
 
 export default function ThreeDCharacter({
