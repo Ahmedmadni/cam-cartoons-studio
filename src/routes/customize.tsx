@@ -22,7 +22,8 @@ import {
   type AvatarCustomization,
   type AvatarRenderMode,
 } from "@/lib/avatarCustomization";
-import { CHARACTER_LABELS, useStudioStore } from "@/lib/store";
+import { useStudioStore } from "@/lib/store";
+import { getCharacterLabel, getCharacterDefinition } from "@/lib/characterLibrary";
 
 export const Route = createFileRoute("/customize")({
   head: () => ({
@@ -153,8 +154,9 @@ function CustomizePage() {
     shoulderScale: customization?.shoulderScale ?? base.shoulderScale,
     headScale: customization?.headScale ?? base.headScale,
   };
-  const currentModelUrl = customization?.modelUrl ?? base.modelUrl ?? "";
+  const currentModelUrl = customization?.modelUrl ?? getCharacterDefinition(selectedCharacter)?.modelUrl ?? base.modelUrl ?? "";
   const hasReadyPlayerMe = Boolean(currentModelUrl.trim());
+  const definition = getCharacterDefinition(selectedCharacter);
 
   const update = (patch: AvatarCustomization) => {
     updateCustomization(selectedCharacter, patch);
@@ -171,7 +173,7 @@ function CustomizePage() {
               مصمم الشخصيات
             </span>
             <h1 className="mt-2 text-3xl font-black text-foreground sm:text-4xl">
-              صمّم {CHARACTER_LABELS[selectedCharacter]} كما تحب
+              صمّم {getCharacterLabel(selectedCharacter)} كما تحب
             </h1>
             <p className="mt-1 font-semibold text-muted-foreground">
               كل التغييرات تُحفظ تلقائيًا على هذا الجهاز.
@@ -223,6 +225,7 @@ function CustomizePage() {
           <section className="space-y-5">
             <div className="rounded-3xl border-2 border-border bg-card p-5 shadow-sm">
               <h2 className="text-xl font-black text-foreground">مصدر الشخصية</h2>
+              {definition?.provider === "imported-glb" && <p className="mt-2 text-sm font-semibold text-muted-foreground">الشخصية المستوردة هي المصدر الأساسي؛ يمكنك ضبط المقياس والإزاحة من محرر المكتبة.</p>}
               <div className="mt-3 grid gap-2">
                 {(Object.keys(MODE_LABELS) as AvatarRenderMode[]).map((mode) => {
                   const disabled = mode === "readyplayerme" && !hasReadyPlayerMe;

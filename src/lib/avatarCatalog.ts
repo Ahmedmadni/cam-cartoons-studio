@@ -1,5 +1,6 @@
 import type { AvatarCustomization } from "./avatarCustomization";
 import type { CharacterType } from "./store";
+import { getCharacterDefinition, type LegacyCharacterType } from "./characterLibrary";
 
 export type HairStyle = "crop" | "curls" | "bun" | "waves";
 export type FaceShape = "round" | "oval" | "square";
@@ -65,7 +66,7 @@ export function prepareReadyPlayerMeUrl(rawUrl: string | null | undefined) {
 
 const rpmUrl = (value: string | undefined) => prepareReadyPlayerMeUrl(value);
 
-export const AVATAR_PROFILES: Record<CharacterType, AvatarProfile> = {
+export const AVATAR_PROFILES: Record<LegacyCharacterType, AvatarProfile> = {
   boy: {
     type: "boy",
     label: "ولد",
@@ -176,12 +177,19 @@ export const AVATAR_PROFILES: Record<CharacterType, AvatarProfile> = {
   },
 };
 
-export function getAvatarProfile(type: CharacterType) {
-  return AVATAR_PROFILES[type];
+export function getAvatarProfile(type: CharacterType): AvatarProfile {
+  const definition = getCharacterDefinition(type);
+  const base = AVATAR_PROFILES[definition?.basePreset ?? (type in AVATAR_PROFILES ? (type as LegacyCharacterType) : "man")];
+  return {
+    ...base,
+    type,
+    rpmScale: definition?.scale ?? base.rpmScale,
+    rpmYOffset: definition?.yOffset ?? base.rpmYOffset,
+  };
 }
 
 export function usesReadyPlayerMe(type: CharacterType) {
-  return Boolean(AVATAR_PROFILES[type].modelUrl);
+  return Boolean(getCharacterDefinition(type)?.modelUrl ?? getAvatarProfile(type).modelUrl);
 }
 
 
@@ -189,13 +197,12 @@ export function mergeAvatarProfile(
   type: CharacterType,
   customization: AvatarCustomization | undefined,
 ): AvatarProfile {
-  const base = AVATAR_PROFILES[type];
-  if (!customization) return base;
-
-  const rawModelUrl = customization.modelUrl?.trim();
+  const base = getAvatarProfile(type);
+  const definition = getCharacterDefinition(type);
+  const rawModelUrl = customization?.modelUrl?.trim();
   return {
     ...base,
     ...customization,
-    modelUrl: rawModelUrl ? prepareReadyPlayerMeUrl(rawModelUrl) : base.modelUrl,
+    modelUrl: prepareReadyPlayerMeUrl(rawModelUrl || definition?.modelUrl || base.modelUrl),
   };
 }
