@@ -181,7 +181,7 @@ function LibraryPage() {
   }).sort((a, b) => Number(Boolean(b.isFavorite)) - Number(Boolean(a.isFavorite)) ||
     Number(b.provider === "imported-glb") - Number(a.provider === "imported-glb")), [characters, filter, search]);
 
-  const captureThumbnail = () => {
+  const captureThumbnail = (silent = false) => {
     if (!selected) return;
     try {
       const source = canvasRef.current;
@@ -209,9 +209,18 @@ function LibraryPage() {
       updateCharacter(selected.id, { ...draft, thumbnail: image });
       setCaptureError(null);
     } catch (error) {
-      setCaptureError(error instanceof Error ? error.message : "تعذر التقاط صورة المعاينة.");
+      if (!silent) setCaptureError(error instanceof Error ? error.message : "تعذر التقاط صورة المعاينة.");
     }
   };
+
+  // Build a real model-specific portrait after the 3D stage has fully loaded.
+  // The model stays as an emoji placeholder only if WebGL/CORS capture fails.
+  useEffect(() => {
+    if (!selected || selected.provider === "procedural" || selected.thumbnail || diagnostics?.status !== "ready") return;
+    const timer = window.setTimeout(() => captureThumbnail(true), 850);
+    return () => window.clearTimeout(timer);
+    // The store update from capture adds thumbnail, which stops re-captures.
+  }, [selected?.id, selected?.thumbnail, selected?.provider, diagnostics?.status]);
 
   const saveOffline = async (item: CharacterDefinition) => {
     if (!item.modelUrl || item.assetId || offlineSavingId) return;
@@ -330,7 +339,7 @@ function LibraryPage() {
                 {offlineError && <p role="alert" className="mt-2 font-bold text-destructive">{offlineError}</p>}
               </div>
             )}
-            <button type="button" onClick={captureThumbnail}
+            <button type="button" onClick={() => captureThumbnail()}
               disabled={selected.provider !== "procedural" && diagnostics?.status !== "ready"}
               className="rounded-full border-2 border-primary px-6 py-3 font-bold text-foreground disabled:cursor-not-allowed disabled:opacity-40">
               التقاط صورة معاينة من النموذج
