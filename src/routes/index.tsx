@@ -24,6 +24,7 @@ export const Route = createFileRoute("/")({
 const emptyDraft: CharacterDraft = {
   name: "", category: "other", provider: "imported-glb", modelUrl: "", thumbnail: "",
   voicePreset: "normal", tags: [], basePreset: "man", scale: 1.02, yOffset: -1.62,
+  preferredFraming: "upper",
 };
 
 function Editor({ initial, onClose, onSave }: {
@@ -37,6 +38,7 @@ function Editor({ initial, onClose, onSave }: {
     voicePreset: initial.voicePreset ?? "normal", tags: initial.tags,
     basePreset: initial.basePreset ?? "man", scale: initial.scale ?? 1.02,
     yOffset: initial.yOffset ?? -1.62,
+    preferredFraming: initial.preferredFraming ?? "upper",
   } : { ...emptyDraft });
   const [tags, setTags] = useState(initial?.tags.join("، ") ?? "");
   const [file, setFile] = useState<File | null>(null);
@@ -122,6 +124,15 @@ function Editor({ initial, onClose, onSave }: {
               </select>
             </label>
           </div>
+          {draft.provider !== "procedural" && <label className="block text-sm font-bold">
+            لقطة المعاينة الافتراضية
+            <select className={inputClass} value={draft.preferredFraming ?? "upper"}
+              onChange={(e) => patch({ preferredFraming: e.target.value as CameraFraming })}>
+              {Object.entries(FRAMING_LABELS).map(([framing, label]) =>
+                <option key={framing} value={framing}>{label}</option>)}
+            </select>
+            <span className="mt-1 block text-xs text-muted-foreground">للصور وبطاقات المكتبة؛ لا يغيّر كاميرا القصص.</span>
+          </label>}
           {draft.provider !== "procedural" && <div className="grid grid-cols-2 gap-3">
             <label className="text-sm font-bold">المقياس
               <input type="number" className={inputClass} min={0.1} max={4} step={0.01}
