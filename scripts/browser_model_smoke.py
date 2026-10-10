@@ -265,9 +265,12 @@ def main():
                 (ARTIFACTS / "browser-origin-check.json").write_text(
                     json.dumps(origin_results, ensure_ascii=False, indent=2), encoding="utf-8"
                 )
-                # Test the optional-candidate flow in an isolated Chromium tab,
-                # after standard WebGL and original-five smoke are completed.
-                candidate_page = context.new_page()
+                # Tear down the original context and all its WebGL canvases
+                # before the candidate review. A second tab in the same context
+                # can exhaust SwiftShader resources on CI runners.
+                context.close()
+                candidate_context = browser.new_context(viewport={"width": 1366, "height": 900})
+                candidate_page = candidate_context.new_page()
                 candidate_page.goto(URL, wait_until="networkidle", timeout=60000)
                 expect(candidate_page.get_by_role("button", name="أضف ياسمين للتقييم")).to_be_visible()
                 candidate_page.get_by_role("button", name="أضف ياسمين للتقييم").dispatch_event("click")
@@ -277,11 +280,10 @@ def main():
                 assert candidate_page.get_by_role("button", name="حذف ياسمين").count() == 1, (
                     "Selecting an existing candidate must not create a duplicate"
                 )
-                await_gltf_ready(candidate_page, "ياسمين", expected_zero_bones=False)
                 candidate_page.get_by_role("button", name="فحص رابط GLB وCORS").dispatch_event("click")
                 expect(candidate_page.get_by_role("status")).to_contain_text("المصدر متاح", timeout=22000)
-                candidate_page.close()
-                context.close()
+                await_gltf_ready(candidate_page, "ياسمين", expected_zero_bones=False)
+                candidate_context.close()
                 browser.close()
             print("PASS: hosted GLB, model controls, mobile WebGL, IndexedDB import and reload")
         finally:
