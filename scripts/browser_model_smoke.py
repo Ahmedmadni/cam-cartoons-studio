@@ -168,13 +168,14 @@ def main():
                     await_gltf_ready(page, name, expected_zero_bones=False)
                     mouth_button = page.get_by_role("button", name="تجربة حركة الفم")
                     expect(mouth_button).to_be_visible()
-                    if mouth_button.is_enabled():
+                    mouth_available = mouth_button.is_enabled()
+                    if mouth_available:
                         mouth_button.dispatch_event("click")
                         expect(page.get_by_role("button", name="إيقاف تجربة الفم")).to_have_attribute(
                             "aria-pressed", "true"
                         )
                     origin_results.append({"name": name, "browser_cors": "passed", "direct_glb_render": "passed",
-                                           "mouth_preview_available": mouth_button.is_enabled()})
+                                           "mouth_preview_available": mouth_available})
                     print(f"PASS: publisher-origin CORS and real GLB render for {name}", flush=True)
                 (ARTIFACTS / "browser-origin-check.json").write_text(
                     json.dumps(origin_results, ensure_ascii=False, indent=2), encoding="utf-8"
