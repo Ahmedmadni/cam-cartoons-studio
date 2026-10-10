@@ -12,6 +12,7 @@ import { cacheRemoteGlb, deleteGlbAsset, saveGlbAsset, MAX_GLB_BYTES } from "@/l
 import { probeRemoteGlb } from "@/lib/glbSourceProbe";
 import { FRAMING_LABELS, REVIEW_ANGLE_LABELS, type CameraFraming, type ReviewCameraAngle } from "@/lib/cameraComposition";
 import { LIGHTING_LABELS, type LightingStyle } from "@/lib/studioLighting";
+import { describeSurfaceLimitations } from "@/lib/avatarSurfaceQuality";
 import { REVIEW_BACKDROPS, REVIEW_STUDIO_GRADIENTS, type ReviewBackdropId } from "@/lib/reviewBackdrops";
 
 export const Route = createFileRoute("/")({
@@ -480,6 +481,33 @@ function LibraryPage() {
                 <p className="font-black text-foreground">حالة التوافق: {readiness.title}</p>
                 <p>المجسمات: {diagnostics.meshCount ?? 0} · الخامات: {diagnostics.materialCount ?? 0} · المجسمات المرتبطة بالعظام: {diagnostics.skinnedMeshCount ?? 0}</p>
                 <p>العظام: {diagnostics.boneCount ?? 0} · تعابير Morph: {diagnostics.morphCount ?? 0} · مقاطع الحركة المرفقة: {diagnostics.animationClipCount ?? 0}</p>
+                <div className="mt-3 rounded-xl border border-border bg-muted/30 p-3">
+                  <p className="font-black text-foreground">تحليل الأسطح والخامات الفعلية</p>
+                  <p className="mt-1">المثلثات (تقديريًا): {(diagnostics.triangleCount ?? 0).toLocaleString("ar")} · خرائط النسيج: {diagnostics.textureCount ?? 0}</p>
+                  <p>خامات PBR: {diagnostics.pbrMaterialCount ?? 0} · خامات ذات Normal Maps: {diagnostics.normalMappedMaterialCount ?? 0}</p>
+                  <p>خرائط معروفة الدقة: {diagnostics.knownResolutionCount ?? 0} · خرائط منخفضة الدقة: {diagnostics.lowResolutionCount ?? 0}</p>
+                  <p>خرائط تحسّن ترشيح عرضها: {diagnostics.enhancedTextureCount ?? 0}</p>
+                  <p className="mt-2 text-xs font-normal">يتم الحفاظ على خشونة المواد وألوانها الأصلية؛ دقة الخرائط وحدها لا تثبت جودة التصميم.</p>
+                  {describeSurfaceLimitations({
+                    triangleCount: diagnostics.triangleCount ?? 0,
+                    textureCount: diagnostics.textureCount ?? 0,
+                    knownResolutionCount: diagnostics.knownResolutionCount ?? 0,
+                    lowResolutionCount: diagnostics.lowResolutionCount ?? 0,
+                    pbrMaterialCount: diagnostics.pbrMaterialCount ?? 0,
+                    normalMappedMaterialCount: diagnostics.normalMappedMaterialCount ?? 0,
+                    enhancedTextureCount: diagnostics.enhancedTextureCount ?? 0,
+                  }).length > 0 && <ul className="mt-2 list-disc space-y-1 pr-5 text-xs">
+                    {describeSurfaceLimitations({
+                      triangleCount: diagnostics.triangleCount ?? 0,
+                      textureCount: diagnostics.textureCount ?? 0,
+                      knownResolutionCount: diagnostics.knownResolutionCount ?? 0,
+                      lowResolutionCount: diagnostics.lowResolutionCount ?? 0,
+                      pbrMaterialCount: diagnostics.pbrMaterialCount ?? 0,
+                      normalMappedMaterialCount: diagnostics.normalMappedMaterialCount ?? 0,
+                      enhancedTextureCount: diagnostics.enhancedTextureCount ?? 0,
+                    }).map((note) => <li key={note}>{note}</li>)}
+                  </ul>}
+                </div>
                 <p>تحريك الرأس: {diagnostics.hasHeadRig ? "متاح" : "غير مدعوم"} · الذراعان: {diagnostics.hasArmRig ? "متاحان" : "غير مدعومين"}</p>
                 <p>تحريك الفم: {diagnostics.hasLipSync ? "مدعوم" : "غير مدعوم"} · رمش العين: {diagnostics.hasBlink ? "مدعوم" : "غير مدعوم"}</p>
                 {diagnostics.dimensions && <p>

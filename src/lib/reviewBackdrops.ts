@@ -29,4 +29,8 @@ export const REVIEW_STUDIO_GRADIENTS: Record<LightingStyle, { start: string; end
     start: "#0D1327", end: "#394660",
     css: "radial-gradient(circle at 50% 30%, #4B5772 0%, #25334B 42%, #080F20 100%)",
   },
+  softbox: {
+    start: "#B7C3D2", end: "#EDF0F3",
+    css: "radial-gradient(circle at 50% 40%, #F1F2F3 0%, #CED5DE 50%, #8294A9 100%)",
+  },
 };

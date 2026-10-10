@@ -29,6 +29,14 @@ export type AvatarDiagnostics = {
   meshCount?: number;
   skinnedMeshCount?: number;
   materialCount?: number;
+  /** Real texture/geometry observations, never a subjective artistic score. */
+  triangleCount?: number;
+  textureCount?: number;
+  knownResolutionCount?: number;
+  lowResolutionCount?: number;
+  pbrMaterialCount?: number;
+  normalMappedMaterialCount?: number;
+  enhancedTextureCount?: number;
   animationClipCount?: number;
   hasHeadRig?: boolean;
   hasArmRig?: boolean;

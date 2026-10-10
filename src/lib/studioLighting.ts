@@ -1,10 +1,11 @@
 /** Three-point cinematic lighting tuned for skinned PBR characters. */
-export type LightingStyle = "cinematic" | "daylight" | "dramatic";
+export type LightingStyle = "cinematic" | "daylight" | "dramatic" | "softbox";
 
 export const LIGHTING_LABELS: Record<LightingStyle, string> = {
   cinematic: "سينمائية",
   daylight: "طبيعية",
   dramatic: "درامية",
+  softbox: "استوديو ناعم",
 };
 
 export const LIGHTING_RECIPES = {
@@ -22,6 +23,13 @@ export const LIGHTING_RECIPES = {
     key: 2.55, fill: 0.3, rim: 3.8, ambience: 0.34, env: 0.42,
     keyColor: "#F8DEC7", fillColor: "#74A9E0", rimColor: "#95BFFF",
     ambientSky: "#D9E6FF", ambientGround: "#354252",
+  },
+  // Balanced broad fill exposes eye/skin/hair texture without extreme
+  // highlights; avoids "plastic" grading as a substitute for real geometry.
+  softbox: {
+    key: 1.35, fill: 0.96, rim: 0.95, ambience: 0.58, env: 0.84,
+    keyColor: "#FFF7ED", fillColor: "#EEF4FF", rimColor: "#FFF4E7",
+    ambientSky: "#F9F8F6", ambientGround: "#9EA8B5",
   },
 } as const satisfies Record<LightingStyle, {
   key: number; fill: number; rim: number; ambience: number; env: number;

@@ -1,5 +1,5 @@
 import { useGLTF } from "@react-three/drei";
-import { useFrame } from "@react-three/fiber";
+import { useFrame, useThree } from "@react-three/fiber";
 import { useEffect, useMemo, useRef } from "react";
 import { Box3, MathUtils, Vector3 } from "three";
 import type { Bone, Euler, Group, Mesh, Object3D } from "three";
@@ -7,6 +7,7 @@ import { clone as cloneSkeleton } from "three/examples/jsm/utils/SkeletonUtils.j
 
 import { getAvatarProfile } from "@/lib/avatarCatalog";
 import { faceState } from "@/lib/faceState";
+import { enhanceSurfaceSampling, inspectSurfaceQuality } from "@/lib/avatarSurfaceQuality";
 import { calculateModelFit, detectFaceCapabilities, FACE_MORPH_ALIASES, matchMorphAlias, type AvatarDiagnostics } from "@/lib/modelPresentation";
 import { useStudioStore } from "@/lib/store";
 import type { AnimationType, CharacterType } from "@/lib/store";
@@ -75,11 +76,8 @@ function collectRig(root: Object3D): Rig {
         morphMeshes.push(mesh);
       }
 
-      const material = mesh.material;
-      if (material && !Array.isArray(material) && "envMapIntensity" in material) {
-        (material as typeof material & { envMapIntensity: number }).envMapIntensity = 0.75;
-        material.needsUpdate = true;
-      }
+      // Keep original GLB PBR response; flattening all materials to 0.75
+      // damages distinctive skin, hair, metallic accessories and fabrics.
     }
   });
 
@@ -164,7 +162,12 @@ export default function ReadyPlayerMeAvatar({ type, url, animation, spin, previe
   const profile = getAvatarProfile(type);
   const root = useRef<Group>(null);
   const gltf = useGLTF(url);
+  const gpuAnisotropy = useThree((state) => state.gl.capabilities.getMaxAnisotropy());
   const avatar = useMemo(() => cloneSkeleton(gltf.scene), [gltf.scene]);
+  const surface = useMemo(() => {
+    const enhancedTextureCount = enhanceSurfaceSampling(avatar, gpuAnisotropy);
+    return { ...inspectSurfaceQuality(avatar), enhancedTextureCount };
+  }, [avatar, gpuAnisotropy]);
   const rig = useMemo(() => collectRig(avatar), [avatar]);
   const basePose = useRef<BonePose>(capturePose(rig));
 
@@ -205,6 +208,7 @@ export default function ReadyPlayerMeAvatar({ type, url, animation, spin, previe
       meshCount,
       skinnedMeshCount,
       materialCount: materialIds.size,
+      ...surface,
       animationClipCount: gltf.animations.length,
       hasHeadRig: Boolean(rig.head),
       hasArmRig: Boolean(rig.leftArm && rig.rightArm),
@@ -219,7 +223,7 @@ export default function ReadyPlayerMeAvatar({ type, url, animation, spin, previe
       offset: [-center.x, -bounds.min.y, -center.z] as [number, number, number],
       diagnostics,
     };
-  }, [avatar, rig, profile.rpmScale, gltf.animations.length, url]);
+  }, [avatar, rig, profile.rpmScale, gltf.animations.length, url, surface]);
 
   useEffect(() => {
     onDiagnostics?.(presentation.diagnostics);
