@@ -13,7 +13,7 @@ describe("Phase 18D optional human GLB candidates", () => {
       expect(item.draft.modelUrl).toBe(item.modelUrl);
       expect(item.draft.name).toBe(item.name);
       expect(item.sizeBytes).toBeGreaterThan(4_000_000);
-      expect(item.draft.isDefault).toBeUndefined();
+      expect("isDefault" in item.draft).toBe(false);
     }
     expect(DEFAULT_CHARACTERS).toHaveLength(9); // never seed unapproved candidates
   });
