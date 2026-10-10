@@ -52,7 +52,7 @@ describe("Facial driver supports every capability it advertises", () => {
   });
   test("unrelated morph names do not trigger unsupported claims", () => {
     expect(detectFaceCapabilities(["eyesLookUp", "mouthSmileLeft", "HairVolume"])).toEqual({
-      hasLipSync: false, hasBlink: false,
+      hasLipSync: false, hasBlink: false, hasSmile: true, hasBrowUp: false,
     });
   });
 });
