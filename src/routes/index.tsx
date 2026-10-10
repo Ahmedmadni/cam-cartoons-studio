@@ -311,7 +311,9 @@ function LibraryPage() {
     // Always expose the newly selected card even if the prior filter hid it.
     setFilter("all");
     setSearch("");
-    document.getElementById("selected-character-preview")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.requestAnimationFrame(() => {
+      document.getElementById("selected-character-preview")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
   };
 
   return (
