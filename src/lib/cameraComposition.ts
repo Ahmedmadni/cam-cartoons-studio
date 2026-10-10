@@ -76,7 +76,6 @@ export function calculateFramedCameraShot(
   const { height, width, depth } = diagnostics.dimensions;
   const scale = diagnostics.normalizedScale;
   const heightScaled = height * scale;
-  const estimatedHeadRatio = framing === "portrait" ? 0.83 : 0.71;
   // Head bone position wins over guesses for models with long necks, short bodies,
   // or non-standard skeleton proportions.
   const headRatio = typeof diagnostics.headHeightRatio === "number" &&
@@ -99,7 +98,7 @@ export function calculateFramedCameraShot(
   const minDistance = framing === "portrait" ? 0.95 : 1.5;
   return {
     distance: Math.min(50, Math.max(minDistance, vertical, horizontal) + depth * scale * 0.28),
-    targetY: yOffset + heightScaled * (framing === "portrait" ? targetRatio : targetRatio),
+    targetY: yOffset + heightScaled * targetRatio,
     fov: full.fov,
     fitted: true,
   };
