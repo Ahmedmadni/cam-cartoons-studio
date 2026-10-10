@@ -17,6 +17,8 @@ type Props = {
   animation: AnimationType;
   spin: boolean;
   previewSpeech?: boolean | undefined;
+  /** Recenter only during visual inspection, never during story playback. */
+  reviewMode?: boolean | undefined;
   onDiagnostics?: ((details: AvatarDiagnostics) => void) | undefined;
 };
 
@@ -158,7 +160,7 @@ function dampBone(
   bone.rotation.z = MathUtils.damp(bone.rotation.z, base.z + (target.z ?? 0), speed, delta);
 }
 
-export default function ReadyPlayerMeAvatar({ type, url, animation, spin, previewSpeech = false, onDiagnostics }: Props) {
+export default function ReadyPlayerMeAvatar({ type, url, animation, spin, previewSpeech = false, reviewMode = false, onDiagnostics }: Props) {
   const profile = getAvatarProfile(type);
   const root = useRef<Group>(null);
   const gltf = useGLTF(url);
@@ -234,6 +236,10 @@ export default function ReadyPlayerMeAvatar({ type, url, animation, spin, previe
     const t = state.clock.elapsedTime;
     if (spin) group.rotation.y += delta * 0.52;
     if (animation === "spin") group.rotation.y += delta * 2.1;
+    // Recenter the real mesh after a user stops rotation, so photo angles are repeatable.
+    if (reviewMode && !spin && animation !== "spin" && animation !== "dance") {
+      group.rotation.y = MathUtils.damp(group.rotation.y, 0, 8, delta);
+    }
 
     let targetY = profile.rpmYOffset;
     let targetZ = 0;

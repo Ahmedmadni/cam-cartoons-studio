@@ -4,7 +4,7 @@ import { PerspectiveCamera } from "three";
 import { Component, Suspense, useCallback, useEffect, useState, type ReactNode } from "react";
 
 import { getAvatarProfile, mergeAvatarProfile } from "@/lib/avatarCatalog";
-import { calculateFramedCameraShot, type CameraFraming } from "@/lib/cameraComposition";
+import { calculateFramedCameraShot, calculateReviewCameraPosition, type CameraFraming, type ReviewCameraAngle } from "@/lib/cameraComposition";
 import { LIGHTING_RECIPES, type LightingStyle } from "@/lib/studioLighting";
 import { useCharacterLibrary } from "@/lib/characterLibrary";
 import { useLocalGlbUrl } from "@/lib/useLocalGlbUrl";
@@ -19,10 +19,12 @@ function ResponsiveCharacterCamera({
   diagnostics,
   type,
   framing,
+  reviewAngle,
 }: {
   diagnostics: AvatarDiagnostics | null;
   type: CharacterType;
   framing: CameraFraming;
+  reviewAngle: ReviewCameraAngle;
 }) {
   const { camera, size, invalidate } = useThree();
   const yOffset = getAvatarProfile(type).rpmYOffset;
@@ -31,11 +33,12 @@ function ResponsiveCharacterCamera({
     if (!(camera instanceof PerspectiveCamera)) return;
     const shot = calculateFramedCameraShot(diagnostics, size.width / Math.max(size.height, 1), yOffset, framing);
     camera.fov = shot.fov;
-    camera.position.set(0, shot.targetY, shot.distance);
+    const orbit = calculateReviewCameraPosition(shot.distance, reviewAngle);
+    camera.position.set(orbit.x, shot.targetY, orbit.z);
     camera.lookAt(0, shot.targetY, 0);
     camera.updateProjectionMatrix();
     invalidate();
-  }, [camera, diagnostics, framing, invalidate, size.height, size.width, yOffset]);
+  }, [camera, diagnostics, framing, invalidate, reviewAngle, size.height, size.width, yOffset]);
 
   return null;
 }
@@ -88,12 +91,14 @@ function Avatar({
   animation,
   spin,
   previewSpeech,
+  reviewMode,
   onDiagnostics,
 }: {
   type: CharacterType;
   animation: AnimationType;
   spin: boolean;
   previewSpeech: boolean;
+  reviewMode: boolean;
   onDiagnostics?: ((details: AvatarDiagnostics) => void) | undefined;
 }) {
   const customization = useAvatarCustomizationStore((state) => state.customizations[type]);
@@ -133,6 +138,7 @@ function Avatar({
           animation={animation}
           spin={spin}
           previewSpeech={previewSpeech}
+          reviewMode={reviewMode}
           onDiagnostics={onDiagnostics}
         />
       </Suspense>
@@ -152,6 +158,10 @@ export type ThreeDCharacterProps = {
   /** Review presets; omit to retain Story/Studio full-body framing. */
   framing?: CameraFraming;
   lighting?: LightingStyle;
+  /** Fixed photographic viewpoint; omitted in story/studio for legacy front view. */
+  reviewAngle?: ReviewCameraAngle;
+  /** Only library review recenters the model after spin stops. */
+  reviewMode?: boolean;
   transparent?: boolean;
   className?: string;
   /** صورة خلفية تُرسم داخل المشهد وتظهر أيضاً في الفيديو المسجل. */
@@ -167,6 +177,8 @@ export default function ThreeDCharacter({
   previewSpeech = false,
   framing = "full",
   lighting = "cinematic",
+  reviewAngle = "front",
+  reviewMode = false,
   transparent = false,
   className,
   backgroundUrl,
@@ -208,7 +220,7 @@ export default function ThreeDCharacter({
         onCanvasReady?.(gl.domElement);
       }}
     >
-      <ResponsiveCharacterCamera type={type} diagnostics={cameraDiagnostics} framing={framing} />
+      <ResponsiveCharacterCamera type={type} diagnostics={cameraDiagnostics} framing={framing} reviewAngle={reviewAngle} />
       {backgroundUrl && (
         <Suspense fallback={null}>
           <Backdrop url={backgroundUrl} />
@@ -235,7 +247,7 @@ export default function ThreeDCharacter({
       />
 
       <Suspense fallback={null}>
-        <Avatar type={type} animation={animation} spin={spin} previewSpeech={previewSpeech} onDiagnostics={handleDiagnostics} />
+        <Avatar type={type} animation={animation} spin={spin} previewSpeech={previewSpeech} reviewMode={reviewMode} onDiagnostics={handleDiagnostics} />
       </Suspense>
 
       {!transparent && (
