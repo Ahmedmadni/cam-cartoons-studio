@@ -136,13 +136,8 @@ def main():
                 expect(page.get_by_role("heading", name="شخصيات بشرية جديدة قيد التقييم")).to_be_visible()
                 expect(page.get_by_role("button", name="أضف ياسمين للتقييم")).to_be_visible()
                 expect(page.get_by_role("button", name="أضف زياد للتقييم")).to_be_visible()
-                page.get_by_role("button", name="أضف ياسمين للتقييم").dispatch_event("click")
-                expect(page.get_by_role("button", name="افتح ياسمين في مكتبتي")).to_be_visible()
-                expect(page.get_by_role("heading", name="ياسمين").last).to_be_visible()
-                page.get_by_role("button", name="افتح ياسمين في مكتبتي").dispatch_event("click")
-                assert page.get_by_role("button", name="حذف ياسمين").count() == 1, (
-                    "Selecting an existing candidate must not create a duplicate"
-                )
+                # Keep heavy optional avatar downloads isolated from baseline
+                # renderer and IndexedDB regression tests.
                 add_character(page, "اختبار الجودة")
                 capture_evidence(page, "desktop-loaded-glb.png")
                 # Dispatch actual DOM clicks to verify React controls without waiting on
@@ -270,6 +265,22 @@ def main():
                 (ARTIFACTS / "browser-origin-check.json").write_text(
                     json.dumps(origin_results, ensure_ascii=False, indent=2), encoding="utf-8"
                 )
+                # Test the optional-candidate flow in an isolated Chromium tab,
+                # after standard WebGL and original-five smoke are completed.
+                candidate_page = context.new_page()
+                candidate_page.goto(URL, wait_until="networkidle", timeout=60000)
+                expect(candidate_page.get_by_role("button", name="أضف ياسمين للتقييم")).to_be_visible()
+                candidate_page.get_by_role("button", name="أضف ياسمين للتقييم").dispatch_event("click")
+                expect(candidate_page.get_by_role("button", name="افتح ياسمين في مكتبتي")).to_be_visible()
+                expect(candidate_page.get_by_role("heading", name="ياسمين").last).to_be_visible()
+                candidate_page.get_by_role("button", name="افتح ياسمين في مكتبتي").dispatch_event("click")
+                assert candidate_page.get_by_role("button", name="حذف ياسمين").count() == 1, (
+                    "Selecting an existing candidate must not create a duplicate"
+                )
+                await_gltf_ready(candidate_page, "ياسمين", expected_zero_bones=False)
+                candidate_page.get_by_role("button", name="فحص رابط GLB وCORS").dispatch_event("click")
+                expect(candidate_page.get_by_role("status")).to_contain_text("المصدر متاح", timeout=22000)
+                candidate_page.close()
                 context.close()
                 browser.close()
             print("PASS: hosted GLB, model controls, mobile WebGL, IndexedDB import and reload")
