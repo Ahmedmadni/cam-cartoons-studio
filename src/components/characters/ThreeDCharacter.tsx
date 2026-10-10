@@ -91,12 +91,14 @@ function Avatar({
   animation,
   spin,
   previewSpeech,
+  reviewMode,
   onDiagnostics,
 }: {
   type: CharacterType;
   animation: AnimationType;
   spin: boolean;
   previewSpeech: boolean;
+  reviewMode: boolean;
   onDiagnostics?: ((details: AvatarDiagnostics) => void) | undefined;
 }) {
   const customization = useAvatarCustomizationStore((state) => state.customizations[type]);
@@ -136,6 +138,7 @@ function Avatar({
           animation={animation}
           spin={spin}
           previewSpeech={previewSpeech}
+          reviewMode={reviewMode}
           onDiagnostics={onDiagnostics}
         />
       </Suspense>
@@ -157,6 +160,8 @@ export type ThreeDCharacterProps = {
   lighting?: LightingStyle;
   /** Fixed photographic viewpoint; omitted in story/studio for legacy front view. */
   reviewAngle?: ReviewCameraAngle;
+  /** Only library review recenters the model after spin stops. */
+  reviewMode?: boolean;
   transparent?: boolean;
   className?: string;
   /** صورة خلفية تُرسم داخل المشهد وتظهر أيضاً في الفيديو المسجل. */
@@ -173,6 +178,7 @@ export default function ThreeDCharacter({
   framing = "full",
   lighting = "cinematic",
   reviewAngle = "front",
+  reviewMode = false,
   transparent = false,
   className,
   backgroundUrl,
@@ -241,7 +247,7 @@ export default function ThreeDCharacter({
       />
 
       <Suspense fallback={null}>
-        <Avatar type={type} animation={animation} spin={spin} previewSpeech={previewSpeech} onDiagnostics={handleDiagnostics} />
+        <Avatar type={type} animation={animation} spin={spin} previewSpeech={previewSpeech} reviewMode={reviewMode} onDiagnostics={handleDiagnostics} />
       </Suspense>
 
       {!transparent && (

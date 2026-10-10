@@ -4,7 +4,7 @@ The Phase 17 GLB technical checks do not grade artistic realism. This update ext
 
 ## Scope and regression guarantees
 
-- Angle and backdrop choices are transient review settings on the character-library page. They do **not** modify the stored character definition, camera/animation logic for stories, avatar customizations, favorites, names, imported binaries or deleted character IDs.
+- Angle and backdrop choices are transient review settings on the character-library page. In review mode, stopping the turntable smoothly returns the avatar to forward-facing orientation before repeatable comparisons. They do **not** modify the stored character definition, camera/animation logic for stories, avatar customizations, favorites, names, imported binaries or deleted character IDs.
 - Framing and three-point lighting from Phase 17 remain available. The existing GLB rig, materials and textures are preserved: changing the backdrop cannot be misrepresented as improving mesh geometry.
 - Backgrounds are from `public/backgrounds/premium/` and ship with the app. Featured GLB geometry continues to load from the upstream host unless the user saves an IndexedDB copy.
 - Tests cover camera angles and local background paths. The existing Chromium smoke suite remains responsible for real WebGL/CORS behavior.

@@ -370,7 +370,7 @@ function LibraryPage() {
           <div className="h-[420px] overflow-hidden rounded-2xl md:h-[540px]"
             style={{ background: REVIEW_STUDIO_GRADIENTS[reviewLighting].css }}>
             <CharacterStage type={selected.id} animation={reviewAnimation} spin={reviewSpin} previewSpeech={previewSpeech}
-               framing={reviewFraming} lighting={reviewLighting} reviewAngle={reviewAngle}
+               framing={reviewFraming} lighting={reviewLighting} reviewAngle={reviewAngle} reviewMode
                backgroundUrl={REVIEW_BACKDROPS.find((item) => item.id === reviewBackdrop)?.url ?? ""}
               onCanvasReady={(canvas) => { canvasRef.current = canvas; }}
               onDiagnostics={setDiagnostics} />
