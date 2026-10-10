@@ -66,7 +66,7 @@ class GlbAuditTests(unittest.TestCase):
             "featured-cinematic-female", "featured-cinematic-male",
             "featured-selfie-girl", "featured-michelle", "featured-portrait-reem",
         })
-        self.assertEqual(len({item["url"] for item in result.values()}), 4)
+        self.assertEqual(len({item["url"] for item in result.values()}), 5)
 
 
 if __name__ == "__main__":
