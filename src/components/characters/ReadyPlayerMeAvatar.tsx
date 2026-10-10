@@ -7,7 +7,7 @@ import { clone as cloneSkeleton } from "three/examples/jsm/utils/SkeletonUtils.j
 
 import { getAvatarProfile } from "@/lib/avatarCatalog";
 import { faceState } from "@/lib/faceState";
-import { calculateModelFit, detectFaceCapabilities, type AvatarDiagnostics } from "@/lib/modelPresentation";
+import { calculateModelFit, detectFaceCapabilities, FACE_MORPH_ALIASES, matchMorphAlias, type AvatarDiagnostics } from "@/lib/modelPresentation";
 import { useStudioStore } from "@/lib/store";
 import type { AnimationType, CharacterType } from "@/lib/store";
 
@@ -16,6 +16,7 @@ type Props = {
   url: string;
   animation: AnimationType;
   spin: boolean;
+  previewSpeech?: boolean | undefined;
   onDiagnostics?: ((details: AvatarDiagnostics) => void) | undefined;
 };
 
@@ -106,8 +107,7 @@ function capturePose(rig: Rig): BonePose {
   };
 }
 
-function setMorph(meshes: MorphMesh[], aliases: string[], value: number) {
-  const normalizedAliases = aliases.map(normalizeName);
+function setMorph(meshes: MorphMesh[], aliases: readonly string[], value: number) {
   const clamped = MathUtils.clamp(value, 0, 1);
 
   for (const mesh of meshes) {
@@ -116,34 +116,33 @@ function setMorph(meshes: MorphMesh[], aliases: string[], value: number) {
     if (!dictionary || !influences) continue;
 
     for (const [name, index] of Object.entries(dictionary)) {
-      const normalized = normalizeName(name);
-      if (!normalizedAliases.some((alias) => normalized === alias || normalized.endsWith(alias))) continue;
+      if (!matchMorphAlias(name, aliases)) continue;
       influences[index] = clamped;
     }
   }
 }
 
-function applyFaceMorphs(rig: Rig, animation: AnimationType, autoBlink: number) {
-  const open = faceState.mouthOpen > 0.06 ? faceState.mouthOpen : 0;
+function applyFaceMorphs(rig: Rig, animation: AnimationType, autoBlink: number, previewMouthOpen: number) {
+  const open = previewMouthOpen > 0 ? previewMouthOpen : (faceState.mouthOpen > 0.06 ? faceState.mouthOpen : 0);
   const smile = Math.max(faceState.smile, animation === "happy" ? 0.72 : 0);
   const blinkLeft = MathUtils.clamp(Math.max(faceState.blinkLeft, autoBlink), 0, 1);
   const blinkRight = MathUtils.clamp(Math.max(faceState.blinkRight, autoBlink), 0, 1);
   const browUp = MathUtils.clamp(faceState.browUp, 0, 1);
 
-  setMorph(rig.morphMeshes, ["mouthOpen", "jawOpen", "visemeAA", "viseme_aa"], open);
-  setMorph(rig.morphMeshes, ["mouthSmile", "mouthSmileLeft", "mouthSmileRight"], smile);
-  setMorph(rig.morphMeshes, ["eyeBlinkLeft"], blinkLeft);
-  setMorph(rig.morphMeshes, ["eyeBlinkRight"], blinkRight);
-  setMorph(rig.morphMeshes, ["eyesClosed"], Math.max(blinkLeft, blinkRight));
-  setMorph(rig.morphMeshes, ["browInnerUp", "browOuterUpLeft", "browOuterUpRight"], browUp);
+  setMorph(rig.morphMeshes, FACE_MORPH_ALIASES.mouthOpen, open);
+  setMorph(rig.morphMeshes, FACE_MORPH_ALIASES.smile, smile);
+  setMorph(rig.morphMeshes, FACE_MORPH_ALIASES.blinkLeft, blinkLeft);
+  setMorph(rig.morphMeshes, FACE_MORPH_ALIASES.blinkRight, blinkRight);
+  setMorph(rig.morphMeshes, FACE_MORPH_ALIASES.blinkBoth, Math.max(blinkLeft, blinkRight));
+  setMorph(rig.morphMeshes, FACE_MORPH_ALIASES.browUp, browUp);
 
   const lookX = MathUtils.clamp(faceState.eyeX, -1, 1);
   const lookY = MathUtils.clamp(faceState.eyeY, -1, 1);
 
-  setMorph(rig.morphMeshes, ["eyesLookLeft", "eyeLookOutLeft", "eyeLookInRight"], Math.max(0, lookX));
-  setMorph(rig.morphMeshes, ["eyesLookRight", "eyeLookInLeft", "eyeLookOutRight"], Math.max(0, -lookX));
-  setMorph(rig.morphMeshes, ["eyesLookUp", "eyeLookUpLeft", "eyeLookUpRight"], Math.max(0, -lookY));
-  setMorph(rig.morphMeshes, ["eyesLookDown", "eyeLookDownLeft", "eyeLookDownRight"], Math.max(0, lookY));
+  setMorph(rig.morphMeshes, FACE_MORPH_ALIASES.lookLeft, Math.max(0, lookX));
+  setMorph(rig.morphMeshes, FACE_MORPH_ALIASES.lookRight, Math.max(0, -lookX));
+  setMorph(rig.morphMeshes, FACE_MORPH_ALIASES.lookUp, Math.max(0, -lookY));
+  setMorph(rig.morphMeshes, FACE_MORPH_ALIASES.lookDown, Math.max(0, lookY));
 }
 
 function dampBone(
@@ -159,7 +158,7 @@ function dampBone(
   bone.rotation.z = MathUtils.damp(bone.rotation.z, base.z + (target.z ?? 0), speed, delta);
 }
 
-export default function ReadyPlayerMeAvatar({ type, url, animation, spin, onDiagnostics }: Props) {
+export default function ReadyPlayerMeAvatar({ type, url, animation, spin, previewSpeech = false, onDiagnostics }: Props) {
   const profile = getAvatarProfile(type);
   const root = useRef<Group>(null);
   const gltf = useGLTF(url);
@@ -312,7 +311,9 @@ export default function ReadyPlayerMeAvatar({ type, url, animation, spin, onDiag
     const autoBlink = !tracking && blinkPhase >= 3.48 && blinkPhase <= 3.72
       ? Math.sin(((blinkPhase - 3.48) / 0.24) * Math.PI)
       : 0;
-    applyFaceMorphs(rig, animation, autoBlink);
+    // Isolated diagnostic preview: doesn't write to faceState, audio or story data.
+    const testOpen = previewSpeech && !tracking ? Math.pow(Math.sin(t * 7), 2) * 0.85 : 0;
+    applyFaceMorphs(rig, animation, autoBlink, testOpen);
   });
 
   return (
