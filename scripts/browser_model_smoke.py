@@ -168,7 +168,10 @@ def main():
                 page.get_by_label("تقييم ملامح الوجه").select_option("needs-work")
                 expect(page.get_by_text("تقييم فني يدوي — 1 من 4 عناصر تمت مراجعتها")).to_be_visible()
                 page.get_by_label("ملاحظات الجودة الفنية").fill("مراجعة الجلد والشعر")
-                page.reload(wait_until="networkidle")
+                # WebGL can keep fetching/decoding assets after DOM is interactive;
+                # networkidle is not a reliable condition for this persistence test.
+                page.reload(wait_until="domcontentloaded", timeout=25000)
+                expect(page.get_by_role("heading", name="مكتبة الشخصيات المفتوحة")).to_be_visible()
                 page.get_by_role("button", name=re.compile("اختبار الجودة")).first.dispatch_event("click")
                 expect(page.get_by_label("تقييم ملامح الوجه")).to_have_value("needs-work")
                 expect(page.get_by_label("ملاحظات الجودة الفنية")).to_have_value("مراجعة الجلد والشعر")
