@@ -146,7 +146,7 @@ function Avatar({
           reviewMode={reviewMode}
           reviewExpression={reviewExpression}
           surfaceCleanup={surfaceCleanup}
-          sourceUrl={profile.modelUrl}
+          sourceUrl={profile.modelUrl ?? undefined}
           onDiagnostics={onDiagnostics}
         />
       </Suspense>
