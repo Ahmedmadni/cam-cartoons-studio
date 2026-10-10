@@ -132,6 +132,12 @@ def main():
                 page.goto(URL, wait_until="networkidle", timeout=60000)
                 expect(page.get_by_role("heading", name="مكتبة الشخصيات المفتوحة")).to_be_visible(timeout=30000)
 
+                # Optional candidates must appear but should not be auto-seeded.
+                expect(page.get_by_role("heading", name="شخصيات بشرية جديدة قيد التقييم")).to_be_visible()
+                expect(page.get_by_role("button", name="أضف ياسمين للتقييم")).to_be_visible()
+                expect(page.get_by_role("button", name="أضف زياد للتقييم")).to_be_visible()
+                # Keep heavy optional avatar downloads isolated from baseline
+                # renderer and IndexedDB regression tests.
                 add_character(page, "اختبار الجودة")
                 capture_evidence(page, "desktop-loaded-glb.png")
                 # Dispatch actual DOM clicks to verify React controls without waiting on
@@ -193,6 +199,19 @@ def main():
                     verified_count += 1
                     print(f"PASS: real hosted model binary loaded in WebGL: {featured_path.name}", flush=True)
                 print(f"Real publisher-hosted GLB models exercised: {verified_count}/5", flush=True)
+                candidate_files = sorted(Path("public/__qa__/candidates").glob("curated-*.glb"))
+                for candidate_path in candidate_files:
+                    page.goto(URL, wait_until="networkidle", timeout=60000)
+                    add_character(
+                        page, "فحص النموذج " + candidate_path.stem,
+                        model_url="/__qa__/candidates/" + candidate_path.name,
+                        expected_zero_bones=False,
+                    )
+                    assert "تحريك الفم: مدعوم" in page.locator("body").inner_text(), (
+                        f"{candidate_path.name}: morph metadata did not match actual loader"
+                    )
+                    print(f"PASS: real Rocketbox candidate loaded in Chromium: {candidate_path.name}", flush=True)
+                print(f"Real candidate binary GLBs exercised: {len(candidate_files)}/2", flush=True)
 
                 # Unlike same-origin CI fixture loading, this performs real CORS
                 # requests and GLTFLoader renders from the publisher origin.
@@ -246,7 +265,25 @@ def main():
                 (ARTIFACTS / "browser-origin-check.json").write_text(
                     json.dumps(origin_results, ensure_ascii=False, indent=2), encoding="utf-8"
                 )
+                # Tear down the original context and all its WebGL canvases
+                # before the candidate review. A second tab in the same context
+                # can exhaust SwiftShader resources on CI runners.
                 context.close()
+                candidate_context = browser.new_context(viewport={"width": 1366, "height": 900})
+                candidate_page = candidate_context.new_page()
+                candidate_page.goto(URL, wait_until="networkidle", timeout=60000)
+                expect(candidate_page.get_by_role("button", name="أضف ياسمين للتقييم")).to_be_visible()
+                candidate_page.get_by_role("button", name="أضف ياسمين للتقييم").dispatch_event("click")
+                expect(candidate_page.get_by_role("button", name="افتح ياسمين في مكتبتي")).to_be_visible()
+                expect(candidate_page.get_by_role("heading", name="ياسمين").last).to_be_visible()
+                candidate_page.get_by_role("button", name="افتح ياسمين في مكتبتي").dispatch_event("click")
+                assert candidate_page.get_by_role("button", name="حذف ياسمين").count() == 1, (
+                    "Selecting an existing candidate must not create a duplicate"
+                )
+                candidate_page.get_by_role("button", name="فحص رابط GLB وCORS").dispatch_event("click")
+                expect(candidate_page.get_by_role("status")).to_contain_text("المصدر متاح", timeout=22000)
+                await_gltf_ready(candidate_page, "ياسمين", expected_zero_bones=False)
+                candidate_context.close()
                 browser.close()
             print("PASS: hosted GLB, model controls, mobile WebGL, IndexedDB import and reload")
         finally:

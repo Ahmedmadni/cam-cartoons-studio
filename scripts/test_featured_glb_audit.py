@@ -4,7 +4,7 @@ import json
 import struct
 import unittest
 
-from audit_featured_glbs import inspect_glb, parse_glb, featured_urls
+from audit_featured_glbs import inspect_glb, parse_glb, featured_urls, candidate_urls
 
 
 def sample_glb(*, meshes=None, skins=None, nodes=None, morph_names=None):
@@ -58,6 +58,16 @@ class GlbAuditTests(unittest.TestCase):
             inspect_glb(sample_glb(meshes=[]))
         with self.assertRaises(ValueError):
             inspect_glb(sample_glb(meshes=[{"primitives": [{"attributes": {"NORMAL": 0}}]}]))
+
+    def test_candidate_sources_are_two_distinct_commit_pinned_glbs(self):
+        candidates = candidate_urls()
+        self.assertEqual(set(candidates), {
+            "curated-rocketbox-yasmin", "curated-rocketbox-ziyad",
+        })
+        self.assertTrue(all(
+            "/8af29d456c4d4d4f7e8ac32ac0c2b2aaf02c27d3/" in item["url"]
+            for item in candidates.values()
+        ))
 
     def test_featured_source_has_five_distinct_real_urls(self):
         result = featured_urls()
