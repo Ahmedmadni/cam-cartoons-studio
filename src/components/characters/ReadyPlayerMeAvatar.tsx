@@ -221,6 +221,14 @@ export default function ReadyPlayerMeAvatar({ type, url, animation, spin, previe
   }, [avatar, gpuAnisotropy]);
   const rig = useMemo(() => collectRig(avatar), [avatar]);
   const boneFaceDriver = useMemo(() => createBoneFaceDriver(rig.facialBones), [rig]);
+  // Inspect the COMPLETE loaded morph dictionaries once. The UI limits its
+  // diagnostic name sample to 36 entries, which is not a safe animation source.
+  const hasGazeMorphTargets = useMemo(() => rig.morphMeshes.some((mesh) =>
+    Object.keys(mesh.morphTargetDictionary ?? {}).some((name) =>
+      matchMorphAlias(name, FACE_MORPH_ALIASES.lookLeft) ||
+      matchMorphAlias(name, FACE_MORPH_ALIASES.lookRight) ||
+      matchMorphAlias(name, FACE_MORPH_ALIASES.lookUp) ||
+      matchMorphAlias(name, FACE_MORPH_ALIASES.lookDown))), [rig]);
   const basePose = useRef<BonePose>(capturePose(rig));
 
   // Read the geometry in its bind pose, not after runtime animations change the bones.
@@ -388,18 +396,12 @@ export default function ReadyPlayerMeAvatar({ type, url, animation, spin, previe
     // Avoid doubling motion when a morph already drives the same feature.
     const poseMouth = reviewActive ? expressionPose.mouthOpen : Math.max(0, faceState.mouthOpen);
     const mouth = testOpen > 0 ? testOpen : poseMouth;
-    const morphNames = presentation.diagnostics.morphNames ?? [];
-    const hasEyeMorphs = morphNames.some((name) =>
-      matchMorphAlias(name, FACE_MORPH_ALIASES.lookLeft) ||
-      matchMorphAlias(name, FACE_MORPH_ALIASES.lookRight) ||
-      matchMorphAlias(name, FACE_MORPH_ALIASES.lookUp) ||
-      matchMorphAlias(name, FACE_MORPH_ALIASES.lookDown));
     const eyeX = reviewActive ? expressionPose.eyeX :
       tracking ? faceState.eyeX : Math.sin(t * 0.45) * 0.14;
     const eyeY = reviewActive ? expressionPose.eyeY :
       tracking ? faceState.eyeY : Math.sin(t * 0.37 + 0.6) * 0.09;
     boneFaceDriver.apply(mouth, eyeX, eyeY, Math.min(delta, 0.1),
-      !presentation.diagnostics.hasLipSync, !hasEyeMorphs);
+      !presentation.diagnostics.hasLipSync, !hasGazeMorphTargets);
   });
 
   return (
