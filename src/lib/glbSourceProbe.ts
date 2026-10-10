@@ -2,8 +2,9 @@
  * Non-persistent check of a remote GLB from the actual visitor's browser.
  * A server-side audit cannot verify CORS restrictions seen by the GLTFLoader.
  *
- * Fetch only the first 12 bytes when the publisher supports HTTP Range.
- * When Range is ignored, stop the reader promptly rather than cache the GLB.
+ * Read only the first 12 bytes of a normal GET response.
+ * Never issue Range requests against the same GLB URL as GLTFLoader: misconfigured
+ * CDNs can cache partial binary responses and break a later full model load.
  */
 export type GlbProbe = {
   declaredBytes: number;
@@ -39,7 +40,8 @@ export async function probeRemoteGlb(url: string, timeoutMs = 12000): Promise<Gl
       response = await fetch(address.toString(), {
         mode: "cors",
         credentials: "omit",
-        headers: { Range: "bytes=0-11" },
+        // Avoid poisoning the browser/CDN cache with a 12-byte HTTP 206.
+        cache: "no-store",
         signal: controller.signal,
       });
     } catch (error) {
@@ -64,7 +66,7 @@ export async function probeRemoteGlb(url: string, timeoutMs = 12000): Promise<Gl
       if (controller.signal.aborted) throw new Error("انتهت مهلة قراءة ملف الشخصية.");
       throw error;
     } finally {
-      // A 200 response may ignore Range and contain the full model; do not retain it.
+      // Stop after the header; no-store prevents incomplete bytes being cached.
       await reader.cancel().catch(() => {});
       reader.releaseLock();
     }
