@@ -16,6 +16,7 @@ import { describeSurfaceLimitations } from "@/lib/avatarSurfaceQuality";
 import { REVIEW_BACKDROPS, REVIEW_STUDIO_GRADIENTS, type ReviewBackdropId } from "@/lib/reviewBackdrops";
 import { REVIEW_EXPRESSION_LABELS, type ReviewExpression } from "@/lib/facialPerformance";
 import { CURATED_CANDIDATES, findImportedCandidate, type CuratedCandidate } from "@/lib/curatedCharacters";
+import ArtReviewWorkbench from "@/components/characters/ArtReviewWorkbench";
 
 export const Route = createFileRoute("/")({
   head: () => ({ meta: [
@@ -507,6 +508,25 @@ function LibraryPage() {
               </div>
             </div>
             <p className="font-semibold text-muted-foreground">معاينة مباشرة داخل الاستوديو — {PROVIDER_LABELS[selected.provider]}</p>
+            {selected.provider !== "procedural" && <ArtReviewWorkbench
+              key={selected.id + ":" + (selected.assetId ?? selected.modelUrl ?? "")}
+              character={selected}
+              diagnostics={diagnostics}
+              getCanvas={() => canvasRef.current}
+              framing={reviewFraming}
+              lighting={reviewLighting}
+              angle={reviewAngle}
+              setFraming={setReviewFraming}
+              setLighting={setReviewLighting}
+              setAngle={setReviewAngle}
+              prepareNeutralReview={() => {
+                setReviewSpin(false);
+                setReviewAnimation("idle");
+                setPreviewSpeech(false);
+                setReviewExpression("neutral");
+                setReviewBackdrop("studio");
+              }}
+            />}
             {selected.provider === "imported-glb" && (
               <div className="rounded-2xl border border-border bg-muted/40 p-3 text-sm">
                 {selected.assetId ? (
