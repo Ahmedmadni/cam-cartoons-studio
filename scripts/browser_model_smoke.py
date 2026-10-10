@@ -203,6 +203,10 @@ def main():
                     mouth_button = page.get_by_role("button", name="تجربة حركة الفم")
                     expect(mouth_button).to_be_visible()
                     mouth_available = mouth_button.is_enabled()
+                    if name == "هند":
+                        assert not mouth_available, "هند must not claim unsupported lipsync"
+                    if name == "ريم":
+                        assert mouth_available, "ريم must expose the verified face morphs"
                     if mouth_available:
                         mouth_button.dispatch_event("click")
                         expect(page.get_by_role("button", name="إيقاف تجربة الفم")).to_have_attribute(
