@@ -103,3 +103,22 @@ export function calculateFramedCameraShot(
     fitted: true,
   };
 }
+
+/** Repeatable photography angles for comparing geometry from identical viewpoints. */
+export type ReviewCameraAngle = "front" | "threeQuarter" | "profile";
+
+export const REVIEW_ANGLE_LABELS: Record<ReviewCameraAngle, string> = {
+  front: "أمامي",
+  threeQuarter: "ثلاثة أرباع",
+  profile: "جانبي",
+};
+
+/** Camera orbit, not a rotation of the animated GLB skeleton or story scene. */
+export function calculateReviewCameraPosition(distance: number, angle: ReviewCameraAngle) {
+  const safeDistance = Number.isFinite(distance) && distance > 0 ? distance : DEFAULT_SHOT.distance;
+  const radians = angle === "threeQuarter" ? Math.PI / 4 : angle === "profile" ? Math.PI / 2 : 0;
+  // Leave additional room for projected shoulders and hair at oblique angles.
+  const margin = angle === "profile" ? 1.16 : angle === "threeQuarter" ? 1.07 : 1;
+  return { x: Math.sin(radians) * safeDistance * margin,
+    z: Math.cos(radians) * safeDistance * margin };
+}

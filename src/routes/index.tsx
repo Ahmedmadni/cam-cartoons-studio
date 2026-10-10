@@ -10,8 +10,9 @@ import { useStudioStore, VOICES, ANIMATION_LABELS, type AnimationType, type Voic
 import { assessAnimationReadiness, type AvatarDiagnostics } from "@/lib/modelPresentation";
 import { cacheRemoteGlb, deleteGlbAsset, saveGlbAsset, MAX_GLB_BYTES } from "@/lib/localGlbStorage";
 import { probeRemoteGlb } from "@/lib/glbSourceProbe";
-import { FRAMING_LABELS, type CameraFraming } from "@/lib/cameraComposition";
+import { FRAMING_LABELS, REVIEW_ANGLE_LABELS, type CameraFraming, type ReviewCameraAngle } from "@/lib/cameraComposition";
 import { LIGHTING_LABELS, type LightingStyle } from "@/lib/studioLighting";
+import { REVIEW_BACKDROPS, REVIEW_STUDIO_GRADIENTS, type ReviewBackdropId } from "@/lib/reviewBackdrops";
 
 export const Route = createFileRoute("/")({
   head: () => ({ meta: [
@@ -178,6 +179,8 @@ function LibraryPage() {
   const [reviewSpin, setReviewSpin] = useState(false);
   const [reviewFraming, setReviewFraming] = useState<CameraFraming>("upper");
   const [reviewLighting, setReviewLighting] = useState<LightingStyle>("cinematic");
+  const [reviewAngle, setReviewAngle] = useState<ReviewCameraAngle>("front");
+  const [reviewBackdrop, setReviewBackdrop] = useState<ReviewBackdropId>("studio");
   const [previewSpeech, setPreviewSpeech] = useState(false);
   const [sourceProbe, setSourceProbe] = useState<{
     characterId: string; phase: "checking" | "success" | "error"; message: string;
@@ -192,6 +195,8 @@ function LibraryPage() {
     setReviewFraming(useCharacterLibrary.getState().characters
       .find((character) => character.id === selectedCharacter)?.preferredFraming ?? "upper");
     setReviewLighting("cinematic");
+    setReviewAngle("front");
+    setReviewBackdrop("studio");
     setPreviewSpeech(false);
     setSourceProbe(null);
     canvasRef.current = null;
@@ -222,8 +227,8 @@ function LibraryPage() {
       const ctx = output.getContext("2d");
       if (!ctx) throw new Error("تعذر تجهيز صورة المعاينة.");
       const gradient = ctx.createLinearGradient(0, 0, 480, 360);
-      gradient.addColorStop(0, "#203251");
-      gradient.addColorStop(1, "#556d86");
+      gradient.addColorStop(0, REVIEW_STUDIO_GRADIENTS[reviewLighting].start);
+      gradient.addColorStop(1, REVIEW_STUDIO_GRADIENTS[reviewLighting].end);
       ctx.fillStyle = gradient;
       ctx.fillRect(0, 0, 480, 360);
       const srcRatio = source.width / source.height;
@@ -362,9 +367,11 @@ function LibraryPage() {
           لا توجد شخصيات مطابقة. استخدم «إضافة شخصية» أو غيّر البحث والتصفية.
         </p>}
         {selected && <section className="mt-8 grid gap-5 rounded-3xl border-2 border-primary/40 bg-card p-5 md:grid-cols-2">
-          <div className="h-80 overflow-hidden rounded-2xl bg-muted">
+          <div className="h-[420px] overflow-hidden rounded-2xl md:h-[540px]"
+            style={{ background: REVIEW_STUDIO_GRADIENTS[reviewLighting].css }}>
             <CharacterStage type={selected.id} animation={reviewAnimation} spin={reviewSpin} previewSpeech={previewSpeech}
-               framing={reviewFraming} lighting={reviewLighting}
+               framing={reviewFraming} lighting={reviewLighting} reviewAngle={reviewAngle}
+               backgroundUrl={REVIEW_BACKDROPS.find((item) => item.id === reviewBackdrop)?.url}
               onCanvasReady={(canvas) => { canvasRef.current = canvas; }}
               onDiagnostics={setDiagnostics} />
           </div>
@@ -372,7 +379,7 @@ function LibraryPage() {
             <h2 className="text-3xl font-black">{selected.name}</h2>
             <div className="rounded-2xl border border-border bg-muted/40 p-3">
               <p className="text-sm font-black">اختبار الشخصية قبل استخدامها</p>
-              <p className="mt-1 text-xs text-muted-foreground">شاهد الوجه والذراعين أثناء الحركة. يمكن إيقاف الدوران لتقييم ملامح الوجه أماميًا.</p>
+              <p className="mt-1 text-xs text-muted-foreground">قارن ملامح الوجه والشعر والملابس من الأمام والجانب بإضاءة ثابتة؛ فنجاح العظام لا يعني الجودة الفنية.</p>
               <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label="إطار التصوير">
                 {(Object.entries(FRAMING_LABELS) as [CameraFraming, string][]).map(([framing, label]) =>
                   <button key={framing} type="button" aria-pressed={reviewFraming === framing}
@@ -391,7 +398,23 @@ function LibraryPage() {
                     {label}
                   </button>)}
               </div>
-              <p className="mt-2 text-xs text-muted-foreground">لتجديد صورة بطاقة الشخصية بالزاوية والإضاءة المختارة، اضغط «التقاط صورة معاينة من النموذج».</p>
+              <p className="mt-3 text-xs font-black">زاوية مشاهدة ثابتة</p>
+              <div className="mt-2 flex flex-wrap gap-2" role="group" aria-label="زاوية المعاينة">
+                {(Object.entries(REVIEW_ANGLE_LABELS) as [ReviewCameraAngle, string][]).map(([angle, label]) =>
+                  <button key={angle} type="button" aria-pressed={reviewAngle === angle}
+                    onClick={() => { setReviewSpin(false); setReviewAngle(angle); }}
+                    className={"rounded-full px-3 py-2 text-xs font-bold " + (reviewAngle === angle
+                      ? "bg-primary text-primary-foreground" : "bg-card text-foreground")}>
+                    {label}
+                  </button>)}
+              </div>
+              <label className="mt-2 block text-xs font-black" htmlFor="review-backdrop">خلفية المشهد</label>
+              <select id="review-backdrop" value={reviewBackdrop}
+                onChange={(event) => setReviewBackdrop(event.target.value as ReviewBackdropId)}
+                className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm font-semibold">
+                {REVIEW_BACKDROPS.map((backdrop) => <option key={backdrop.id} value={backdrop.id}>{backdrop.label}</option>)}
+              </select>
+              <p className="mt-2 text-xs text-muted-foreground">يمكن التقاط صورة من النموذج الحقيقي بهذه الزاوية والخلفية. الصور المحلية لا تغير هندسة الشخصية أو خاماتها.</p>
               <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label="حركات فحص الشخصية">
                 {(["idle", "wave", "happy", "nod", "dance"] as AnimationType[]).map((animation) =>
                   <button key={animation} type="button" aria-pressed={reviewAnimation === animation}
