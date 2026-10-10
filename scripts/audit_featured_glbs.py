@@ -124,8 +124,8 @@ def featured_urls() -> dict[str, str]:
     )
     featured = {id_: {"name": name, "url": url} for id_, name, url in entries
                 if id_.startswith("featured-")}
-    if len(featured) != 4:
-        raise ValueError(f"Expected four source GLBs, got {len(featured)}")
+    if len(featured) != 5:
+        raise ValueError(f"Expected five source GLBs, got {len(featured)}")
     return featured
 
 
@@ -151,7 +151,7 @@ def audit_live(save_browser_fixtures: bool = False) -> int:
     OUTPUT.parent.mkdir(parents=True, exist_ok=True)
     OUTPUT.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
     healthy = sum(item["status"] == "verified" for item in report["models"].values())
-    print(f"Actual hosted GLB files verified: {healthy}/4; report: {OUTPUT}", flush=True)
+    print(f"Actual hosted GLB files verified: {healthy}/5; report: {OUTPUT}", flush=True)
     # External domains can fail intermittently: the audit must report that failure,
     # without blocking local browser/TypeScript/test quality gates.
     return 0

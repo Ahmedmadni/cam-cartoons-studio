@@ -172,6 +172,10 @@ export default function ReadyPlayerMeAvatar({ type, url, animation, spin, previe
     const size = bounds.getSize(new Vector3());
     const center = bounds.getCenter(new Vector3());
     const dimensions = { width: size.x, height: size.y, depth: size.z };
+    const headPosition = rig.head?.getWorldPosition(new Vector3());
+    const headHeightRatio = headPosition && size.y > 0
+      ? Math.min(1, Math.max(0, (headPosition.y - bounds.min.y) / size.y))
+      : undefined;
     const fit = calculateModelFit(dimensions, profile.rpmScale);
     const morphNames = [...new Set(rig.morphMeshes.flatMap((mesh) => Object.keys(mesh.morphTargetDictionary ?? {})))];
     const boneNames: string[] = [];
@@ -193,6 +197,7 @@ export default function ReadyPlayerMeAvatar({ type, url, animation, spin, previe
       modelUrl: url,
       dimensions,
       normalizedScale: fit.scale,
+      ...(headHeightRatio === undefined ? {} : { headHeightRatio }),
       boneCount: boneNames.length,
       morphCount: morphNames.length,
       meshCount,

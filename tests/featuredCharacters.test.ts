@@ -8,9 +8,9 @@ import {
 import { cacheRemoteGlb } from "../src/lib/localGlbStorage";
 
 describe("Featured premium GLB collection", () => {
-  test("provides four real GLB model URLs with individual identities and voices", () => {
-    expect(FEATURED_CHARACTERS.length).toBe(4);
-    expect(new Set(FEATURED_CHARACTERS.map((c) => c.id)).size).toBe(4);
+  test("provides five real GLB model URLs with individual identities and voices", () => {
+    expect(FEATURED_CHARACTERS.length).toBe(5);
+    expect(new Set(FEATURED_CHARACTERS.map((c) => c.id)).size).toBe(5);
     for (const avatar of FEATURED_CHARACTERS) {
       expect(avatar.provider).toBe("imported-glb");
       expect(avatar.modelUrl).toBeDefined();
@@ -31,7 +31,7 @@ describe("Featured premium GLB collection", () => {
       tags: ["مخصص"],
     };
     const migrated = migrateFeaturedCharacters([...legacy, custom]);
-    expect(migrated.length).toBe(9);
+    expect(migrated.length).toBe(10);
     expect(migrated.find((c) => c.id === "girl")?.isFavorite).toBe(true);
     expect(migrated.find((c) => c.id === "my-own")).toEqual(custom);
     expect(migrateFeaturedCharacters(migrated)).toEqual(migrated);

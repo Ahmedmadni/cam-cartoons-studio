@@ -10,6 +10,8 @@ import { useStudioStore, VOICES, ANIMATION_LABELS, type AnimationType, type Voic
 import { assessAnimationReadiness, type AvatarDiagnostics } from "@/lib/modelPresentation";
 import { cacheRemoteGlb, deleteGlbAsset, saveGlbAsset, MAX_GLB_BYTES } from "@/lib/localGlbStorage";
 import { probeRemoteGlb } from "@/lib/glbSourceProbe";
+import { FRAMING_LABELS, type CameraFraming } from "@/lib/cameraComposition";
+import { LIGHTING_LABELS, type LightingStyle } from "@/lib/studioLighting";
 
 export const Route = createFileRoute("/")({
   head: () => ({ meta: [
@@ -22,6 +24,7 @@ export const Route = createFileRoute("/")({
 const emptyDraft: CharacterDraft = {
   name: "", category: "other", provider: "imported-glb", modelUrl: "", thumbnail: "",
   voicePreset: "normal", tags: [], basePreset: "man", scale: 1.02, yOffset: -1.62,
+  preferredFraming: "upper",
 };
 
 function Editor({ initial, onClose, onSave }: {
@@ -35,6 +38,7 @@ function Editor({ initial, onClose, onSave }: {
     voicePreset: initial.voicePreset ?? "normal", tags: initial.tags,
     basePreset: initial.basePreset ?? "man", scale: initial.scale ?? 1.02,
     yOffset: initial.yOffset ?? -1.62,
+    preferredFraming: initial.preferredFraming ?? "upper",
   } : { ...emptyDraft });
   const [tags, setTags] = useState(initial?.tags.join("، ") ?? "");
   const [file, setFile] = useState<File | null>(null);
@@ -120,6 +124,15 @@ function Editor({ initial, onClose, onSave }: {
               </select>
             </label>
           </div>
+          {draft.provider !== "procedural" && <label className="block text-sm font-bold">
+            لقطة المعاينة الافتراضية
+            <select className={inputClass} value={draft.preferredFraming ?? "upper"}
+              onChange={(e) => patch({ preferredFraming: e.target.value as CameraFraming })}>
+              {Object.entries(FRAMING_LABELS).map(([framing, label]) =>
+                <option key={framing} value={framing}>{label}</option>)}
+            </select>
+            <span className="mt-1 block text-xs text-muted-foreground">للصور وبطاقات المكتبة؛ لا يغيّر كاميرا القصص.</span>
+          </label>}
           {draft.provider !== "procedural" && <div className="grid grid-cols-2 gap-3">
             <label className="text-sm font-bold">المقياس
               <input type="number" className={inputClass} min={0.1} max={4} step={0.01}
@@ -163,6 +176,8 @@ function LibraryPage() {
   const [offlineError, setOfflineError] = useState<string | null>(null);
   const [reviewAnimation, setReviewAnimation] = useState<AnimationType>("idle");
   const [reviewSpin, setReviewSpin] = useState(false);
+  const [reviewFraming, setReviewFraming] = useState<CameraFraming>("upper");
+  const [reviewLighting, setReviewLighting] = useState<LightingStyle>("cinematic");
   const [previewSpeech, setPreviewSpeech] = useState(false);
   const [sourceProbe, setSourceProbe] = useState<{
     characterId: string; phase: "checking" | "success" | "error"; message: string;
@@ -174,6 +189,9 @@ function LibraryPage() {
     setOfflineError(null);
     setReviewAnimation("idle");
     setReviewSpin(false);
+    setReviewFraming(useCharacterLibrary.getState().characters
+      .find((character) => character.id === selectedCharacter)?.preferredFraming ?? "upper");
+    setReviewLighting("cinematic");
     setPreviewSpeech(false);
     setSourceProbe(null);
     canvasRef.current = null;
@@ -229,7 +247,7 @@ function LibraryPage() {
   // The model stays as an emoji placeholder only if WebGL/CORS capture fails.
   useEffect(() => {
     if (!selected || selected.provider === "procedural" || selected.thumbnail || diagnostics?.status !== "ready") return;
-    const timer = window.setTimeout(() => captureThumbnail(true), 850);
+    const timer = window.setTimeout(() => captureThumbnail(true), 1400);
     return () => window.clearTimeout(timer);
     // The store update from capture adds thumbnail, which stops re-captures.
   }, [selected?.id, selected?.thumbnail, selected?.provider, diagnostics?.status]);
@@ -346,6 +364,7 @@ function LibraryPage() {
         {selected && <section className="mt-8 grid gap-5 rounded-3xl border-2 border-primary/40 bg-card p-5 md:grid-cols-2">
           <div className="h-80 overflow-hidden rounded-2xl bg-muted">
             <CharacterStage type={selected.id} animation={reviewAnimation} spin={reviewSpin} previewSpeech={previewSpeech}
+               framing={reviewFraming} lighting={reviewLighting}
               onCanvasReady={(canvas) => { canvasRef.current = canvas; }}
               onDiagnostics={setDiagnostics} />
           </div>
@@ -354,6 +373,25 @@ function LibraryPage() {
             <div className="rounded-2xl border border-border bg-muted/40 p-3">
               <p className="text-sm font-black">اختبار الشخصية قبل استخدامها</p>
               <p className="mt-1 text-xs text-muted-foreground">شاهد الوجه والذراعين أثناء الحركة. يمكن إيقاف الدوران لتقييم ملامح الوجه أماميًا.</p>
+              <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label="إطار التصوير">
+                {(Object.entries(FRAMING_LABELS) as [CameraFraming, string][]).map(([framing, label]) =>
+                  <button key={framing} type="button" aria-pressed={reviewFraming === framing}
+                    onClick={() => setReviewFraming(framing)}
+                    className={"rounded-full px-3 py-2 text-xs font-bold " + (reviewFraming === framing
+                      ? "bg-primary text-primary-foreground" : "bg-card text-foreground")}>
+                    {label}
+                  </button>)}
+              </div>
+              <div className="mt-2 flex flex-wrap gap-2" role="group" aria-label="إضاءة المعاينة">
+                {(Object.entries(LIGHTING_LABELS) as [LightingStyle, string][]).map(([lighting, label]) =>
+                  <button key={lighting} type="button" aria-pressed={reviewLighting === lighting}
+                    onClick={() => setReviewLighting(lighting)}
+                    className={"rounded-full px-3 py-2 text-xs font-bold " + (reviewLighting === lighting
+                      ? "bg-primary text-primary-foreground" : "bg-card text-foreground")}>
+                    {label}
+                  </button>)}
+              </div>
+              <p className="mt-2 text-xs text-muted-foreground">لتجديد صورة بطاقة الشخصية بالزاوية والإضاءة المختارة، اضغط «التقاط صورة معاينة من النموذج».</p>
               <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label="حركات فحص الشخصية">
                 {(["idle", "wave", "happy", "nod", "dance"] as AnimationType[]).map((animation) =>
                   <button key={animation} type="button" aria-pressed={reviewAnimation === animation}

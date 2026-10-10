@@ -108,3 +108,20 @@ The silent **تجربة حركة الفم** preview animates the compatible mout
 Both facial morph capability detection and live expression driving now use the same central alias table for mouth, blink, brow, and eye movement. Therefore a morph target that is called "supported" by the diagnostics is actually recognized by the renderer.
 
 **Limitations:** Passing remote CORS means these links worked from the tested browser origin at that time. It cannot guarantee future remote uptime, commercial redistribution rights, or reference-level character appearance. The embedded/mouth tests are technical checks, not realistic lip-sync evaluation with audio.
+
+
+## Phase 17 — Cinematic framing & expressive closeup characters
+
+**Current roster:** 5 imported GLB characters + 4 procedural fallback characters (9 total for a fresh browser). The new fifth model, **ريم**, is the publisher-hosted \`realistic-halfbody.glb\`: a facially rigged **head-and-torso portrait**, not a substitute for a full-body character. The existing **هند** full-body model is kept intact for users who already customized it; it lacks face morphs and is not advertised as speaking.
+
+**In the character library** the selected model can be reviewed through three camera compositions: **الجسم كاملًا**, **نصف الجسم**, and **الوجه والكتفان**. The closeup uses the skeleton's actual head-bone location if detected and fits the available screen width. Three switchable PBR three-point lighting recipes—**سينمائية**, **طبيعية**, and **درامية**—let the user see face detail, skin, fabric, shadow contrast and eye reflections. These camera/lighting controls are **review-only**; existing Story and Studio framing remains unchanged.
+
+Select **الوجه والكتفان**, choose suitable light, and click **التقاط صورة معاينة من النموذج** to save that frame as the character's real WebP library thumbnail. Previously captured personal thumbnails are preserved until the user replaces them; no placeholder photo is substituted for the true 3D model.
+
+Newly created/imported entries expose **لقطة المعاينة الافتراضية** in the editor. The user may prefer a full-body or headshot preview on a per-character basis. The initial default for ريم is a face portrait.
+
+The persisted library schema upgrades once to **v3**, adding ريم only to browsers with an older version, preserving personalized labels and favorites and never resurrecting previously deleted older characters on reload.
+
+**QA gate:** The remote source is structurally audited for five GLBs, and Chromium must load each source directly with CORS. In particular, ريم must expose functional mouth blendshapes, and هند must *not* claim unsupported lip sync. The camera/lighting and stored-library migration have deterministic tests.
+
+**Artistic limitation:** A technically valid rig and pleasant studio lighting cannot guarantee likeness to the user's cinematic reference images. Final face/hair/clothing evaluation still needs actual rendered image comparison on a machine capable of WebGL screenshots and stronger art sourcing. All five GLB assets remain linked to their upstream source; they are not redistributed in this repository.

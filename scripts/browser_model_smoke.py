@@ -136,6 +136,13 @@ def main():
                 capture_evidence(page, "desktop-loaded-glb.png")
                 # Dispatch actual DOM clicks to verify React controls without waiting on
                 # unrelated Vite dev-server navigation/network tasks in Playwright.
+                expect(page.get_by_role("button", name="نصف الجسم")).to_have_attribute("aria-pressed", "true")
+                page.get_by_role("button", name="الوجه والكتفان").dispatch_event("click")
+                expect(page.get_by_role("button", name="الوجه والكتفان")).to_have_attribute("aria-pressed", "true")
+                page.get_by_role("button", name="درامية").dispatch_event("click")
+                expect(page.get_by_role("button", name="درامية")).to_have_attribute("aria-pressed", "true")
+                page.get_by_role("button", name="سينمائية").dispatch_event("click")
+                page.get_by_role("button", name="الجسم كاملًا").dispatch_event("click")
                 page.get_by_role("button", name="تلويح").dispatch_event("click")
                 expect(page.get_by_role("button", name="تلويح")).to_have_attribute("aria-pressed", "true")
                 page.get_by_role("button", name="تدوير الشخصية").dispatch_event("click")
@@ -169,7 +176,7 @@ def main():
                     assert "المجسمات:" in page.locator("body").inner_text()
                     verified_count += 1
                     print(f"PASS: real hosted model binary loaded in WebGL: {featured_path.name}", flush=True)
-                print(f"Real publisher-hosted GLB models exercised: {verified_count}/4", flush=True)
+                print(f"Real publisher-hosted GLB models exercised: {verified_count}/5", flush=True)
 
                 # Unlike same-origin CI fixture loading, this performs real CORS
                 # requests and GLTFLoader renders from the publisher origin.
@@ -179,6 +186,7 @@ def main():
                     ("عمر", "https://three.ws/avatars/realistic-male.glb"),
                     ("ليلى", "https://three.ws/avatars/selfie-girl.glb"),
                     ("هند", "https://three.ws/avatars/michelle.glb"),
+                    ("ريم", "https://three.ws/avatars/realistic-halfbody.glb"),
                 ]
                 for name, source_url in featured_names:
                     page.goto(URL, wait_until="networkidle", timeout=60000)
@@ -188,9 +196,17 @@ def main():
                     source_status = page.get_by_role("status")
                     expect(source_status).to_contain_text("المصدر متاح", timeout=22000)
                     await_gltf_ready(page, name, expected_zero_bones=False, source_url=source_url)
+                    if name == "ريم":
+                        expect(page.get_by_role("button", name="الوجه والكتفان")).to_have_attribute(
+                            "aria-pressed", "true"
+                        )
                     mouth_button = page.get_by_role("button", name="تجربة حركة الفم")
                     expect(mouth_button).to_be_visible()
                     mouth_available = mouth_button.is_enabled()
+                    if name == "هند":
+                        assert not mouth_available, "هند must not claim unsupported lipsync"
+                    if name == "ريم":
+                        assert mouth_available, "ريم must expose the verified face morphs"
                     if mouth_available:
                         mouth_button.dispatch_event("click")
                         expect(page.get_by_role("button", name="إيقاف تجربة الفم")).to_have_attribute(

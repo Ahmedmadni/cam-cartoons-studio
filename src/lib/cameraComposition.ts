@@ -52,3 +52,54 @@ export function calculateCameraShot(
     fitted: true,
   };
 }
+
+
+/** Review-only camera presets; Story and Studio retain their existing full-body camera. */
+export type CameraFraming = "full" | "upper" | "portrait";
+
+export const FRAMING_LABELS: Record<CameraFraming, string> = {
+  full: "الجسم كاملًا",
+  upper: "نصف الجسم",
+  portrait: "الوجه والكتفان",
+};
+
+export function calculateFramedCameraShot(
+  diagnostics: AvatarDiagnostics | null,
+  aspect: number,
+  yOffset: number,
+  framing: CameraFraming,
+): CameraShot {
+  const full = calculateCameraShot(diagnostics, aspect, yOffset);
+  if (framing === "full" || !full.fitted || !diagnostics?.dimensions || !diagnostics.normalizedScale) {
+    return full;
+  }
+  const { height, width, depth } = diagnostics.dimensions;
+  const scale = diagnostics.normalizedScale;
+  const heightScaled = height * scale;
+  // Head bone position wins over guesses for models with long necks, short bodies,
+  // or non-standard skeleton proportions.
+  const headRatio = typeof diagnostics.headHeightRatio === "number" &&
+    Number.isFinite(diagnostics.headHeightRatio) &&
+    diagnostics.headHeightRatio >= 0.4 && diagnostics.headHeightRatio <= 1
+    ? diagnostics.headHeightRatio : 0.86;
+  const targetRatio = framing === "portrait"
+    ? Math.max(0.70, headRatio - 0.06)
+    : Math.min(0.79, Math.max(0.60, headRatio - 0.18));
+  const visibleFraction = framing === "portrait" ? 0.45 : 0.79;
+  // Portrait cropping deliberately excludes outstretched arms and loose
+  // garments; the full-body setting retains complete mesh bounds.
+  const visibleWidth = Math.min(
+    width * scale * (framing === "portrait" ? 0.55 : 0.82),
+    heightScaled * (framing === "portrait" ? 0.38 : 0.72),
+  );
+  const tanHalf = Math.tan((full.fov * Math.PI) / 360);
+  const vertical = (heightScaled * visibleFraction * 1.12) / (2 * tanHalf);
+  const horizontal = (visibleWidth * 1.12) / (2 * tanHalf * aspect);
+  const minDistance = framing === "portrait" ? 0.95 : 1.5;
+  return {
+    distance: Math.min(50, Math.max(minDistance, vertical, horizontal) + depth * scale * 0.28),
+    targetY: yOffset + heightScaled * targetRatio,
+    fov: full.fov,
+    fitted: true,
+  };
+}

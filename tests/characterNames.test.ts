@@ -8,17 +8,17 @@ import {
 } from "../src/lib/characterLibrary";
 
 describe("Natural Arabic character names", () => {
-  test("all eight built-in characters have distinct, familiar personal names", () => {
+  test("all nine built-in characters have distinct, familiar personal names", () => {
     const names = DEFAULT_CHARACTERS.map((character) => character.name);
-    expect(names).toEqual(["يوسف", "نور", "أحمد", "مريم", "سارة", "عمر", "ليلى", "هند"]);
-    expect(new Set(names).size).toBe(8);
+    expect(names).toEqual(["يوسف", "نور", "أحمد", "مريم", "سارة", "عمر", "ليلى", "هند", "ريم"]);
+    expect(new Set(names).size).toBe(9);
     expect(FEATURED_CHARACTERS.every((character) => !character.name.includes("—"))).toBe(true);
   });
 
   test("upgrades legacy stock labels without changing character IDs, models, tags or favorites", () => {
     const previous = DEFAULT_CHARACTERS.map((character) => ({
       ...character,
-      name: PREVIOUS_DEFAULT_NAMES[character.id]!,
+      name: PREVIOUS_DEFAULT_NAMES[character.id] ?? character.name,
       isFavorite: character.id === "featured-cinematic-female",
     }));
     const renamed = upgradeDefaultCharacterNames(previous);

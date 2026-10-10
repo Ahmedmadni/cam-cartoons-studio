@@ -22,6 +22,8 @@ export type AvatarDiagnostics = {
   message?: string;
   dimensions?: ModelSize;
   normalizedScale?: number;
+  /** Head bone Y as a fraction of original mesh height, measured in bind pose. */
+  headHeightRatio?: number;
   boneCount?: number;
   morphCount?: number;
   meshCount?: number;

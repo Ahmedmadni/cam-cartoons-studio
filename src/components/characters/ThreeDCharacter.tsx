@@ -4,7 +4,8 @@ import { PerspectiveCamera } from "three";
 import { Component, Suspense, useCallback, useEffect, useState, type ReactNode } from "react";
 
 import { getAvatarProfile, mergeAvatarProfile } from "@/lib/avatarCatalog";
-import { calculateCameraShot } from "@/lib/cameraComposition";
+import { calculateFramedCameraShot, type CameraFraming } from "@/lib/cameraComposition";
+import { LIGHTING_RECIPES, type LightingStyle } from "@/lib/studioLighting";
 import { useCharacterLibrary } from "@/lib/characterLibrary";
 import { useLocalGlbUrl } from "@/lib/useLocalGlbUrl";
 import type { AvatarDiagnostics } from "@/lib/modelPresentation";
@@ -17,22 +18,24 @@ import ReadyPlayerMeAvatar from "./ReadyPlayerMeAvatar";
 function ResponsiveCharacterCamera({
   diagnostics,
   type,
+  framing,
 }: {
   diagnostics: AvatarDiagnostics | null;
   type: CharacterType;
+  framing: CameraFraming;
 }) {
   const { camera, size, invalidate } = useThree();
   const yOffset = getAvatarProfile(type).rpmYOffset;
 
   useEffect(() => {
     if (!(camera instanceof PerspectiveCamera)) return;
-    const shot = calculateCameraShot(diagnostics, size.width / Math.max(size.height, 1), yOffset);
+    const shot = calculateFramedCameraShot(diagnostics, size.width / Math.max(size.height, 1), yOffset, framing);
     camera.fov = shot.fov;
     camera.position.set(0, shot.targetY, shot.distance);
     camera.lookAt(0, shot.targetY, 0);
     camera.updateProjectionMatrix();
     invalidate();
-  }, [camera, diagnostics, invalidate, size.height, size.width, yOffset]);
+  }, [camera, diagnostics, framing, invalidate, size.height, size.width, yOffset]);
 
   return null;
 }
@@ -146,6 +149,9 @@ export type ThreeDCharacterProps = {
   spin?: boolean;
   /** Animate supported mouth morphs in a silent diagnostic preview. */
   previewSpeech?: boolean;
+  /** Review presets; omit to retain Story/Studio full-body framing. */
+  framing?: CameraFraming;
+  lighting?: LightingStyle;
   transparent?: boolean;
   className?: string;
   /** صورة خلفية تُرسم داخل المشهد وتظهر أيضاً في الفيديو المسجل. */
@@ -159,6 +165,8 @@ export default function ThreeDCharacter({
   animation = "idle",
   spin = true,
   previewSpeech = false,
+  framing = "full",
+  lighting = "cinematic",
   transparent = false,
   className,
   backgroundUrl,
@@ -166,6 +174,7 @@ export default function ThreeDCharacter({
   onDiagnostics,
 }: ThreeDCharacterProps) {
   const [cameraDiagnostics, setCameraDiagnostics] = useState<AvatarDiagnostics | null>(null);
+  const lights = LIGHTING_RECIPES[lighting];
 
   useEffect(() => {
     setCameraDiagnostics(null);
@@ -199,30 +208,30 @@ export default function ThreeDCharacter({
         onCanvasReady?.(gl.domElement);
       }}
     >
-      <ResponsiveCharacterCamera type={type} diagnostics={cameraDiagnostics} />
+      <ResponsiveCharacterCamera type={type} diagnostics={cameraDiagnostics} framing={framing} />
       {backgroundUrl && (
         <Suspense fallback={null}>
           <Backdrop url={backgroundUrl} />
         </Suspense>
       )}
 
-      <hemisphereLight args={["#FFF8EE", "#6E7A86", 0.65]} />
+      <hemisphereLight args={[lights.ambientSky, lights.ambientGround, lights.ambience]} />
       <directionalLight
         position={[3.2, 5, 4.2]}
-        intensity={2.2}
-        color="#FFF4E8"
+        intensity={lights.key}
+        color={lights.keyColor}
         castShadow
         shadow-mapSize={[2048, 2048]}
         shadow-bias={-0.00035}
         shadow-radius={6}
       />
-      <directionalLight position={[-3.5, 2.2, 3]} intensity={0.7} color="#D7E8FF" />
+      <directionalLight position={[-3.5, 2.2, 3]} intensity={lights.fill} color={lights.fillColor} />
       <spotLight
         position={[0, 4.5, -3.5]}
-        intensity={4.2}
+        intensity={lights.rim}
         angle={0.65}
         penumbra={1}
-        color="#FFE0B8"
+        color={lights.rimColor}
       />
 
       <Suspense fallback={null}>
@@ -241,10 +250,10 @@ export default function ThreeDCharacter({
       )}
 
       {/* إضاءة استوديو محلية بالكامل (بدون تحميل ملفات HDR خارجية قد يفشل جلبها) */}
-      <Environment resolution={256} environmentIntensity={0.62}>
-        <Lightformer form="rect" intensity={3} color="#FFF4E8" position={[0, 4, 2]} scale={[6, 2, 1]} />
-        <Lightformer form="rect" intensity={1.5} color="#D7E8FF" position={[-5, 1, 2]} rotation-y={Math.PI / 2} scale={[4, 3, 1]} />
-        <Lightformer form="rect" intensity={1.5} color="#FFE0B8" position={[5, 1, 2]} rotation-y={-Math.PI / 2} scale={[4, 3, 1]} />
+      <Environment resolution={256} environmentIntensity={lights.env}>
+        <Lightformer form="rect" intensity={lights.key * 1.35} color={lights.keyColor} position={[0, 4, 2]} scale={[6, 2, 1]} />
+        <Lightformer form="rect" intensity={lights.fill * 1.6} color={lights.fillColor} position={[-5, 1, 2]} rotation-y={Math.PI / 2} scale={[4, 3, 1]} />
+        <Lightformer form="rect" intensity={lights.rim * 0.45} color={lights.rimColor} position={[5, 1, 2]} rotation-y={-Math.PI / 2} scale={[4, 3, 1]} />
         <Lightformer form="ring" intensity={1} color="#FFFFFF" position={[0, 1, -5]} scale={3} />
       </Environment>
     </Canvas>
