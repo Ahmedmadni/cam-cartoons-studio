@@ -59,12 +59,12 @@ class GlbAuditTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             inspect_glb(sample_glb(meshes=[{"primitives": [{"attributes": {"NORMAL": 0}}]}]))
 
-    def test_featured_source_has_four_distinct_real_urls(self):
+    def test_featured_source_has_five_distinct_real_urls(self):
         result = featured_urls()
-        self.assertEqual(len(result), 4)
+        self.assertEqual(len(result), 5)
         self.assertEqual(set(result), {
             "featured-cinematic-female", "featured-cinematic-male",
-            "featured-selfie-girl", "featured-michelle",
+            "featured-selfie-girl", "featured-michelle", "featured-portrait-reem",
         })
         self.assertEqual(len({item["url"] for item in result.values()}), 4)
 
