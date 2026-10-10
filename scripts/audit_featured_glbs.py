@@ -139,8 +139,8 @@ def candidate_urls() -> dict[str, dict[str, str]]:
     )
     candidates = {id_: {"name": name, "url": url}
                   for id_, name, url in entries if id_.startswith("curated-")}
-    if len(candidates) != 2 or len({item["url"] for item in candidates.values()}) != 2:
-        raise ValueError("Expected two distinct pinned candidate GLB sources")
+    if len(candidates) != 5 or len({item["url"] for item in candidates.values()}) != 5:
+        raise ValueError("Expected five distinct pinned candidate GLB sources")
     return candidates
 
 
@@ -172,14 +172,21 @@ def audit_live(save_browser_fixtures: bool = False) -> int:
             binary, headers = read_limited(source["url"])
             details = inspect_glb(binary)
             # Surface candidate weaknesses instead of trusting advertised morph support.
-            if not details["body_rigged"] or not details["likely_lipsync"]:
-                raise ValueError("Candidate lacks body joints or compatible speech morphs")
+            if not details["body_rigged"]:
+                raise ValueError("Candidate has no humanoid body skeleton")
+            # The two Rocketbox sources were specifically chosen for lip morphs.
+            # MakeHuman/MPFB rigs may lack ARKit facial targets: report honestly.
+            if identity.startswith("curated-rocketbox-") and not details["likely_lipsync"]:
+                raise ValueError("Rocketbox face-rigged candidate has no supported speech morph")
             if save_browser_fixtures:
                 path = Path("public/__qa__/candidates") / (identity + ".glb")
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_bytes(binary)
-            report["candidates"][identity] = {**source, **headers,
-                                              "status": "technically_verified", **details}
+            report["candidates"][identity] = {
+                **source, **headers, "status": "technically_verified",
+                "face_rig_grade": "face_morphs" if details["likely_lipsync"] else "body_only",
+                **details,
+            }
             print(f"  candidate verified; joints={details['joints']}; morphs={details['morph_count']}", flush=True)
         except (ValueError, OSError, TimeoutError, urllib.error.URLError) as exc:
             report["candidates"][identity] = {**source, "status": "unavailable_or_invalid",
@@ -190,7 +197,7 @@ def audit_live(save_browser_fixtures: bool = False) -> int:
     healthy = sum(item["status"] == "verified" for item in report["models"].values())
     reviewed = sum(item["status"] == "technically_verified"
                    for item in report["candidates"].values())
-    print(f"Featured GLBs: {healthy}/5; new technical candidates: {reviewed}/2; "
+    print(f"Featured GLBs: {healthy}/5; new technical candidates: {reviewed}/5; "
           f"report: {OUTPUT}", flush=True)
     # External domains can fail intermittently: the audit must report that failure,
     # without blocking local browser/TypeScript/test quality gates.

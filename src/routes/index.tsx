@@ -352,12 +352,12 @@ function LibraryPage() {
             <div>
               <h2 id="art-candidates-heading" className="text-xl font-black">شخصيات بشرية جديدة قيد التقييم</h2>
               <p className="mt-1 max-w-3xl text-sm font-semibold text-muted-foreground">
-                نماذج GLB إضافية من Microsoft Rocketbox. يمكنك إضافتها وتجربتها هنا دون مغادرة التطبيق.
+                نماذج GLB بشرية من Microsoft Rocketbox وMakeHuman / PrivacyPuppet. يمكنك إضافتها وتجربتها هنا دون مغادرة التطبيق.
                 لم نعتمد بعد درجة مطابقتها للصور السينمائية المرجعية، ولن نضيفها تلقائيًا إلى مكتبتك.
               </p>
             </div>
             <span className="rounded-full border border-border px-3 py-1 text-xs font-bold text-muted-foreground">
-              مرشحان — موافقة فنية مطلوبة
+              {CURATED_CANDIDATES.length} مرشحين — موافقة فنية مطلوبة
             </span>
           </div>
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
@@ -370,6 +370,9 @@ function LibraryPage() {
                     {candidate.origin} · {(candidate.sizeBytes / 1024 / 1024).toFixed(1)} MB
                   </p>
                   <p className="mt-2 text-sm text-muted-foreground">{candidate.description}</p>
+                  <p className="mt-2 text-xs font-bold text-muted-foreground">
+                    {candidate.faceRig === "blendshapes" ? "مورفات وجه موثّقة من المصدر" : "هيكل بشري — تعابير الوجه غير مضمونة"}
+                  </p>
                 </div>
                 <button type="button" onClick={() => chooseCandidate(candidate)}
                   className="inline-flex items-center justify-center gap-2 rounded-full border border-primary px-4 py-3 text-sm font-black text-foreground hover:bg-primary/10">

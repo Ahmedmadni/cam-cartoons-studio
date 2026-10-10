@@ -59,15 +59,17 @@ class GlbAuditTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             inspect_glb(sample_glb(meshes=[{"primitives": [{"attributes": {"NORMAL": 0}}]}]))
 
-    def test_candidate_sources_are_two_distinct_commit_pinned_glbs(self):
+    def test_candidate_sources_are_five_distinct_commit_pinned_glbs(self):
         candidates = candidate_urls()
         self.assertEqual(set(candidates), {
             "curated-rocketbox-yasmin", "curated-rocketbox-ziyad",
+            "curated-mpfb-kofi", "curated-mpfb-yuki", "curated-mpfb-liam",
         })
-        self.assertTrue(all(
-            "/8af29d456c4d4d4f7e8ac32ac0c2b2aaf02c27d3/" in item["url"]
-            for item in candidates.values()
-        ))
+        for item in candidates.values():
+            self.assertTrue(
+                "/8af29d456c4d4d4f7e8ac32ac0c2b2aaf02c27d3/" in item["url"] or
+                "/ff1b635eba22d782423a6d81233e8deca7f6d1bd/" in item["url"]
+            )
 
     def test_featured_source_has_five_distinct_real_urls(self):
         result = featured_urls()
