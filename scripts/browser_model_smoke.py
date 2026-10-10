@@ -246,7 +246,9 @@ def main():
                     assert f"توجيه العينين بالعظام: {eye_status}" in page.locator("body").inner_text(), (
                         f"{candidate_path.name}: eyeball joints mismatched in renderer"
                     )
-                    if candidate_path.stem.startswith("curated-mpfb-"):
+                    if candidate_path.stem == "curated-mpfb-kofi":
+                        # One representative A/B check is sufficient. Repeated
+                        # large avatar remounts can exhaust SwiftShader budgets.
                         compare = page.get_by_role("button", name="التحسين مفعّل — اعرض الأصل للمقارنة")
                         expect(compare).to_be_visible()
                         expect(compare).to_have_attribute("aria-pressed", "true")
@@ -271,6 +273,15 @@ def main():
                     print(f"PASS: real optional GLB: {candidate_path.name}; lips={lips}; "
                           f"jaw={jaw_status}; eyes={eye_status}", flush=True)
                 print(f"Real candidate binary GLBs exercised: {len(candidate_files)}/5", flush=True)
+
+                # Close every heavy fixture-loaded GLB and WebGL program before
+                # testing remote featured URLs. Original avatars must be able to
+                # load in a clean context independently of stress-test churn.
+                context.close()
+                context = browser.new_context(viewport={"width": 1366, "height": 900})
+                page = context.new_page()
+                page.goto(URL, wait_until="domcontentloaded", timeout=45000)
+                expect(page.get_by_role("heading", name="مكتبة الشخصيات المفتوحة")).to_be_visible()
 
                 # Unlike same-origin CI fixture loading, this performs real CORS
                 # requests and GLTFLoader renders from the publisher origin.
