@@ -109,6 +109,30 @@ function capturePose(rig: Rig): BonePose {
   };
 }
 
+// Resolving morph names against a 70+ key dictionary every animation frame
+// wastes CPU and allocations on phones. Cache mappings by immutable GLTF dict.
+const morphResolutionCache = new WeakMap<
+  Record<string, number>,
+  WeakMap<readonly string[], { single: number[]; paired: number[] }>
+>();
+
+function getMorphBinding(dictionary: Record<string, number>, aliases: readonly string[], pairedSmile = false) {
+  let byAliases = morphResolutionCache.get(dictionary);
+  if (!byAliases) {
+    byAliases = new WeakMap();
+    morphResolutionCache.set(dictionary, byAliases);
+  }
+  let entry = byAliases.get(aliases);
+  if (!entry) {
+    entry = {
+      single: resolveMorphIndices(dictionary, aliases),
+      paired: resolveMorphIndices(dictionary, aliases, true),
+    };
+    byAliases.set(aliases, entry);
+  }
+  return pairedSmile ? entry.paired : entry.single;
+}
+
 function setMorph(
   meshes: MorphMesh[],
   aliases: readonly string[],
@@ -125,10 +149,10 @@ function setMorph(
 
     // Mixed ARKit and generic eyeBlink shapes must not close eyelids twice.
     if (onlyWithoutSideBlink && (
-      resolveMorphIndices(dictionary, FACE_MORPH_ALIASES.blinkLeft).length ||
-      resolveMorphIndices(dictionary, FACE_MORPH_ALIASES.blinkRight).length
+      getMorphBinding(dictionary, FACE_MORPH_ALIASES.blinkLeft).length ||
+      getMorphBinding(dictionary, FACE_MORPH_ALIASES.blinkRight).length
     )) continue;
-    const indices = resolveMorphIndices(dictionary, aliases, pairedSmile);
+    const indices = getMorphBinding(dictionary, aliases, pairedSmile);
     for (const index of indices) {
       if (index >= influences.length) continue;
       influences[index] = MathUtils.damp(influences[index] ?? 0, target, 14, delta);
