@@ -132,6 +132,17 @@ def main():
                 page.goto(URL, wait_until="networkidle", timeout=60000)
                 expect(page.get_by_role("heading", name="مكتبة الشخصيات المفتوحة")).to_be_visible(timeout=30000)
 
+                # Optional candidates must appear but should not be auto-seeded.
+                expect(page.get_by_role("heading", name="شخصيات بشرية جديدة قيد التقييم")).to_be_visible()
+                expect(page.get_by_role("button", name="أضف ياسمين للتقييم")).to_be_visible()
+                expect(page.get_by_role("button", name="أضف زياد للتقييم")).to_be_visible()
+                page.get_by_role("button", name="أضف ياسمين للتقييم").dispatch_event("click")
+                expect(page.get_by_role("button", name="افتح ياسمين في مكتبتي")).to_be_visible()
+                expect(page.get_by_role("heading", name="ياسمين").last).to_be_visible()
+                page.get_by_role("button", name="افتح ياسمين في مكتبتي").dispatch_event("click")
+                assert page.get_by_role("button", name="حذف ياسمين").count() == 1, (
+                    "Selecting an existing candidate must not create a duplicate"
+                )
                 add_character(page, "اختبار الجودة")
                 capture_evidence(page, "desktop-loaded-glb.png")
                 # Dispatch actual DOM clicks to verify React controls without waiting on
@@ -193,6 +204,19 @@ def main():
                     verified_count += 1
                     print(f"PASS: real hosted model binary loaded in WebGL: {featured_path.name}", flush=True)
                 print(f"Real publisher-hosted GLB models exercised: {verified_count}/5", flush=True)
+                candidate_files = sorted(Path("public/__qa__/candidates").glob("curated-*.glb"))
+                for candidate_path in candidate_files:
+                    page.goto(URL, wait_until="networkidle", timeout=60000)
+                    add_character(
+                        page, "فحص النموذج " + candidate_path.stem,
+                        model_url="/__qa__/candidates/" + candidate_path.name,
+                        expected_zero_bones=False,
+                    )
+                    assert "تحريك الفم: مدعوم" in page.locator("body").inner_text(), (
+                        f"{candidate_path.name}: morph metadata did not match actual loader"
+                    )
+                    print(f"PASS: real Rocketbox candidate loaded in Chromium: {candidate_path.name}", flush=True)
+                print(f"Real candidate binary GLBs exercised: {len(candidate_files)}/2", flush=True)
 
                 # Unlike same-origin CI fixture loading, this performs real CORS
                 # requests and GLTFLoader renders from the publisher origin.

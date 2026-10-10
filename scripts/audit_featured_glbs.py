@@ -18,6 +18,7 @@ from pathlib import Path
 
 MAX_BYTES = 32 * 1024 * 1024
 FEATURED_SOURCE = Path("src/lib/characterLibrary.ts")
+CANDIDATE_SOURCE = Path("src/lib/curatedCharacters.ts")
 OUTPUT = Path("artifacts/model-review/featured-asset-audit.json")
 GLB_MAGIC = 0x46546C67
 JSON_TYPE = 0x4E4F534A
@@ -129,8 +130,25 @@ def featured_urls() -> dict[str, str]:
     return featured
 
 
+def candidate_urls() -> dict[str, dict[str, str]]:
+    catalog = CANDIDATE_SOURCE.read_text(encoding="utf-8")
+    entries = re.findall(
+        r'id:\s*"([^"]+)"\s*,\s*name:\s*"([^"]+)"[^}]*?'
+        r'modelUrl:\s*"(https://[^"]+\.glb)"',
+        catalog, flags=re.S,
+    )
+    candidates = {id_: {"name": name, "url": url}
+                  for id_, name, url in entries if id_.startswith("curated-")}
+    if len(candidates) != 2 or len({item["url"] for item in candidates.values()}) != 2:
+        raise ValueError("Expected two distinct pinned candidate GLB sources")
+    return candidates
+
+
 def audit_live(save_browser_fixtures: bool = False) -> int:
-    report = {"models": {}, "note": "Structural audit only; not a visual-art or CORS certification"}
+    report = {
+        "models": {}, "candidates": {},
+        "note": "Structural audit only; candidate assets remain opt-in and NOT art approved",
+    }
     for identity, source in featured_urls().items():
         print(f"Inspecting {source['name']}: {source['url']}", flush=True)
         try:
@@ -148,10 +166,32 @@ def audit_live(save_browser_fixtures: bool = False) -> int:
             report["models"][identity] = {**source, "status": "unavailable_or_invalid",
                                            "error": str(exc)}
             print(f"  UNVERIFIED: {exc}", flush=True)
+    for identity, source in candidate_urls().items():
+        print(f"Inspecting candidate {source['name']}: {source['url']}", flush=True)
+        try:
+            binary, headers = read_limited(source["url"])
+            details = inspect_glb(binary)
+            # Surface candidate weaknesses instead of trusting advertised morph support.
+            if not details["body_rigged"] or not details["likely_lipsync"]:
+                raise ValueError("Candidate lacks body joints or compatible speech morphs")
+            if save_browser_fixtures:
+                path = Path("public/__qa__/candidates") / (identity + ".glb")
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(binary)
+            report["candidates"][identity] = {**source, **headers,
+                                              "status": "technically_verified", **details}
+            print(f"  candidate verified; joints={details['joints']}; morphs={details['morph_count']}", flush=True)
+        except (ValueError, OSError, TimeoutError, urllib.error.URLError) as exc:
+            report["candidates"][identity] = {**source, "status": "unavailable_or_invalid",
+                                              "error": str(exc)}
+            print(f"  Candidate NOT verified: {exc}", flush=True)
     OUTPUT.parent.mkdir(parents=True, exist_ok=True)
     OUTPUT.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
     healthy = sum(item["status"] == "verified" for item in report["models"].values())
-    print(f"Actual hosted GLB files verified: {healthy}/5; report: {OUTPUT}", flush=True)
+    reviewed = sum(item["status"] == "technically_verified"
+                   for item in report["candidates"].values())
+    print(f"Featured GLBs: {healthy}/5; new technical candidates: {reviewed}/2; "
+          f"report: {OUTPUT}", flush=True)
     # External domains can fail intermittently: the audit must report that failure,
     # without blocking local browser/TypeScript/test quality gates.
     return 0

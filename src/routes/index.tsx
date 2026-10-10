@@ -15,6 +15,7 @@ import { LIGHTING_LABELS, type LightingStyle } from "@/lib/studioLighting";
 import { describeSurfaceLimitations } from "@/lib/avatarSurfaceQuality";
 import { REVIEW_BACKDROPS, REVIEW_STUDIO_GRADIENTS, type ReviewBackdropId } from "@/lib/reviewBackdrops";
 import { REVIEW_EXPRESSION_LABELS, type ReviewExpression } from "@/lib/facialPerformance";
+import { CURATED_CANDIDATES, findImportedCandidate, type CuratedCandidate } from "@/lib/curatedCharacters";
 
 export const Route = createFileRoute("/")({
   head: () => ({ meta: [
@@ -302,6 +303,17 @@ function LibraryPage() {
     if (item.voicePreset) setSelectedVoice(item.voicePreset);
   };
 
+  const chooseCandidate = (candidate: CuratedCandidate) => {
+    const existing = findImportedCandidate(useCharacterLibrary.getState().characters, candidate);
+    const id = existing?.id ?? addCharacter(candidate.draft);
+    const saved = useCharacterLibrary.getState().characters.find((item) => item.id === id);
+    if (saved) choose(saved);
+    // Always expose the newly selected card even if the prior filter hid it.
+    setFilter("all");
+    setSearch("");
+    document.getElementById("selected-character-preview")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
   return (
     <main dir="rtl" className="min-h-screen bg-background px-4 py-8">
       <div className="mx-auto max-w-7xl">
@@ -330,6 +342,39 @@ function LibraryPage() {
             </button>)}
           </div>
           <p className="mt-3 text-sm font-semibold text-muted-foreground">{visible.length} من {characters.length} شخصية</p>
+        </section>
+        <section aria-labelledby="art-candidates-heading"
+          className="mt-6 rounded-3xl border border-border bg-card p-4 sm:p-6">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 id="art-candidates-heading" className="text-xl font-black">شخصيات بشرية جديدة قيد التقييم</h2>
+              <p className="mt-1 max-w-3xl text-sm font-semibold text-muted-foreground">
+                نماذج GLB إضافية من Microsoft Rocketbox. يمكنك إضافتها وتجربتها هنا دون مغادرة التطبيق.
+                لم نعتمد بعد درجة مطابقتها للصور السينمائية المرجعية، ولن نضيفها تلقائيًا إلى مكتبتك.
+              </p>
+            </div>
+            <span className="rounded-full border border-border px-3 py-1 text-xs font-bold text-muted-foreground">
+              مرشحان — موافقة فنية مطلوبة
+            </span>
+          </div>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            {CURATED_CANDIDATES.map((candidate) => {
+              const existing = findImportedCandidate(characters, candidate);
+              return <article key={candidate.id} className="flex flex-col justify-between gap-3 rounded-2xl border border-border bg-background p-4">
+                <div>
+                  <h3 className="text-lg font-black">{candidate.name}</h3>
+                  <p className="mt-1 text-xs font-semibold text-muted-foreground">
+                    {candidate.origin} · {(candidate.sizeBytes / 1024 / 1024).toFixed(1)} MB
+                  </p>
+                  <p className="mt-2 text-sm text-muted-foreground">{candidate.description}</p>
+                </div>
+                <button type="button" onClick={() => chooseCandidate(candidate)}
+                  className="inline-flex items-center justify-center gap-2 rounded-full border border-primary px-4 py-3 text-sm font-black text-foreground hover:bg-primary/10">
+                  <Camera className="size-4" /> {existing ? "افتح " + candidate.name + " في مكتبتي" : "أضف " + candidate.name + " للتقييم"}
+                </button>
+              </article>;
+            })}
+          </div>
         </section>
         <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {visible.map((item) => <article key={item.id} className={"overflow-hidden rounded-3xl border-2 bg-card shadow-sm " +
@@ -370,7 +415,7 @@ function LibraryPage() {
         {visible.length === 0 && <p className="mt-8 rounded-3xl border border-dashed border-border p-8 text-center font-bold">
           لا توجد شخصيات مطابقة. استخدم «إضافة شخصية» أو غيّر البحث والتصفية.
         </p>}
-        {selected && <section className="mt-8 grid gap-5 rounded-3xl border-2 border-primary/40 bg-card p-5 md:grid-cols-2">
+        {selected && <section id="selected-character-preview" className="mt-8 grid gap-5 rounded-3xl border-2 border-primary/40 bg-card p-5 md:grid-cols-2">
           <div className="h-[420px] overflow-hidden rounded-2xl md:h-[540px]"
             style={{ background: REVIEW_STUDIO_GRADIENTS[reviewLighting].css }}>
             <CharacterStage type={selected.id} animation={reviewAnimation} spin={reviewSpin} previewSpeech={previewSpeech}
