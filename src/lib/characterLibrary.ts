@@ -82,6 +82,13 @@ export const FEATURED_CHARACTERS: CharacterDefinition[] = [
   },
 ];
 
+/** Exactly-once v3 seed; never resurrect deleted older entries on later reloads. */
+export function seedPortraitForUpgrade(previous: CharacterDefinition[]): CharacterDefinition[] {
+  const newPortrait = FEATURED_CHARACTERS.find((item) => item.id === "featured-portrait-reem");
+  return newPortrait && !previous.some((item) => item.id === newPortrait.id)
+    ? [...previous, newPortrait] : previous;
+}
+
 export function migrateFeaturedCharacters(previous: CharacterDefinition[]): CharacterDefinition[] {
   const existingIds = new Set(previous.map((character) => character.id));
   return [...previous, ...FEATURED_CHARACTERS.filter((character) => !existingIds.has(character.id))];
@@ -227,11 +234,8 @@ export const useCharacterLibrary = create<CharacterLibraryState>()(
         const named = upgradeDefaultCharacterNames(prior);
         // Version 3 introduces ONE new portrait avatar. Do not re-add any
         // of the four existing models if a user has intentionally deleted them.
-        const newPortrait = FEATURED_CHARACTERS.find((item) => item.id === "featured-portrait-reem");
         return {
-          characters: previousVersion < 3 && newPortrait &&
-            !named.some((item) => item.id === newPortrait.id)
-              ? [...named, newPortrait] : named,
+          characters: previousVersion < 3 ? seedPortraitForUpgrade(named) : named,
         };
       },
       partialize: (state) => ({ characters: state.characters }),
