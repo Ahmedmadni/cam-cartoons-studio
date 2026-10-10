@@ -169,7 +169,7 @@ def main():
                     assert "المجسمات:" in page.locator("body").inner_text()
                     verified_count += 1
                     print(f"PASS: real hosted model binary loaded in WebGL: {featured_path.name}", flush=True)
-                print(f"Real publisher-hosted GLB models exercised: {verified_count}/4", flush=True)
+                print(f"Real publisher-hosted GLB models exercised: {verified_count}/5", flush=True)
 
                 # Unlike same-origin CI fixture loading, this performs real CORS
                 # requests and GLTFLoader renders from the publisher origin.
@@ -179,6 +179,7 @@ def main():
                     ("عمر", "https://three.ws/avatars/realistic-male.glb"),
                     ("ليلى", "https://three.ws/avatars/selfie-girl.glb"),
                     ("هند", "https://three.ws/avatars/michelle.glb"),
+                    ("ريم", "https://three.ws/avatars/realistic-halfbody.glb"),
                 ]
                 for name, source_url in featured_names:
                     page.goto(URL, wait_until="networkidle", timeout=60000)
