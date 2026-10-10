@@ -7,6 +7,7 @@ import { clone as cloneSkeleton } from "three/examples/jsm/utils/SkeletonUtils.j
 
 import { getAvatarProfile } from "@/lib/avatarCatalog";
 import { faceState } from "@/lib/faceState";
+import { getNaturalBlink, getReviewExpressionPose, resolveMorphIndices, type ReviewExpression } from "@/lib/facialPerformance";
 import { enhanceSurfaceSampling, inspectSurfaceQuality } from "@/lib/avatarSurfaceQuality";
 import { calculateModelFit, detectFaceCapabilities, FACE_MORPH_ALIASES, matchMorphAlias, type AvatarDiagnostics } from "@/lib/modelPresentation";
 import { useStudioStore } from "@/lib/store";
@@ -20,6 +21,7 @@ type Props = {
   previewSpeech?: boolean | undefined;
   /** Recenter only during visual inspection, never during story playback. */
   reviewMode?: boolean | undefined;
+  reviewExpression?: ReviewExpression | undefined;
   onDiagnostics?: ((details: AvatarDiagnostics) => void) | undefined;
 };
 
@@ -107,42 +109,64 @@ function capturePose(rig: Rig): BonePose {
   };
 }
 
-function setMorph(meshes: MorphMesh[], aliases: readonly string[], value: number) {
-  const clamped = MathUtils.clamp(value, 0, 1);
-
+function setMorph(
+  meshes: MorphMesh[],
+  aliases: readonly string[],
+  value: number,
+  delta: number,
+  pairedSmile = false,
+  onlyWithoutSideBlink = false,
+) {
+  const target = MathUtils.clamp(value, 0, 1);
   for (const mesh of meshes) {
     const dictionary = mesh.morphTargetDictionary;
     const influences = mesh.morphTargetInfluences;
     if (!dictionary || !influences) continue;
 
-    for (const [name, index] of Object.entries(dictionary)) {
-      if (!matchMorphAlias(name, aliases)) continue;
-      influences[index] = clamped;
+    // Mixed ARKit and generic eyeBlink shapes must not close eyelids twice.
+    if (onlyWithoutSideBlink && (
+      resolveMorphIndices(dictionary, FACE_MORPH_ALIASES.blinkLeft).length ||
+      resolveMorphIndices(dictionary, FACE_MORPH_ALIASES.blinkRight).length
+    )) continue;
+    const indices = resolveMorphIndices(dictionary, aliases, pairedSmile);
+    for (const index of indices) {
+      if (index >= influences.length) continue;
+      influences[index] = MathUtils.damp(influences[index] ?? 0, target, 14, delta);
     }
   }
 }
 
-function applyFaceMorphs(rig: Rig, animation: AnimationType, autoBlink: number, previewMouthOpen: number) {
-  const open = previewMouthOpen > 0 ? previewMouthOpen : (faceState.mouthOpen > 0.06 ? faceState.mouthOpen : 0);
-  const smile = Math.max(faceState.smile, animation === "happy" ? 0.72 : 0);
-  const blinkLeft = MathUtils.clamp(Math.max(faceState.blinkLeft, autoBlink), 0, 1);
-  const blinkRight = MathUtils.clamp(Math.max(faceState.blinkRight, autoBlink), 0, 1);
-  const browUp = MathUtils.clamp(faceState.browUp, 0, 1);
+function applyFaceMorphs(
+  rig: Rig,
+  animation: AnimationType,
+  autoBlink: { left: number; right: number },
+  previewMouthOpen: number,
+  delta: number,
+  expression: ReviewExpression,
+  reviewActive: boolean,
+) {
+  const pose = getReviewExpressionPose(expression);
+  const open = previewMouthOpen > 0 ? previewMouthOpen :
+    reviewActive ? pose.mouthOpen : (faceState.mouthOpen > 0.06 ? faceState.mouthOpen : 0);
+  const smile = reviewActive ? pose.smile :
+    Math.max(faceState.smile, animation === "happy" ? 0.72 : 0);
+  const blinkLeft = MathUtils.clamp(Math.max(reviewActive ? 0 : faceState.blinkLeft, autoBlink.left), 0, 1);
+  const blinkRight = MathUtils.clamp(Math.max(reviewActive ? 0 : faceState.blinkRight, autoBlink.right), 0, 1);
+  const browUp = reviewActive ? pose.browUp : faceState.browUp;
 
-  setMorph(rig.morphMeshes, FACE_MORPH_ALIASES.mouthOpen, open);
-  setMorph(rig.morphMeshes, FACE_MORPH_ALIASES.smile, smile);
-  setMorph(rig.morphMeshes, FACE_MORPH_ALIASES.blinkLeft, blinkLeft);
-  setMorph(rig.morphMeshes, FACE_MORPH_ALIASES.blinkRight, blinkRight);
-  setMorph(rig.morphMeshes, FACE_MORPH_ALIASES.blinkBoth, Math.max(blinkLeft, blinkRight));
-  setMorph(rig.morphMeshes, FACE_MORPH_ALIASES.browUp, browUp);
+  setMorph(rig.morphMeshes, FACE_MORPH_ALIASES.mouthOpen, open, delta);
+  setMorph(rig.morphMeshes, FACE_MORPH_ALIASES.smile, smile, delta, true);
+  setMorph(rig.morphMeshes, FACE_MORPH_ALIASES.blinkLeft, blinkLeft, delta);
+  setMorph(rig.morphMeshes, FACE_MORPH_ALIASES.blinkRight, blinkRight, delta);
+  setMorph(rig.morphMeshes, FACE_MORPH_ALIASES.blinkBoth, Math.max(blinkLeft, blinkRight), delta, false, true);
+  setMorph(rig.morphMeshes, FACE_MORPH_ALIASES.browUp, browUp, delta);
 
-  const lookX = MathUtils.clamp(faceState.eyeX, -1, 1);
-  const lookY = MathUtils.clamp(faceState.eyeY, -1, 1);
-
-  setMorph(rig.morphMeshes, FACE_MORPH_ALIASES.lookLeft, Math.max(0, lookX));
-  setMorph(rig.morphMeshes, FACE_MORPH_ALIASES.lookRight, Math.max(0, -lookX));
-  setMorph(rig.morphMeshes, FACE_MORPH_ALIASES.lookUp, Math.max(0, -lookY));
-  setMorph(rig.morphMeshes, FACE_MORPH_ALIASES.lookDown, Math.max(0, lookY));
+  const lookX = MathUtils.clamp(reviewActive ? pose.eyeX : faceState.eyeX, -1, 1);
+  const lookY = MathUtils.clamp(reviewActive ? pose.eyeY : faceState.eyeY, -1, 1);
+  setMorph(rig.morphMeshes, FACE_MORPH_ALIASES.lookLeft, Math.max(0, lookX), delta);
+  setMorph(rig.morphMeshes, FACE_MORPH_ALIASES.lookRight, Math.max(0, -lookX), delta);
+  setMorph(rig.morphMeshes, FACE_MORPH_ALIASES.lookUp, Math.max(0, -lookY), delta);
+  setMorph(rig.morphMeshes, FACE_MORPH_ALIASES.lookDown, Math.max(0, lookY), delta);
 }
 
 function dampBone(
@@ -158,7 +182,7 @@ function dampBone(
   bone.rotation.z = MathUtils.damp(bone.rotation.z, base.z + (target.z ?? 0), speed, delta);
 }
 
-export default function ReadyPlayerMeAvatar({ type, url, animation, spin, previewSpeech = false, reviewMode = false, onDiagnostics }: Props) {
+export default function ReadyPlayerMeAvatar({ type, url, animation, spin, previewSpeech = false, reviewMode = false, reviewExpression = "neutral", onDiagnostics }: Props) {
   const profile = getAvatarProfile(type);
   const root = useRef<Group>(null);
   const gltf = useGLTF(url);
@@ -214,6 +238,8 @@ export default function ReadyPlayerMeAvatar({ type, url, animation, spin, previe
       hasArmRig: Boolean(rig.leftArm && rig.rightArm),
       hasLipSync: capability.hasLipSync,
       hasBlink: capability.hasBlink,
+      hasSmile: capability.hasSmile,
+      hasBrowUp: capability.hasBrowUp,
       boneNames: boneNames.slice(0, 36),
       morphNames: morphNames.slice(0, 36),
       ...(!fit.valid ? { message: "تعذر قراءة أبعاد النموذج؛ تم استخدام المقياس الافتراضي." } : {}),
@@ -267,11 +293,12 @@ export default function ReadyPlayerMeAvatar({ type, url, animation, spin, previe
     group.rotation.z = MathUtils.damp(group.rotation.z, targetZ, 8, delta);
 
     const pose = basePose.current;
-    let headX = faceState.pitch * 0.45;
-    let headY = -faceState.yaw * 0.58;
-    let headZ = -faceState.roll * 0.46;
-
     const tracking = useStudioStore.getState().isFaceTrackingEnabled;
+    const reviewActive = reviewMode && !tracking;
+    const expressionPose = getReviewExpressionPose(reviewActive ? reviewExpression : "neutral");
+    let headX = reviewActive ? expressionPose.headPitch : faceState.pitch * 0.45;
+    let headY = reviewActive ? expressionPose.headYaw : -faceState.yaw * 0.58;
+    let headZ = reviewActive ? expressionPose.headRoll : -faceState.roll * 0.46;
     // Micro-movements only while face tracking is disabled; never fight MediaPipe.
     if (!tracking && animation === "idle") {
       headX += Math.sin(t * 0.83) * 0.014;
@@ -322,13 +349,10 @@ export default function ReadyPlayerMeAvatar({ type, url, animation, spin, previe
     dampBone(rig.leftForeArm, pose.leftForeArm, leftForeArm, delta);
     dampBone(rig.rightForeArm, pose.rightForeArm, rightForeArm, delta);
 
-    const blinkPhase = t % 4.9;
-    const autoBlink = !tracking && blinkPhase >= 3.48 && blinkPhase <= 3.72
-      ? Math.sin(((blinkPhase - 3.48) / 0.24) * Math.PI)
-      : 0;
-    // Isolated diagnostic preview: doesn't write to faceState, audio or story data.
-    const testOpen = previewSpeech && !tracking ? Math.pow(Math.sin(t * 7), 2) * 0.85 : 0;
-    applyFaceMorphs(rig, animation, autoBlink, testOpen);
+    const autoBlink = tracking ? { left: 0, right: 0 } : getNaturalBlink(t);
+    // This is a silent mouth demonstration, NOT calibrated audio / phoneme sync.
+    const testOpen = previewSpeech && reviewActive ? Math.pow(Math.sin(t * 7), 2) * 0.70 : 0;
+    applyFaceMorphs(rig, animation, autoBlink, testOpen, Math.min(delta, 0.1), reviewExpression, reviewActive);
   });
 
   return (

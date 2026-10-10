@@ -6,6 +6,7 @@ import { Component, Suspense, useCallback, useEffect, useState, type ReactNode }
 import { getAvatarProfile, mergeAvatarProfile } from "@/lib/avatarCatalog";
 import { calculateFramedCameraShot, calculateReviewCameraPosition, type CameraFraming, type ReviewCameraAngle } from "@/lib/cameraComposition";
 import { LIGHTING_RECIPES, type LightingStyle } from "@/lib/studioLighting";
+import type { ReviewExpression } from "@/lib/facialPerformance";
 import { useCharacterLibrary } from "@/lib/characterLibrary";
 import { useLocalGlbUrl } from "@/lib/useLocalGlbUrl";
 import type { AvatarDiagnostics } from "@/lib/modelPresentation";
@@ -92,6 +93,7 @@ function Avatar({
   spin,
   previewSpeech,
   reviewMode,
+  reviewExpression,
   onDiagnostics,
 }: {
   type: CharacterType;
@@ -99,6 +101,7 @@ function Avatar({
   spin: boolean;
   previewSpeech: boolean;
   reviewMode: boolean;
+  reviewExpression: ReviewExpression;
   onDiagnostics?: ((details: AvatarDiagnostics) => void) | undefined;
 }) {
   const customization = useAvatarCustomizationStore((state) => state.customizations[type]);
@@ -139,6 +142,7 @@ function Avatar({
           spin={spin}
           previewSpeech={previewSpeech}
           reviewMode={reviewMode}
+          reviewExpression={reviewExpression}
           onDiagnostics={onDiagnostics}
         />
       </Suspense>
@@ -162,6 +166,8 @@ export type ThreeDCharacterProps = {
   reviewAngle?: ReviewCameraAngle;
   /** Only library review recenters the model after spin stops. */
   reviewMode?: boolean;
+  /** Character-library expression test; never changes story tracking or recorded animation. */
+  reviewExpression?: ReviewExpression;
   transparent?: boolean;
   className?: string;
   /** صورة خلفية تُرسم داخل المشهد وتظهر أيضاً في الفيديو المسجل. */
@@ -179,6 +185,7 @@ export default function ThreeDCharacter({
   lighting = "cinematic",
   reviewAngle = "front",
   reviewMode = false,
+  reviewExpression = "neutral",
   transparent = false,
   className,
   backgroundUrl,
@@ -247,7 +254,7 @@ export default function ThreeDCharacter({
       />
 
       <Suspense fallback={null}>
-        <Avatar type={type} animation={animation} spin={spin} previewSpeech={previewSpeech} reviewMode={reviewMode} onDiagnostics={handleDiagnostics} />
+        <Avatar type={type} animation={animation} spin={spin} previewSpeech={previewSpeech} reviewMode={reviewMode} reviewExpression={reviewExpression} onDiagnostics={handleDiagnostics} />
       </Suspense>
 
       {!transparent && (

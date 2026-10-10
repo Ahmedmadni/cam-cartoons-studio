@@ -42,6 +42,8 @@ export type AvatarDiagnostics = {
   hasArmRig?: boolean;
   hasLipSync?: boolean;
   hasBlink?: boolean;
+  hasSmile?: boolean;
+  hasBrowUp?: boolean;
   boneNames?: string[];
   morphNames?: string[];
 };
@@ -79,6 +81,8 @@ export function detectFaceCapabilities(names: string[]) {
       matchMorphAlias(name, FACE_MORPH_ALIASES.blinkLeft) ||
       matchMorphAlias(name, FACE_MORPH_ALIASES.blinkRight) ||
       matchMorphAlias(name, FACE_MORPH_ALIASES.blinkBoth)),
+    hasSmile: names.some((name) => matchMorphAlias(name, FACE_MORPH_ALIASES.smile)),
+    hasBrowUp: names.some((name) => matchMorphAlias(name, FACE_MORPH_ALIASES.browUp)),
   };
 }
 
