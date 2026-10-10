@@ -37,6 +37,8 @@ export type AvatarDiagnostics = {
   pbrMaterialCount?: number;
   normalMappedMaterialCount?: number;
   enhancedTextureCount?: number;
+  /** Verified MPFB transparency/depth fixes; zeroes for untouched source models. */
+  mpfbSurfaceFixes?: import("./mpfbSurfaceFixes").MpfbSurfaceFixReport;
   animationClipCount?: number;
   hasHeadRig?: boolean;
   hasArmRig?: boolean;

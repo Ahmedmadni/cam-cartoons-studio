@@ -63,6 +63,7 @@ def inspect_glb(data: bytes) -> dict:
                    if isinstance(i, int) and 0 <= i < len(nodes)]
     normalized_joints = {re.sub(r"[^a-z0-9]", "", str(name).lower()) for name in joint_names}
     meshes = g.get("meshes", [])
+    mesh_name_samples = [str(item.get("name", "")) for item in meshes]
     primitives = [p for m in meshes for p in m.get("primitives", [])]
     if not primitives or not any("POSITION" in p.get("attributes", {}) for p in primitives):
         raise ValueError("Meshes have no accessible POSITION attributes")
@@ -81,6 +82,9 @@ def inspect_glb(data: bytes) -> dict:
         "sha256": hashlib.sha256(data).hexdigest(),
         "mesh_count": len(meshes),
         "primitive_count": len(primitives),
+        "mesh_name_samples": mesh_name_samples[:36],
+        "low_poly_overlays": sum("lowpoly" in re.sub(r"[^a-z0-9]", "", name.lower()) for name in mesh_name_samples),
+        "high_poly_overlays": sum("highpoly" in re.sub(r"[^a-z0-9]", "", name.lower()) for name in mesh_name_samples),
         "skins": len(skins),
         "joints": len(joints),
         "joint_examples": joint_names[:18],

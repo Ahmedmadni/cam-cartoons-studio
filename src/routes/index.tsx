@@ -13,6 +13,7 @@ import { probeRemoteGlb } from "@/lib/glbSourceProbe";
 import { FRAMING_LABELS, REVIEW_ANGLE_LABELS, type CameraFraming, type ReviewCameraAngle } from "@/lib/cameraComposition";
 import { LIGHTING_LABELS, type LightingStyle } from "@/lib/studioLighting";
 import { describeSurfaceLimitations } from "@/lib/avatarSurfaceQuality";
+import { isPinnedMpfbModel } from "@/lib/mpfbSurfaceFixes";
 import { REVIEW_BACKDROPS, REVIEW_STUDIO_GRADIENTS, type ReviewBackdropId } from "@/lib/reviewBackdrops";
 import { REVIEW_EXPRESSION_LABELS, type ReviewExpression } from "@/lib/facialPerformance";
 import { CURATED_CANDIDATES, findImportedCandidate, type CuratedCandidate } from "@/lib/curatedCharacters";
@@ -183,6 +184,7 @@ function LibraryPage() {
   const [reviewSpin, setReviewSpin] = useState(false);
   const [reviewFraming, setReviewFraming] = useState<CameraFraming>("upper");
   const [reviewLighting, setReviewLighting] = useState<LightingStyle>("cinematic");
+  const [surfaceCleanup, setSurfaceCleanup] = useState(true);
   const [reviewAngle, setReviewAngle] = useState<ReviewCameraAngle>("front");
   const [reviewBackdrop, setReviewBackdrop] = useState<ReviewBackdropId>("studio");
   const [previewSpeech, setPreviewSpeech] = useState(false);
@@ -200,6 +202,7 @@ function LibraryPage() {
     setReviewFraming(useCharacterLibrary.getState().characters
       .find((character) => character.id === selectedCharacter)?.preferredFraming ?? "upper");
     setReviewLighting("cinematic");
+    setSurfaceCleanup(true);
     setReviewAngle("front");
     setReviewBackdrop("studio");
     setPreviewSpeech(false);
@@ -425,7 +428,7 @@ function LibraryPage() {
           <div className="h-[420px] overflow-hidden rounded-2xl md:h-[540px]"
             style={{ background: REVIEW_STUDIO_GRADIENTS[reviewLighting].css }}>
             <CharacterStage type={selected.id} animation={reviewAnimation} spin={reviewSpin} previewSpeech={previewSpeech}
-               framing={reviewFraming} lighting={reviewLighting} reviewAngle={reviewAngle} reviewMode reviewExpression={reviewExpression}
+               framing={reviewFraming} lighting={reviewLighting} reviewAngle={reviewAngle} reviewMode reviewExpression={reviewExpression} surfaceCleanup={surfaceCleanup}
                backgroundUrl={REVIEW_BACKDROPS.find((item) => item.id === reviewBackdrop)?.url ?? ""}
               onCanvasReady={(canvas) => { canvasRef.current = canvas; }}
               onDiagnostics={setDiagnostics} />
@@ -469,6 +472,24 @@ function LibraryPage() {
                 className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm font-semibold">
                 {REVIEW_BACKDROPS.map((backdrop) => <option key={backdrop.id} value={backdrop.id}>{backdrop.label}</option>)}
               </select>
+              {isPinnedMpfbModel(selected.modelUrl) && <div className="mt-3 rounded-xl border border-border bg-background p-3">
+                <p className="text-sm font-black">معالجة تداخل طبقات الوجه والشعر</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  تحسين موجّه لنماذج MakeHuman الأصلية: إخفاء طبقة متداخلة عند وجود البديل عالي التفاصيل،
+                  وضبط تراكب خامات الوجه وشفافية الرموش والشعر دون تغيير ألوان أو صور الخامات.
+                </p>
+                <button type="button" aria-pressed={surfaceCleanup}
+                  onClick={() => setSurfaceCleanup((value) => !value)}
+                  className={"mt-2 rounded-full border px-4 py-2 text-xs font-bold " +
+                    (surfaceCleanup ? "border-primary bg-primary text-primary-foreground" : "border-border bg-muted text-foreground")}>
+                  {surfaceCleanup ? "التحسين مفعّل — اعرض الأصل للمقارنة" : "عرض الأصل — فعّل التحسين"}
+                </button>
+                {diagnostics?.status === "ready" && <p className="mt-2 text-xs text-muted-foreground">
+                  طبقات الوجه المخفية: {diagnostics.mpfbSurfaceFixes?.hiddenLowPolyOverlays ?? 0} ·
+                  خامات الوجه المعدلة: {diagnostics.mpfbSurfaceFixes?.correctedFaceMaterials ?? 0} ·
+                  حواف الشعر والرموش المحسّنة: {diagnostics.mpfbSurfaceFixes?.correctedHairMaterials ?? 0}
+                </p>}
+              </div>}
               <p className="mt-2 text-xs text-muted-foreground">يمكن التقاط صورة من النموذج الحقيقي بهذه الزاوية والخلفية. الصور المحلية لا تغير هندسة الشخصية أو خاماتها.</p>
               <p className="mt-3 text-xs font-black">تعابير الوجه (عند دعم النموذج)</p>
               <div className="mt-2 flex flex-wrap gap-2" role="group" aria-label="تعابير الوجه">
