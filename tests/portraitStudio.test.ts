@@ -40,9 +40,10 @@ describe("Cinematic character preview", () => {
 
   test("each photographic composition and lighting preset has an Arabic name", () => {
     expect(Object.keys(FRAMING_LABELS)).toEqual(["full", "upper", "portrait"]);
-    expect(Object.keys(LIGHTING_LABELS)).toEqual(["cinematic", "daylight", "dramatic"]);
+    expect(Object.keys(LIGHTING_LABELS)).toEqual(["cinematic", "daylight", "dramatic", "softbox"]);
     expect(LIGHTING_RECIPES.dramatic.fill).toBeLessThan(LIGHTING_RECIPES.daylight.fill);
     expect(LIGHTING_RECIPES.cinematic.key).toBeGreaterThan(0);
+    expect(LIGHTING_RECIPES.softbox.rim).toBeLessThan(LIGHTING_RECIPES.cinematic.rim);
     for (const recipe of Object.values(LIGHTING_RECIPES)) {
       expect(recipe.env).toBeGreaterThan(0);
       expect(recipe.keyColor).toMatch(/^#[0-9A-F]{6}$/i);

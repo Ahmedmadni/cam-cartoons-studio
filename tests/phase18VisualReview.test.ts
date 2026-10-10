@@ -31,7 +31,7 @@ describe("Phase 18 visual character inspection", () => {
   });
 
   test("every built-in lighting style has matching studio and capture colors", () => {
-    expect(Object.keys(REVIEW_STUDIO_GRADIENTS)).toEqual(["cinematic", "daylight", "dramatic"]);
+    expect(Object.keys(REVIEW_STUDIO_GRADIENTS)).toEqual(["cinematic", "daylight", "dramatic", "softbox"]);
     for (const value of Object.values(REVIEW_STUDIO_GRADIENTS)) {
       expect(value.start).toMatch(/^#[0-9A-F]{6}$/i);
       expect(value.end).toMatch(/^#[0-9A-F]{6}$/i);
