@@ -10,7 +10,7 @@ import { cacheRemoteGlb } from "../src/lib/localGlbStorage";
 describe("Featured premium GLB collection", () => {
   test("provides five real GLB model URLs with individual identities and voices", () => {
     expect(FEATURED_CHARACTERS.length).toBe(5);
-    expect(new Set(FEATURED_CHARACTERS.map((c) => c.id)).size).toBe(4);
+    expect(new Set(FEATURED_CHARACTERS.map((c) => c.id)).size).toBe(5);
     for (const avatar of FEATURED_CHARACTERS) {
       expect(avatar.provider).toBe("imported-glb");
       expect(avatar.modelUrl).toBeDefined();
