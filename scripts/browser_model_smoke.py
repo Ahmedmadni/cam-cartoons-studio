@@ -49,7 +49,7 @@ def wait_for_server(proc):
     raise RuntimeError("Local Vite server was not ready within 90 seconds")
 
 
-def await_gltf_ready(page, name, expected_zero_bones=True):
+def await_gltf_ready(page, name, expected_zero_bones=True, source_url=None):
     # The diagnostics appear only when Three.js GLTF loader actually mounts.
     try:
         expect(page.get_by_role("heading", name="تقرير جاهزية نموذج GLB")).to_be_visible(timeout=25000)
@@ -62,6 +62,23 @@ def await_gltf_ready(page, name, expected_zero_bones=True):
     except Exception:
         capture_evidence(page, "model-ready-failure.png")
         print("QA FAILED PAGE TEXT:", page.locator("body").inner_text()[-5000:])
+        if source_url:
+            print("QA DIRECT FULL GET:", page.evaluate("""async (url) => {
+                try {
+                    const resp = await fetch(url, { mode: 'cors', cache: 'no-store', credentials: 'omit' });
+                    const bytes = new Uint8Array(await resp.arrayBuffer());
+                    const view = new DataView(bytes.buffer);
+                    return {
+                        status: resp.status, responseType: resp.type, receivedBytes: bytes.length,
+                        glbMagic: bytes.length >= 4 ? view.getUint32(0, true) : null,
+                        glbVersion: bytes.length >= 8 ? view.getUint32(4, true) : null,
+                        declaredBytes: bytes.length >= 12 ? view.getUint32(8, true) : null,
+                        firstChunkLength: bytes.length >= 16 ? view.getUint32(12, true) : null,
+                        firstChunkType: bytes.length >= 20 ? view.getUint32(16, true) : null,
+                        firstBytes: Array.from(bytes.slice(0, 24)),
+                    };
+                } catch (error) { return { error: String(error) }; }
+            }""", source_url))
         print("QA FAILED GLB response:", page.evaluate("""async () => {
             const resp = await fetch('/__qa__/model.glb');
             const buf = await resp.arrayBuffer();
@@ -157,15 +174,20 @@ def main():
                 # Unlike same-origin CI fixture loading, this performs real CORS
                 # requests and GLTFLoader renders from the publisher origin.
                 origin_results = []
-                featured_names = ["سارة", "عمر", "ليلى", "هند"]
-                for name in featured_names:
+                featured_names = [
+                    ("سارة", "https://three.ws/avatars/realistic-female.glb"),
+                    ("عمر", "https://three.ws/avatars/realistic-male.glb"),
+                    ("ليلى", "https://three.ws/avatars/selfie-girl.glb"),
+                    ("هند", "https://three.ws/avatars/michelle.glb"),
+                ]
+                for name, source_url in featured_names:
                     page.goto(URL, wait_until="networkidle", timeout=60000)
                     page.get_by_role("button", name=re.compile(name)).first.dispatch_event("click")
                     expect(page.get_by_role("heading", name=name).last).to_be_visible(timeout=12000)
                     page.get_by_role("button", name="فحص رابط GLB وCORS").dispatch_event("click")
                     source_status = page.get_by_role("status")
                     expect(source_status).to_contain_text("المصدر متاح", timeout=22000)
-                    await_gltf_ready(page, name, expected_zero_bones=False)
+                    await_gltf_ready(page, name, expected_zero_bones=False, source_url=source_url)
                     mouth_button = page.get_by_role("button", name="تجربة حركة الفم")
                     expect(mouth_button).to_be_visible()
                     mouth_available = mouth_button.is_enabled()
