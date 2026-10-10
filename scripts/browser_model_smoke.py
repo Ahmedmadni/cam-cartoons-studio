@@ -161,6 +161,20 @@ def main():
                 page.get_by_role("button", name="استوديو ناعم").dispatch_event("click")
                 expect(page.get_by_role("button", name="استوديو ناعم")).to_have_attribute("aria-pressed", "true")
                 expect(page.get_by_text("تحليل الأسطح والخامات الفعلية")).to_be_visible()
+                # The six-shot art review uses the real scene only on explicit user action.
+                expect(page.get_by_role("button", name="إنشاء لوحة مقارنة حقيقية (6 زوايا)")).to_be_visible()
+                expect(page.get_by_role("button", name="إنشاء لوحة مقارنة حقيقية (6 زوايا)")).to_be_enabled()
+                assert page.get_by_label("تقييم ملامح الوجه").input_value() == "unreviewed"
+                page.get_by_label("تقييم ملامح الوجه").select_option("needs-work")
+                expect(page.get_by_text("تقييم فني يدوي — 1 من 4 عناصر تمت مراجعتها")).to_be_visible()
+                page.get_by_label("ملاحظات الجودة الفنية").fill("مراجعة الجلد والشعر")
+                page.reload(wait_until="networkidle")
+                page.get_by_role("button", name=re.compile("اختبار الجودة")).first.dispatch_event("click")
+                expect(page.get_by_label("تقييم ملامح الوجه")).to_have_value("needs-work")
+                expect(page.get_by_label("ملاحظات الجودة الفنية")).to_have_value("مراجعة الجلد والشعر")
+                assert page.get_by_role("button", name="حفظ لوحة المقارنة WebP").count() == 0, (
+                    "Art-review frames must not be silently fabricated or persisted"
+                )
                 page.get_by_role("button", name="درامية").dispatch_event("click")
                 expect(page.get_by_role("button", name="درامية")).to_have_attribute("aria-pressed", "true")
                 page.get_by_role("button", name="سينمائية").dispatch_event("click")
