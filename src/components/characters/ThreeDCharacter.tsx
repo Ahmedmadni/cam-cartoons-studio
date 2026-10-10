@@ -84,11 +84,13 @@ function Avatar({
   type,
   animation,
   spin,
+  previewSpeech,
   onDiagnostics,
 }: {
   type: CharacterType;
   animation: AnimationType;
   spin: boolean;
+  previewSpeech: boolean;
   onDiagnostics?: ((details: AvatarDiagnostics) => void) | undefined;
 }) {
   const customization = useAvatarCustomizationStore((state) => state.customizations[type]);
@@ -127,6 +129,7 @@ function Avatar({
           url={modelUrl}
           animation={animation}
           spin={spin}
+          previewSpeech={previewSpeech}
           onDiagnostics={onDiagnostics}
         />
       </Suspense>
@@ -141,6 +144,8 @@ export type ThreeDCharacterProps = {
   type: CharacterType;
   animation?: AnimationType;
   spin?: boolean;
+  /** Animate supported mouth morphs in a silent diagnostic preview. */
+  previewSpeech?: boolean;
   transparent?: boolean;
   className?: string;
   /** صورة خلفية تُرسم داخل المشهد وتظهر أيضاً في الفيديو المسجل. */
@@ -153,6 +158,7 @@ export default function ThreeDCharacter({
   type,
   animation = "idle",
   spin = true,
+  previewSpeech = false,
   transparent = false,
   className,
   backgroundUrl,
@@ -220,7 +226,7 @@ export default function ThreeDCharacter({
       />
 
       <Suspense fallback={null}>
-        <Avatar type={type} animation={animation} spin={spin} onDiagnostics={handleDiagnostics} />
+        <Avatar type={type} animation={animation} spin={spin} previewSpeech={previewSpeech} onDiagnostics={handleDiagnostics} />
       </Suspense>
 
       {!transparent && (

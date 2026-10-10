@@ -94,3 +94,17 @@ GitHub Actions runs all three parts of the quality gate: deterministic binary in
 When a real GLB loads, the library now reports skinned mesh count, mesh count, material count, bone count, morph targets, source animation clips, and whether known face/arm/head drivers are available. It identifies **fully compatible**, **partially compatible**, and **static display-only** cases. The category is compatibility, *not* a claim of premium artistic quality or automatic lip-sync on an arbitrary model.
 
 The report uses the same names as the users see: سارة، عمر، ليلى، هند. All preexisting custom character names and IndexedDB model imports are preserved.
+
+
+## Phase 16 — Direct-origin CORS and face-driver verification
+
+A valid GLB binary hosted by another site is not necessarily accessible from the user's browser. This phase adds two distinct browser tests:
+
+- The **فحص رابط GLB وCORS** button makes a real cross-origin \`fetch\` from the visitor's own browser using \`mode: "cors"\`, no credentials, and an HTTP \`Range: bytes=0-11\` request. It verifies the GLB 2.0 header and declared length. The streamed response is canceled as soon as its 12-byte GLB header has been read; the incomplete response is never retained as the model cache. A failed check identifies network/CORS ambiguity without claiming which is definitely responsible.
+- Chromium CI selects all four real featured characters, verifies their original third-party URLs can be fetched with CORS, and waits for the **actual Three.js GLTFLoader** diagnostics on those remote URLs. Results are saved to \`artifacts/model-review/browser-origin-check.json\`. This is separate from the already-existing local-copy GLB tests.
+
+The silent **تجربة حركة الفم** preview animates the compatible mouth blend shapes inside the Character Library only; it never changes the global face-tracking state, story voice, or recorded audio, and is disabled when a model lacks compatible mouth morphs (e.g. \`هند\`).
+
+Both facial morph capability detection and live expression driving now use the same central alias table for mouth, blink, brow, and eye movement. Therefore a morph target that is called "supported" by the diagnostics is actually recognized by the renderer.
+
+**Limitations:** Passing remote CORS means these links worked from the tested browser origin at that time. It cannot guarantee future remote uptime, commercial redistribution rights, or reference-level character appearance. The embedded/mouth tests are technical checks, not realistic lip-sync evaluation with audio.
