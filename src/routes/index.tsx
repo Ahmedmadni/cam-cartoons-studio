@@ -9,6 +9,7 @@ import {
 import { useStudioStore, VOICES, ANIMATION_LABELS, type AnimationType, type VoiceType } from "@/lib/store";
 import { assessAnimationReadiness, type AvatarDiagnostics } from "@/lib/modelPresentation";
 import { cacheRemoteGlb, deleteGlbAsset, saveGlbAsset, MAX_GLB_BYTES } from "@/lib/localGlbStorage";
+import { probeRemoteGlb } from "@/lib/glbSourceProbe";
 
 export const Route = createFileRoute("/")({
   head: () => ({ meta: [
@@ -162,6 +163,10 @@ function LibraryPage() {
   const [offlineError, setOfflineError] = useState<string | null>(null);
   const [reviewAnimation, setReviewAnimation] = useState<AnimationType>("idle");
   const [reviewSpin, setReviewSpin] = useState(false);
+  const [previewSpeech, setPreviewSpeech] = useState(false);
+  const [sourceProbe, setSourceProbe] = useState<{
+    characterId: string; phase: "checking" | "success" | "error"; message: string;
+  } | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   useEffect(() => {
     setDiagnostics(null);
@@ -169,6 +174,8 @@ function LibraryPage() {
     setOfflineError(null);
     setReviewAnimation("idle");
     setReviewSpin(false);
+    setPreviewSpeech(false);
+    setSourceProbe(null);
     canvasRef.current = null;
   }, [selectedCharacter]);
   const selected = characters.find((item) => item.id === selectedCharacter);
@@ -242,6 +249,24 @@ function LibraryPage() {
       setOfflineError(error instanceof Error ? error.message : "تعذر حفظ النسخة المحلية.");
     } finally {
       setOfflineSavingId(null);
+    }
+  };
+
+  const checkSource = async (item: CharacterDefinition) => {
+    if (!item.modelUrl || item.assetId) return;
+    setSourceProbe({ characterId: item.id, phase: "checking", message: "جارٍ التحقق من المصدر وCORS..." });
+    try {
+      const result = await probeRemoteGlb(item.modelUrl);
+      setSourceProbe({
+        characterId: item.id, phase: "success",
+        message: "المصدر متاح من هذا المتصفح ويعيد GLB 2.0 (" +
+          (result.declaredBytes / 1024 / 1024).toFixed(2) + " ميجابايت).",
+      });
+    } catch (error) {
+      setSourceProbe({
+        characterId: item.id, phase: "error",
+        message: error instanceof Error ? error.message : "تعذر فحص رابط الشخصية.",
+      });
     }
   };
 
@@ -320,7 +345,7 @@ function LibraryPage() {
         </p>}
         {selected && <section className="mt-8 grid gap-5 rounded-3xl border-2 border-primary/40 bg-card p-5 md:grid-cols-2">
           <div className="h-80 overflow-hidden rounded-2xl bg-muted">
-            <CharacterStage type={selected.id} animation={reviewAnimation} spin={reviewSpin}
+            <CharacterStage type={selected.id} animation={reviewAnimation} spin={reviewSpin} previewSpeech={previewSpeech}
               onCanvasReady={(canvas) => { canvasRef.current = canvas; }}
               onDiagnostics={setDiagnostics} />
           </div>
@@ -337,6 +362,13 @@ function LibraryPage() {
                       ? "bg-primary text-primary-foreground" : "bg-card text-foreground")}>
                     {ANIMATION_LABELS[animation]}
                   </button>)}
+                <button type="button" aria-pressed={previewSpeech}
+                  disabled={diagnostics?.status !== "ready" || !diagnostics.hasLipSync}
+                  onClick={() => setPreviewSpeech(!previewSpeech)}
+                  className={"rounded-full border px-3 py-2 text-xs font-bold disabled:cursor-not-allowed disabled:opacity-50 " + (previewSpeech
+                    ? "border-primary bg-primary text-primary-foreground" : "border-border bg-card")}>
+                  {previewSpeech ? "إيقاف تجربة الفم" : "تجربة حركة الفم"}
+                </button>
                 <button type="button" aria-pressed={reviewSpin} onClick={() => setReviewSpin(!reviewSpin)}
                   className={"rounded-full border px-3 py-2 text-xs font-bold " + (reviewSpin
                     ? "border-primary bg-primary text-primary-foreground" : "border-border bg-card")}>
@@ -357,6 +389,15 @@ function LibraryPage() {
                       className="mt-2 rounded-full bg-primary px-5 py-3 font-black text-primary-foreground disabled:opacity-50">
                       {offlineSavingId === selected.id ? "جارٍ تنزيل وحفظ GLB..." : "حفظ الشخصية على هذا الجهاز"}
                     </button>
+                    <button type="button"
+                      disabled={sourceProbe?.characterId === selected.id && sourceProbe.phase === "checking"}
+                      onClick={() => void checkSource(selected)}
+                      className="mt-2 mr-2 rounded-full border border-primary px-4 py-2 font-bold text-foreground disabled:opacity-50">
+                      فحص رابط GLB وCORS
+                    </button>
+                    {sourceProbe?.characterId === selected.id &&
+                      <p role="status" className={"mt-2 font-bold " + (sourceProbe.phase === "error"
+                        ? "text-destructive" : "text-primary")}>{sourceProbe.message}</p>}
                   </>
                 ) : <p className="text-muted-foreground">لا يوجد ملف GLB لهذا النموذج.</p>}
                 {offlineError && <p role="alert" className="mt-2 font-bold text-destructive">{offlineError}</p>}
