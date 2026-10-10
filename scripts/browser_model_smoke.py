@@ -4,6 +4,7 @@
 Run in CI after generate_qa_glb.py and Playwright installation.
 Screenshots and dev-server logs are stored as GitHub Actions artifacts.
 """
+import json
 import os
 import re
 import subprocess
@@ -152,6 +153,32 @@ def main():
                     verified_count += 1
                     print(f"PASS: real hosted model binary loaded in WebGL: {featured_path.name}", flush=True)
                 print(f"Real publisher-hosted GLB models exercised: {verified_count}/4", flush=True)
+
+                # Unlike same-origin CI fixture loading, this performs real CORS
+                # requests and GLTFLoader renders from the publisher origin.
+                origin_results = []
+                featured_names = ["سارة", "عمر", "ليلى", "هند"]
+                for name in featured_names:
+                    page.goto(URL, wait_until="networkidle", timeout=60000)
+                    page.get_by_role("button", name=re.compile(name)).first.dispatch_event("click")
+                    expect(page.get_by_role("heading", name=name).last).to_be_visible(timeout=12000)
+                    page.get_by_role("button", name="فحص رابط GLB وCORS").dispatch_event("click")
+                    source_status = page.get_by_role("status")
+                    expect(source_status).to_contain_text("المصدر متاح", timeout=22000)
+                    await_gltf_ready(page, name, expected_zero_bones=False)
+                    mouth_button = page.get_by_role("button", name="تجربة حركة الفم")
+                    expect(mouth_button).to_be_visible()
+                    if mouth_button.is_enabled():
+                        mouth_button.dispatch_event("click")
+                        expect(page.get_by_role("button", name="إيقاف تجربة الفم")).to_have_attribute(
+                            "aria-pressed", "true"
+                        )
+                    origin_results.append({"name": name, "browser_cors": "passed", "direct_glb_render": "passed",
+                                           "mouth_preview_available": mouth_button.is_enabled()})
+                    print(f"PASS: publisher-origin CORS and real GLB render for {name}", flush=True)
+                (ARTIFACTS / "browser-origin-check.json").write_text(
+                    json.dumps(origin_results, ensure_ascii=False, indent=2), encoding="utf-8"
+                )
                 context.close()
                 browser.close()
             print("PASS: hosted GLB, model controls, mobile WebGL, IndexedDB import and reload")
