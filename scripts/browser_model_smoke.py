@@ -136,6 +136,9 @@ def main():
                 expect(page.get_by_role("heading", name="شخصيات بشرية جديدة قيد التقييم")).to_be_visible()
                 expect(page.get_by_role("button", name="أضف ياسمين للتقييم")).to_be_visible()
                 expect(page.get_by_role("button", name="أضف زياد للتقييم")).to_be_visible()
+                expect(page.get_by_role("button", name="أضف كوفي للتقييم")).to_be_visible()
+                expect(page.get_by_role("button", name="أضف يوكي للتقييم")).to_be_visible()
+                expect(page.get_by_role("button", name="أضف ليام للتقييم")).to_be_visible()
                 # Keep heavy optional avatar downloads isolated from baseline
                 # renderer and IndexedDB regression tests.
                 add_character(page, "اختبار الجودة")
@@ -220,6 +223,7 @@ def main():
                     print(f"PASS: real hosted model binary loaded in WebGL: {featured_path.name}", flush=True)
                 print(f"Real publisher-hosted GLB models exercised: {verified_count}/5", flush=True)
                 candidate_files = sorted(Path("public/__qa__/candidates").glob("curated-*.glb"))
+                model_report = json.loads((ARTIFACTS / "featured-asset-audit.json").read_text(encoding="utf-8"))
                 for candidate_path in candidate_files:
                     page.goto(URL, wait_until="networkidle", timeout=60000)
                     add_character(
@@ -227,11 +231,15 @@ def main():
                         model_url="/__qa__/candidates/" + candidate_path.name,
                         expected_zero_bones=False,
                     )
-                    assert "تحريك الفم: مدعوم" in page.locator("body").inner_text(), (
-                        f"{candidate_path.name}: morph metadata did not match actual loader"
+                    actual_id = candidate_path.stem
+                    reported = model_report["candidates"][actual_id]
+                    # The WebGL renderer must not advertise lip sync on a body-only model.
+                    lips = "مدعوم" if reported["likely_lipsync"] else "غير مدعوم"
+                    assert f"تحريك الفم: {lips}" in page.locator("body").inner_text(), (
+                        f"{candidate_path.name}: morph capabilities disagree with the actual GLB"
                     )
-                    print(f"PASS: real Rocketbox candidate loaded in Chromium: {candidate_path.name}", flush=True)
-                print(f"Real candidate binary GLBs exercised: {len(candidate_files)}/2", flush=True)
+                    print(f"PASS: real optional 3D human model in Chromium: {candidate_path.name}; lips={lips}", flush=True)
+                print(f"Real candidate binary GLBs exercised: {len(candidate_files)}/5", flush=True)
 
                 # Unlike same-origin CI fixture loading, this performs real CORS
                 # requests and GLTFLoader renders from the publisher origin.

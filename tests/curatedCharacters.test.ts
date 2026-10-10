@@ -3,18 +3,20 @@ import { CURATED_CANDIDATES, findImportedCandidate } from "../src/lib/curatedCha
 import { DEFAULT_CHARACTERS, isSafeAssetUrl, type CharacterDefinition } from "../src/lib/characterLibrary";
 
 describe("Phase 18D optional human GLB candidates", () => {
-  test("two distinct pinned source files have safe 3D links and natural Arabic names", () => {
-    expect(CURATED_CANDIDATES.map((item) => item.name)).toEqual(["ياسمين", "زياد"]);
-    expect(new Set(CURATED_CANDIDATES.map((item) => item.modelUrl)).size).toBe(2);
-    expect(new Set(CURATED_CANDIDATES.map((item) => item.id)).size).toBe(2);
+  test("five distinct real source files have pinned origins and understandable names", () => {
+    expect(CURATED_CANDIDATES.map((item) => item.name)).toEqual(["ياسمين", "زياد", "كوفي", "يوكي", "ليام"]);
+    expect(new Set(CURATED_CANDIDATES.map((item) => item.modelUrl)).size).toBe(5);
+    expect(new Set(CURATED_CANDIDATES.map((item) => item.id)).size).toBe(5);
     for (const item of CURATED_CANDIDATES) {
       expect(isSafeAssetUrl(item.modelUrl, "glb")).toBe(true);
-      expect(item.modelUrl).toMatch(/\/8af29d456c4d4d4f7e8ac32ac0c2b2aaf02c27d3\/assets\/avatars\/[^/]+\.glb$/);
+      expect(item.modelUrl).toMatch(/\/(8af29d456c4d4d4f7e8ac32ac0c2b2aaf02c27d3|ff1b635eba22d782423a6d81233e8deca7f6d1bd)\/(assets\/avatars|public\/mpfb_models)\/[^/]+\.glb$/);
       expect(item.draft.modelUrl).toBe(item.modelUrl);
       expect(item.draft.name).toBe(item.name);
       expect(item.sizeBytes).toBeGreaterThan(4_000_000);
       expect("isDefault" in item.draft).toBe(false);
     }
+    expect(CURATED_CANDIDATES.filter((item) => item.faceRig === "blendshapes")).toHaveLength(2);
+    expect(CURATED_CANDIDATES.filter((item) => item.faceRig === "body-only")).toHaveLength(3);
     expect(DEFAULT_CHARACTERS).toHaveLength(9); // never seed unapproved candidates
   });
   test("detects an imported character by source URL despite renaming or offline caching", () => {
