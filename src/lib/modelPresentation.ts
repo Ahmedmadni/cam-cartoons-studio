@@ -36,15 +36,39 @@ export type AvatarDiagnostics = {
   morphNames?: string[];
 };
 
-const normalizeName = (value: string) => value.toLowerCase().replace(/[^a-z0-9]/g, "");
+/**
+ * Single source of truth for morph detection AND the real facial animation driver.
+ * A detected capability must map to a morph that we actually animate.
+ */
+export const FACE_MORPH_ALIASES = {
+  mouthOpen: ["mouthOpen", "jawOpen", "visemeAA", "viseme_aa", "viseme_a", "visemeAh"],
+  smile: ["mouthSmile", "mouthSmileLeft", "mouthSmileRight"],
+  blinkLeft: ["eyeBlinkLeft", "blinkLeft", "eyesClosedLeft"],
+  blinkRight: ["eyeBlinkRight", "blinkRight", "eyesClosedRight"],
+  blinkBoth: ["eyesClosed", "eyeBlink", "blink"],
+  browUp: ["browInnerUp", "browOuterUpLeft", "browOuterUpRight"],
+  lookLeft: ["eyesLookLeft", "eyeLookOutLeft", "eyeLookInRight"],
+  lookRight: ["eyesLookRight", "eyeLookInLeft", "eyeLookOutRight"],
+  lookUp: ["eyesLookUp", "eyeLookUpLeft", "eyeLookUpRight"],
+  lookDown: ["eyesLookDown", "eyeLookDownLeft", "eyeLookDownRight"],
+} as const;
+
+export const normalizeMorphName = (value: string) =>
+  value.toLowerCase().replace(/[^a-z0-9]/g, "");
+
+export function matchMorphAlias(name: string, aliases: readonly string[]) {
+  const normalized = normalizeMorphName(name);
+  return aliases.some((alias) => normalized === normalizeMorphName(alias) ||
+    normalized.endsWith(normalizeMorphName(alias)));
+}
+
 export function detectFaceCapabilities(names: string[]) {
-  const normalized = names.map(normalizeName);
   return {
-    hasLipSync: normalized.some((name) =>
-      ["jawopen", "mouthopen", "visemeaa", "visemea"].some((alias) => name.endsWith(alias))),
-    hasBlink: normalized.some((name) =>
-      ["eyeblinkleft", "eyeblinkright", "eyesclosed", "blinkleft", "blinkright"].some((alias) =>
-        name.endsWith(alias))),
+    hasLipSync: names.some((name) => matchMorphAlias(name, FACE_MORPH_ALIASES.mouthOpen)),
+    hasBlink: names.some((name) =>
+      matchMorphAlias(name, FACE_MORPH_ALIASES.blinkLeft) ||
+      matchMorphAlias(name, FACE_MORPH_ALIASES.blinkRight) ||
+      matchMorphAlias(name, FACE_MORPH_ALIASES.blinkBoth)),
   };
 }
 
