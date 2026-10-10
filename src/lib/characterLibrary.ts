@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { VoiceType } from "./store";
+import type { CameraFraming } from "./cameraComposition";
 
 export type CharacterProvider = "imported-glb" | "readyplayerme" | "procedural";
 export type CharacterCategory = "children" | "youth" | "men" | "women" | "fantasy" | "other";
@@ -22,6 +23,8 @@ export type CharacterDefinition = {
   basePreset?: LegacyCharacterType | undefined;
   scale?: number;
   yOffset?: number;
+  /** The ideal 3D library preview crop; never forces a story/movie crop. */
+  preferredFraming?: CameraFraming;
 };
 
 export type CharacterDraft = Omit<CharacterDefinition, "id" | "isFavorite" | "isDefault">;
@@ -70,6 +73,12 @@ export const FEATURED_CHARACTERS: CharacterDefinition[] = [
     provider: "imported-glb", modelUrl: "https://three.ws/avatars/michelle.glb",
     voicePreset: "woman", basePreset: "woman", tags: ["3D", "متحركة", "مصدر خارجي"],
     isDefault: true, scale: 1, yOffset: -1.62,
+  },
+  {
+    id: "featured-portrait-reem", name: "ريم", category: "women",
+    provider: "imported-glb", modelUrl: "https://three.ws/avatars/realistic-halfbody.glb",
+    voicePreset: "woman", basePreset: "woman", tags: ["Premium", "بورتريه", "نصف جسم", "مصدر خارجي"],
+    isDefault: true, scale: 1, yOffset: -1.62, preferredFraming: "portrait",
   },
 ];
 
@@ -146,6 +155,10 @@ function normalizeDraft(draft: CharacterDraft): CharacterDraft {
   if (thumbnail && !isSafeAssetUrl(thumbnail, "image")) {
     throw new Error("صورة المعاينة يجب أن تكون HTTPS أو مسارًا محليًا بصيغة PNG/JPG/WebP/AVIF.");
   }
+  if (draft.preferredFraming &&
+      !["full", "upper", "portrait"].includes(draft.preferredFraming)) {
+    throw new Error("طريقة تأطير الشخصية غير معروفة.");
+  }
   const scale = draft.scale ?? 1.02;
   const yOffset = draft.yOffset ?? -1.62;
   if (!Number.isFinite(scale) || scale < 0.1 || scale > 4) throw new Error("مقياس النموذج يجب أن يكون بين 0.1 و4.");
@@ -199,7 +212,7 @@ export const useCharacterLibrary = create<CharacterLibraryState>()(
     }),
     {
       name: "cam-cartoons-character-library-v1",
-      version: 2,
+      version: 3,
       migrate: (oldState: unknown, previousVersion: number) => {
         const persisted = oldState && typeof oldState === "object"
           ? oldState as { characters?: unknown }
@@ -211,7 +224,15 @@ export const useCharacterLibrary = create<CharacterLibraryState>()(
         // The version-1 migration already seeded featured characters. Re-seeding
         // them would resurrect avatars that users intentionally deleted.
         const prior = previousVersion < 1 ? migrateFeaturedCharacters(characters) : characters;
-        return { characters: upgradeDefaultCharacterNames(prior) };
+        const named = upgradeDefaultCharacterNames(prior);
+        // Version 3 introduces ONE new portrait avatar. Do not re-add any
+        // of the four existing models if a user has intentionally deleted them.
+        const newPortrait = FEATURED_CHARACTERS.find((item) => item.id === "featured-portrait-reem");
+        return {
+          characters: previousVersion < 3 && newPortrait &&
+            !named.some((item) => item.id === newPortrait.id)
+              ? [...named, newPortrait] : named,
+        };
       },
       partialize: (state) => ({ characters: state.characters }),
     },
