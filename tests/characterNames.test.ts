@@ -18,7 +18,7 @@ describe("Natural Arabic character names", () => {
   test("upgrades legacy stock labels without changing character IDs, models, tags or favorites", () => {
     const previous = DEFAULT_CHARACTERS.map((character) => ({
       ...character,
-      name: PREVIOUS_DEFAULT_NAMES[character.id]!,
+      name: PREVIOUS_DEFAULT_NAMES[character.id] ?? character.name,
       isFavorite: character.id === "featured-cinematic-female",
     }));
     const renamed = upgradeDefaultCharacterNames(previous);
