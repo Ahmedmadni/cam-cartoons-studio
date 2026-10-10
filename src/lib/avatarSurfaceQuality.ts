@@ -43,7 +43,7 @@ function collectSurface(root: Object3D) {
     // Draw mode is triangular for the built-in GLBs. Count is informative,
     // not a claim of unique polygons or an objective quality ranking.
     if (geometry) {
-      const vertices = geometry.index?.count ?? geometry.attributes.position?.count ?? 0;
+      const vertices = geometry.index?.count ?? geometry.attributes["position"]?.count ?? 0;
       if (Number.isFinite(vertices) && vertices > 0) triangleCount += Math.floor(vertices / 3);
     }
     const meshMaterials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
