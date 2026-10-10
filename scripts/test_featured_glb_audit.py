@@ -44,6 +44,22 @@ class GlbAuditTests(unittest.TestCase):
         self.assertTrue(result["likely_blink"])
         self.assertTrue(result["likely_lipsync"])
 
+    def test_exact_mpfb_facial_bones_are_distinct_from_eyelid_and_viseme_morph(self):
+        rig = sample_glb(
+            skins=[{"joints": [0, 1, 2]}],
+            nodes=[{"name": "jaw"}, {"name": "eye.L"}, {"name": "eye.R"}],
+        )
+        details = inspect_glb(rig)
+        self.assertTrue(details["jaw_bone"])
+        self.assertTrue(details["eye_bones"])
+        self.assertFalse(details["likely_lipsync"])
+        misleading = inspect_glb(sample_glb(
+            skins=[{"joints": [0, 1, 2]}],
+            nodes=[{"name": "jawOpen"}, {"name": "eye.Lid"}, {"name": "eye.RLash"}],
+        ))
+        self.assertFalse(misleading["jaw_bone"])
+        self.assertFalse(misleading["eye_bones"])
+
     def test_truncated_and_wrong_header_are_rejected(self):
         blob = sample_glb()
         with self.assertRaises(ValueError):

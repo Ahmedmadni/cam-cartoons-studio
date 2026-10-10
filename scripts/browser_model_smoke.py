@@ -238,7 +238,23 @@ def main():
                     assert f"تحريك الفم: {lips}" in page.locator("body").inner_text(), (
                         f"{candidate_path.name}: morph capabilities disagree with the actual GLB"
                     )
-                    print(f"PASS: real optional 3D human model in Chromium: {candidate_path.name}; lips={lips}", flush=True)
+                    jaw_status = "متاحة" if reported["jaw_bone"] else "غير متاحة"
+                    eye_status = "متاح" if reported["eye_bones"] else "غير متاح"
+                    assert f"عظمة الفك: {jaw_status}" in page.locator("body").inner_text(), (
+                        f"{candidate_path.name}: actual jaw joint mismatches WebGL capability"
+                    )
+                    assert f"توجيه العينين بالعظام: {eye_status}" in page.locator("body").inner_text(), (
+                        f"{candidate_path.name}: eyeball joints mismatched in renderer"
+                    )
+                    if candidate_path.stem.startswith("curated-mpfb-") and reported["jaw_bone"]:
+                        control = page.get_by_role("button", name="تجربة حركة الفك")
+                        expect(control).to_be_enabled()
+                        control.dispatch_event("click")
+                        expect(page.get_by_role("button", name="إيقاف تجربة الفك")).to_have_attribute(
+                            "aria-pressed", "true"
+                        )
+                    print(f"PASS: real optional GLB: {candidate_path.name}; lips={lips}; "
+                          f"jaw={jaw_status}; eyes={eye_status}", flush=True)
                 print(f"Real candidate binary GLBs exercised: {len(candidate_files)}/5", flush=True)
 
                 # Unlike same-origin CI fixture loading, this performs real CORS
