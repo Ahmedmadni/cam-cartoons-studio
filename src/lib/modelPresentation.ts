@@ -44,6 +44,10 @@ export type AvatarDiagnostics = {
   hasBlink?: boolean;
   hasSmile?: boolean;
   hasBrowUp?: boolean;
+  /** Physical skeletal jaw available; jaw oscillation is NOT lip-sync. */
+  hasJawBone?: boolean;
+  /** Both physical eyeball joints exist, independent of blink morphs. */
+  hasEyeBones?: boolean;
   boneNames?: string[];
   morphNames?: string[];
 };
@@ -106,8 +110,12 @@ export function assessAnimationReadiness(details: AvatarDiagnostics | null): Ani
   if (!bodyRig) limitations.push("المجسم لا يحتوي على هيكل عظمي متحرك متكامل؛ بعض الحركات لن تعمل.");
   if (!details.hasHeadRig) limitations.push("لا توجد عظمة رأس معروفة يمكن التحكم بها.");
   if (!details.hasArmRig) limitations.push("عظام الذراعين غير متوافقة مع حركات الإيماء والتلويح.");
-  if (!details.hasLipSync) limitations.push("لا توجد تعابير فم متوافقة مع تحريك الشفاه أثناء الكلام.");
-  if (!details.hasBlink) limitations.push("لا توجد تعابير رمش متوافقة مع الحركة التلقائية للعين.");
+  if (!details.hasLipSync) limitations.push(details.hasJawBone
+    ? "عظمة الفك تدعم فتح الفم البسيط، لكنها لا توفر مزامنة شفاه أو حروف صوتية."
+    : "لا توجد تعابير فم متوافقة مع تحريك الشفاه أثناء الكلام.");
+  if (!details.hasBlink) limitations.push(details.hasEyeBones
+    ? "عظمتا العين تدعمان اتجاه النظر، لكنهما لا تغلقان الجفون للرمش."
+    : "لا توجد تعابير رمش متوافقة مع الحركة التلقائية للعين.");
   if (!details.materialCount) limitations.push("لم تُكتشف خامات واضحة للنموذج.");
   if (!bodyRig && !details.hasLipSync && !details.hasBlink) {
     return { grade: "static", title: "مجسم للعرض فقط", limitations };

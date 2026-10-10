@@ -238,7 +238,23 @@ def main():
                     assert f"تحريك الفم: {lips}" in page.locator("body").inner_text(), (
                         f"{candidate_path.name}: morph capabilities disagree with the actual GLB"
                     )
-                    print(f"PASS: real optional 3D human model in Chromium: {candidate_path.name}; lips={lips}", flush=True)
+                    jaw_status = "متاحة" if reported["jaw_bone"] else "غير متاحة"
+                    eye_status = "متاح" if reported["eye_bones"] else "غير متاح"
+                    assert f"عظمة الفك: {jaw_status}" in page.locator("body").inner_text(), (
+                        f"{candidate_path.name}: actual jaw joint mismatches WebGL capability"
+                    )
+                    assert f"توجيه العينين بالعظام: {eye_status}" in page.locator("body").inner_text(), (
+                        f"{candidate_path.name}: eyeball joints mismatched in renderer"
+                    )
+                    if candidate_path.stem.startswith("curated-mpfb-") and reported["jaw_bone"]:
+                        control = page.get_by_role("button", name="تجربة حركة الفك")
+                        expect(control).to_be_enabled()
+                        control.dispatch_event("click")
+                        expect(page.get_by_role("button", name="إيقاف تجربة الفك")).to_have_attribute(
+                            "aria-pressed", "true"
+                        )
+                    print(f"PASS: real optional GLB: {candidate_path.name}; lips={lips}; "
+                          f"jaw={jaw_status}; eyes={eye_status}", flush=True)
                 print(f"Real candidate binary GLBs exercised: {len(candidate_files)}/5", flush=True)
 
                 # Unlike same-origin CI fixture loading, this performs real CORS
@@ -275,20 +291,31 @@ def main():
                     if name == "هند":
                         assert not page.get_by_role("button", name="ابتسامة", exact=True).is_enabled()
 
-                    mouth_button = page.get_by_role("button", name="تجربة حركة الفم")
+                    body = page.locator("body").inner_text()
+                    has_speech_morph = "تحريك الفم: مدعوم" in body
+                    has_jaw_bone = "عظمة الفك: متاحة" in body
+                    # A body-only GLB may legitimately expose a jaw control
+                    # without morph/viseme speech support. Never confuse them.
+                    preview_label = "تجربة حركة الفم" if has_speech_morph else "تجربة حركة الفك"
+                    mouth_button = page.get_by_role("button", name=preview_label)
                     expect(mouth_button).to_be_visible()
                     mouth_available = mouth_button.is_enabled()
+                    assert mouth_available == (has_speech_morph or has_jaw_bone), (
+                        f"{name}: button capability must reflect real jaw or morph anatomy"
+                    )
                     if name == "هند":
-                        assert not mouth_available, "هند must not claim unsupported lipsync"
+                        assert not has_speech_morph, "هند must not claim unsupported lip sync"
                     if name == "ريم":
-                        assert mouth_available, "ريم must expose the verified face morphs"
+                        assert has_speech_morph, "ريم must expose verified mouth morphs"
                     if mouth_available:
                         mouth_button.dispatch_event("click")
-                        expect(page.get_by_role("button", name="إيقاف تجربة الفم")).to_have_attribute(
+                        stop_label = "إيقاف تجربة الفم" if has_speech_morph else "إيقاف تجربة الفك"
+                        expect(page.get_by_role("button", name=stop_label)).to_have_attribute(
                             "aria-pressed", "true"
                         )
                     origin_results.append({"name": name, "browser_cors": "passed", "direct_glb_render": "passed",
-                                           "mouth_preview_available": mouth_available})
+                                           "mouth_preview_available": mouth_available,
+                                           "lip_morphs": has_speech_morph, "bone_jaw": has_jaw_bone})
                     print(f"PASS: publisher-origin CORS and real GLB render for {name}", flush=True)
                 (ARTIFACTS / "browser-origin-check.json").write_text(
                     json.dumps(origin_results, ensure_ascii=False, indent=2), encoding="utf-8"

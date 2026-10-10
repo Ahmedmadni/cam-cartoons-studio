@@ -475,7 +475,7 @@ function LibraryPage() {
                 {(Object.entries(REVIEW_EXPRESSION_LABELS) as [ReviewExpression, string][]).map(([expression, label]) => {
                   const supported = expression === "neutral" || (diagnostics?.status === "ready" && (
                     expression === "smile" ? diagnostics.hasSmile :
-                      expression === "surprise" ? (diagnostics.hasBrowUp || diagnostics.hasLipSync) :
+                      expression === "surprise" ? (diagnostics.hasBrowUp || diagnostics.hasLipSync || diagnostics.hasJawBone) :
                         diagnostics.hasHeadRig
                   ));
                   return <button key={expression} type="button" disabled={!supported}
@@ -497,11 +497,12 @@ function LibraryPage() {
                     {ANIMATION_LABELS[animation]}
                   </button>)}
                 <button type="button" aria-pressed={previewSpeech}
-                  disabled={diagnostics?.status !== "ready" || !diagnostics.hasLipSync}
+                  disabled={diagnostics?.status !== "ready" || (!diagnostics.hasLipSync && !diagnostics.hasJawBone)}
                   onClick={() => { setReviewExpression("neutral"); setPreviewSpeech(!previewSpeech); }}
                   className={"rounded-full border px-3 py-2 text-xs font-bold disabled:cursor-not-allowed disabled:opacity-50 " + (previewSpeech
                     ? "border-primary bg-primary text-primary-foreground" : "border-border bg-card")}>
-                  {previewSpeech ? "إيقاف تجربة الفم" : "تجربة حركة الفم"}
+                  {diagnostics?.hasLipSync ? (previewSpeech ? "إيقاف تجربة الفم" : "تجربة حركة الفم") :
+                    (previewSpeech ? "إيقاف تجربة الفك" : "تجربة حركة الفك")}
                 </button>
                 <button type="button" aria-pressed={reviewSpin} onClick={() => setReviewSpin(!reviewSpin)}
                   className={"rounded-full border px-3 py-2 text-xs font-bold " + (reviewSpin
@@ -601,6 +602,8 @@ function LibraryPage() {
                 </div>
                 <p>تحريك الرأس: {diagnostics.hasHeadRig ? "متاح" : "غير مدعوم"} · الذراعان: {diagnostics.hasArmRig ? "متاحان" : "غير مدعومين"}</p>
                 <p>تحريك الفم: {diagnostics.hasLipSync ? "مدعوم" : "غير مدعوم"} · رمش العين: {diagnostics.hasBlink ? "مدعوم" : "غير مدعوم"}</p>
+                <p>عظمة الفك: {diagnostics.hasJawBone ? "متاحة" : "غير متاحة"} · توجيه العينين بالعظام: {diagnostics.hasEyeBones ? "متاح" : "غير متاح"}</p>
+                {diagnostics.hasJawBone && !diagnostics.hasLipSync && <p className="text-xs">تجربة الفك تحريك مفصل فعلي وليست مزامنة شفاه مع الأصوات.</p>}
                 {diagnostics.dimensions && <p>
                   أبعاد الأصل: {diagnostics.dimensions.width.toFixed(2)} × {diagnostics.dimensions.height.toFixed(2)} × {diagnostics.dimensions.depth.toFixed(2)}
                 </p>}

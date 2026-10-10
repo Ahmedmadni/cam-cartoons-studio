@@ -6,6 +6,7 @@ import type { Bone, Euler, Group, Mesh, Object3D } from "three";
 import { clone as cloneSkeleton } from "three/examples/jsm/utils/SkeletonUtils.js";
 
 import { getAvatarProfile } from "@/lib/avatarCatalog";
+import { createBoneFaceDriver, findFacialBones, type FacialBoneRig } from "@/lib/boneFaceMotion";
 import { faceState } from "@/lib/faceState";
 import { getNaturalBlink, getReviewExpressionPose, resolveMorphIndices, type ReviewExpression } from "@/lib/facialPerformance";
 import { enhanceSurfaceSampling, inspectSurfaceQuality } from "@/lib/avatarSurfaceQuality";
@@ -38,6 +39,7 @@ type Rig = {
   leftForeArm: Bone | null;
   rightForeArm: Bone | null;
   morphMeshes: MorphMesh[];
+  facialBones: FacialBoneRig;
 };
 
 type BonePose = {
@@ -91,6 +93,7 @@ function collectRig(root: Object3D): Rig {
     leftForeArm: findBone(root, ["leftforearm", "leftlowerarm", "mixamorigleftforearm"]),
     rightForeArm: findBone(root, ["rightforearm", "rightlowerarm", "mixamorigrightforearm"]),
     morphMeshes,
+    facialBones: findFacialBones(root),
   };
 }
 
@@ -217,6 +220,15 @@ export default function ReadyPlayerMeAvatar({ type, url, animation, spin, previe
     return { ...inspectSurfaceQuality(avatar), enhancedTextureCount };
   }, [avatar, gpuAnisotropy]);
   const rig = useMemo(() => collectRig(avatar), [avatar]);
+  const boneFaceDriver = useMemo(() => createBoneFaceDriver(rig.facialBones), [rig]);
+  // Inspect the COMPLETE loaded morph dictionaries once. The UI limits its
+  // diagnostic name sample to 36 entries, which is not a safe animation source.
+  const hasGazeMorphTargets = useMemo(() => rig.morphMeshes.some((mesh) =>
+    Object.keys(mesh.morphTargetDictionary ?? {}).some((name) =>
+      matchMorphAlias(name, FACE_MORPH_ALIASES.lookLeft) ||
+      matchMorphAlias(name, FACE_MORPH_ALIASES.lookRight) ||
+      matchMorphAlias(name, FACE_MORPH_ALIASES.lookUp) ||
+      matchMorphAlias(name, FACE_MORPH_ALIASES.lookDown))), [rig]);
   const basePose = useRef<BonePose>(capturePose(rig));
 
   // Read the geometry in its bind pose, not after runtime animations change the bones.
@@ -264,6 +276,8 @@ export default function ReadyPlayerMeAvatar({ type, url, animation, spin, previe
       hasBlink: capability.hasBlink,
       hasSmile: capability.hasSmile,
       hasBrowUp: capability.hasBrowUp,
+      hasJawBone: boneFaceDriver.hasJaw,
+      hasEyeBones: boneFaceDriver.hasEyes,
       boneNames: boneNames.slice(0, 36),
       morphNames: morphNames.slice(0, 36),
       ...(!fit.valid ? { message: "تعذر قراءة أبعاد النموذج؛ تم استخدام المقياس الافتراضي." } : {}),
@@ -273,7 +287,7 @@ export default function ReadyPlayerMeAvatar({ type, url, animation, spin, previe
       offset: [-center.x, -bounds.min.y, -center.z] as [number, number, number],
       diagnostics,
     };
-  }, [avatar, rig, profile.rpmScale, gltf.animations.length, url, surface]);
+  }, [avatar, rig, boneFaceDriver, profile.rpmScale, gltf.animations.length, url, surface]);
 
   useEffect(() => {
     onDiagnostics?.(presentation.diagnostics);
@@ -377,6 +391,17 @@ export default function ReadyPlayerMeAvatar({ type, url, animation, spin, previe
     // This is a silent mouth demonstration, NOT calibrated audio / phoneme sync.
     const testOpen = previewSpeech && reviewActive ? Math.pow(Math.sin(t * 7), 2) * 0.70 : 0;
     applyFaceMorphs(rig, animation, autoBlink, testOpen, Math.min(delta, 0.1), reviewExpression, reviewActive);
+    // MPFB / MakeHuman GLBs have real jaw and eyeball joints even without
+    // ARKit morphs. Use only those actual joints; never synthesize an eyelid.
+    // Avoid doubling motion when a morph already drives the same feature.
+    const poseMouth = reviewActive ? expressionPose.mouthOpen : Math.max(0, faceState.mouthOpen);
+    const mouth = testOpen > 0 ? testOpen : poseMouth;
+    const eyeX = reviewActive ? expressionPose.eyeX :
+      tracking ? faceState.eyeX : Math.sin(t * 0.45) * 0.14;
+    const eyeY = reviewActive ? expressionPose.eyeY :
+      tracking ? faceState.eyeY : Math.sin(t * 0.37 + 0.6) * 0.09;
+    boneFaceDriver.apply(mouth, eyeX, eyeY, Math.min(delta, 0.1),
+      !presentation.diagnostics.hasLipSync, !hasGazeMorphTargets);
   });
 
   return (

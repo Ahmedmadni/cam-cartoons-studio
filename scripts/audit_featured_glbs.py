@@ -61,6 +61,7 @@ def inspect_glb(data: bytes) -> dict:
     joints = {index for skin in skins for index in skin.get("joints", [])}
     joint_names = [nodes[i].get("name", "") for i in sorted(joints)
                    if isinstance(i, int) and 0 <= i < len(nodes)]
+    normalized_joints = {re.sub(r"[^a-z0-9]", "", str(name).lower()) for name in joint_names}
     meshes = g.get("meshes", [])
     primitives = [p for m in meshes for p in m.get("primitives", [])]
     if not primitives or not any("POSITION" in p.get("attributes", {}) for p in primitives):
@@ -83,6 +84,9 @@ def inspect_glb(data: bytes) -> dict:
         "skins": len(skins),
         "joints": len(joints),
         "joint_examples": joint_names[:18],
+        "jaw_bone": "jaw" in normalized_joints,
+        "eye_bones": bool(normalized_joints & {"eyel", "lefteye"}) and
+                     bool(normalized_joints & {"eyer", "righteye"}),
         "material_count": len(g.get("materials", [])),
         "texture_count": len(g.get("textures", [])),
         "image_count": len(g.get("images", [])),
