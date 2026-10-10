@@ -136,6 +136,13 @@ def main():
                 capture_evidence(page, "desktop-loaded-glb.png")
                 # Dispatch actual DOM clicks to verify React controls without waiting on
                 # unrelated Vite dev-server navigation/network tasks in Playwright.
+                expect(page.get_by_role("button", name="نصف الجسم")).to_have_attribute("aria-pressed", "true")
+                page.get_by_role("button", name="الوجه والكتفان").dispatch_event("click")
+                expect(page.get_by_role("button", name="الوجه والكتفان")).to_have_attribute("aria-pressed", "true")
+                page.get_by_role("button", name="درامية").dispatch_event("click")
+                expect(page.get_by_role("button", name="درامية")).to_have_attribute("aria-pressed", "true")
+                page.get_by_role("button", name="سينمائية").dispatch_event("click")
+                page.get_by_role("button", name="الجسم كاملًا").dispatch_event("click")
                 page.get_by_role("button", name="تلويح").dispatch_event("click")
                 expect(page.get_by_role("button", name="تلويح")).to_have_attribute("aria-pressed", "true")
                 page.get_by_role("button", name="تدوير الشخصية").dispatch_event("click")
@@ -189,6 +196,10 @@ def main():
                     source_status = page.get_by_role("status")
                     expect(source_status).to_contain_text("المصدر متاح", timeout=22000)
                     await_gltf_ready(page, name, expected_zero_bones=False, source_url=source_url)
+                    if name == "ريم":
+                        expect(page.get_by_role("button", name="الوجه والكتفان")).to_have_attribute(
+                            "aria-pressed", "true"
+                        )
                     mouth_button = page.get_by_role("button", name="تجربة حركة الفم")
                     expect(mouth_button).to_be_visible()
                     mouth_available = mouth_button.is_enabled()
