@@ -51,13 +51,13 @@ describe("Real model capability truthfulness", () => {
   });
   test("detects common facial morph naming, ignoring unrelated names", () => {
     expect(detectFaceCapabilities(["viseme_aa", "eyesClosed"])).toEqual({
-      hasLipSync: true, hasBlink: true,
+      hasLipSync: true, hasBlink: true, hasSmile: false, hasBrowUp: false,
     });
     expect(detectFaceCapabilities(["JawOpen", "blinkRight"])).toEqual({
-      hasLipSync: true, hasBlink: true,
+      hasLipSync: true, hasBlink: true, hasSmile: false, hasBrowUp: false,
     });
     expect(detectFaceCapabilities(["JawRotator", "IrisLook"])).toEqual({
-      hasLipSync: false, hasBlink: false,
+      hasLipSync: false, hasBlink: false, hasSmile: false, hasBrowUp: false,
     });
   });
 });

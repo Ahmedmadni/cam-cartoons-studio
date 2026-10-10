@@ -216,6 +216,18 @@ def main():
                         expect(page.get_by_role("button", name="الوجه والكتفان")).to_have_attribute(
                             "aria-pressed", "true"
                         )
+                        # Real morphological expression controls, not still-image overlays.
+                        page.get_by_role("button", name="ابتسامة", exact=True).dispatch_event("click")
+                        expect(page.get_by_role("button", name="ابتسامة", exact=True)).to_have_attribute(
+                            "aria-pressed", "true"
+                        )
+                        page.get_by_role("button", name="محايد", exact=True).dispatch_event("click")
+                        expect(page.get_by_role("button", name="محايد", exact=True)).to_have_attribute(
+                            "aria-pressed", "true"
+                        )
+                    if name == "هند":
+                        assert not page.get_by_role("button", name="ابتسامة", exact=True).is_enabled()
+
                     mouth_button = page.get_by_role("button", name="تجربة حركة الفم")
                     expect(mouth_button).to_be_visible()
                     mouth_available = mouth_button.is_enabled()

@@ -14,6 +14,7 @@ import { FRAMING_LABELS, REVIEW_ANGLE_LABELS, type CameraFraming, type ReviewCam
 import { LIGHTING_LABELS, type LightingStyle } from "@/lib/studioLighting";
 import { describeSurfaceLimitations } from "@/lib/avatarSurfaceQuality";
 import { REVIEW_BACKDROPS, REVIEW_STUDIO_GRADIENTS, type ReviewBackdropId } from "@/lib/reviewBackdrops";
+import { REVIEW_EXPRESSION_LABELS, type ReviewExpression } from "@/lib/facialPerformance";
 
 export const Route = createFileRoute("/")({
   head: () => ({ meta: [
@@ -183,6 +184,7 @@ function LibraryPage() {
   const [reviewAngle, setReviewAngle] = useState<ReviewCameraAngle>("front");
   const [reviewBackdrop, setReviewBackdrop] = useState<ReviewBackdropId>("studio");
   const [previewSpeech, setPreviewSpeech] = useState(false);
+  const [reviewExpression, setReviewExpression] = useState<ReviewExpression>("neutral");
   const [sourceProbe, setSourceProbe] = useState<{
     characterId: string; phase: "checking" | "success" | "error"; message: string;
   } | null>(null);
@@ -199,6 +201,7 @@ function LibraryPage() {
     setReviewAngle("front");
     setReviewBackdrop("studio");
     setPreviewSpeech(false);
+    setReviewExpression("neutral");
     setSourceProbe(null);
     canvasRef.current = null;
   }, [selectedCharacter]);
@@ -371,7 +374,7 @@ function LibraryPage() {
           <div className="h-[420px] overflow-hidden rounded-2xl md:h-[540px]"
             style={{ background: REVIEW_STUDIO_GRADIENTS[reviewLighting].css }}>
             <CharacterStage type={selected.id} animation={reviewAnimation} spin={reviewSpin} previewSpeech={previewSpeech}
-               framing={reviewFraming} lighting={reviewLighting} reviewAngle={reviewAngle} reviewMode
+               framing={reviewFraming} lighting={reviewLighting} reviewAngle={reviewAngle} reviewMode reviewExpression={reviewExpression}
                backgroundUrl={REVIEW_BACKDROPS.find((item) => item.id === reviewBackdrop)?.url ?? ""}
               onCanvasReady={(canvas) => { canvasRef.current = canvas; }}
               onDiagnostics={setDiagnostics} />
@@ -416,6 +419,24 @@ function LibraryPage() {
                 {REVIEW_BACKDROPS.map((backdrop) => <option key={backdrop.id} value={backdrop.id}>{backdrop.label}</option>)}
               </select>
               <p className="mt-2 text-xs text-muted-foreground">يمكن التقاط صورة من النموذج الحقيقي بهذه الزاوية والخلفية. الصور المحلية لا تغير هندسة الشخصية أو خاماتها.</p>
+              <p className="mt-3 text-xs font-black">تعابير الوجه (عند دعم النموذج)</p>
+              <div className="mt-2 flex flex-wrap gap-2" role="group" aria-label="تعابير الوجه">
+                {(Object.entries(REVIEW_EXPRESSION_LABELS) as [ReviewExpression, string][]).map(([expression, label]) => {
+                  const supported = expression === "neutral" || (diagnostics?.status === "ready" && (
+                    expression === "smile" ? diagnostics.hasSmile :
+                      expression === "surprise" ? (diagnostics.hasBrowUp || diagnostics.hasLipSync) :
+                        diagnostics.hasHeadRig
+                  ));
+                  return <button key={expression} type="button" disabled={!supported}
+                    aria-pressed={reviewExpression === expression}
+                    onClick={() => { setReviewExpression(expression); setReviewAnimation("idle"); setPreviewSpeech(false); setReviewSpin(false); }}
+                    className={"rounded-full px-3 py-2 text-xs font-bold disabled:cursor-not-allowed disabled:opacity-40 " + (reviewExpression === expression
+                      ? "bg-primary text-primary-foreground" : "bg-card text-foreground")}>
+                    {label}
+                  </button>;
+                })}
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">هذه تجربة تعابير من Morph Targets وعظام النموذج الحقيقي وليست مزامنة شفاه مع صوت عربي.</p>
               <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label="حركات فحص الشخصية">
                 {(["idle", "wave", "happy", "nod", "dance"] as AnimationType[]).map((animation) =>
                   <button key={animation} type="button" aria-pressed={reviewAnimation === animation}
@@ -426,7 +447,7 @@ function LibraryPage() {
                   </button>)}
                 <button type="button" aria-pressed={previewSpeech}
                   disabled={diagnostics?.status !== "ready" || !diagnostics.hasLipSync}
-                  onClick={() => setPreviewSpeech(!previewSpeech)}
+                  onClick={() => { setReviewExpression("neutral"); setPreviewSpeech(!previewSpeech); }}
                   className={"rounded-full border px-3 py-2 text-xs font-bold disabled:cursor-not-allowed disabled:opacity-50 " + (previewSpeech
                     ? "border-primary bg-primary text-primary-foreground" : "border-border bg-card")}>
                   {previewSpeech ? "إيقاف تجربة الفم" : "تجربة حركة الفم"}
