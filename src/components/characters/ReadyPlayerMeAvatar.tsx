@@ -10,6 +10,7 @@ import { createBoneFaceDriver, findFacialBones, type FacialBoneRig } from "@/lib
 import { faceState } from "@/lib/faceState";
 import { getNaturalBlink, getReviewExpressionPose, resolveMorphIndices, type ReviewExpression } from "@/lib/facialPerformance";
 import { enhanceSurfaceSampling, inspectSurfaceQuality } from "@/lib/avatarSurfaceQuality";
+import { applyMpfbSurfaceFixes } from "@/lib/mpfbSurfaceFixes";
 import { calculateModelFit, detectFaceCapabilities, FACE_MORPH_ALIASES, matchMorphAlias, type AvatarDiagnostics } from "@/lib/modelPresentation";
 import { useStudioStore } from "@/lib/store";
 import type { AnimationType, CharacterType } from "@/lib/store";
@@ -23,6 +24,8 @@ type Props = {
   /** Recenter only during visual inspection, never during story playback. */
   reviewMode?: boolean | undefined;
   reviewExpression?: ReviewExpression | undefined;
+  surfaceCleanup?: boolean | undefined;
+  sourceUrl?: string | undefined;
   onDiagnostics?: ((details: AvatarDiagnostics) => void) | undefined;
 };
 
@@ -209,12 +212,17 @@ function dampBone(
   bone.rotation.z = MathUtils.damp(bone.rotation.z, base.z + (target.z ?? 0), speed, delta);
 }
 
-export default function ReadyPlayerMeAvatar({ type, url, animation, spin, previewSpeech = false, reviewMode = false, reviewExpression = "neutral", onDiagnostics }: Props) {
+export default function ReadyPlayerMeAvatar({ type, url, animation, spin, previewSpeech = false, reviewMode = false, reviewExpression = "neutral", surfaceCleanup = true, sourceUrl, onDiagnostics }: Props) {
   const profile = getAvatarProfile(type);
   const root = useRef<Group>(null);
   const gltf = useGLTF(url);
   const gpuAnisotropy = useThree((state) => state.gl.capabilities.getMaxAnisotropy());
-  const avatar = useMemo(() => cloneSkeleton(gltf.scene), [gltf.scene]);
+  const corrected = useMemo(() => {
+    const scene = cloneSkeleton(gltf.scene);
+    const report = applyMpfbSurfaceFixes(scene, sourceUrl ?? url, surfaceCleanup);
+    return { scene, report };
+  }, [gltf.scene, sourceUrl, surfaceCleanup, url]);
+  const avatar = corrected.scene;
   const surface = useMemo(() => {
     const enhancedTextureCount = enhanceSurfaceSampling(avatar, gpuAnisotropy);
     return { ...inspectSurfaceQuality(avatar), enhancedTextureCount };
@@ -269,6 +277,7 @@ export default function ReadyPlayerMeAvatar({ type, url, animation, spin, previe
       skinnedMeshCount,
       materialCount: materialIds.size,
       ...surface,
+      mpfbSurfaceFixes: corrected.report,
       animationClipCount: gltf.animations.length,
       hasHeadRig: Boolean(rig.head),
       hasArmRig: Boolean(rig.leftArm && rig.rightArm),
@@ -287,7 +296,7 @@ export default function ReadyPlayerMeAvatar({ type, url, animation, spin, previe
       offset: [-center.x, -bounds.min.y, -center.z] as [number, number, number],
       diagnostics,
     };
-  }, [avatar, rig, boneFaceDriver, profile.rpmScale, gltf.animations.length, url, surface]);
+  }, [avatar, rig, boneFaceDriver, profile.rpmScale, gltf.animations.length, url, surface, corrected.report]);
 
   useEffect(() => {
     onDiagnostics?.(presentation.diagnostics);

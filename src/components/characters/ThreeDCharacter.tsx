@@ -94,6 +94,7 @@ function Avatar({
   previewSpeech,
   reviewMode,
   reviewExpression,
+  surfaceCleanup,
   onDiagnostics,
 }: {
   type: CharacterType;
@@ -102,6 +103,7 @@ function Avatar({
   previewSpeech: boolean;
   reviewMode: boolean;
   reviewExpression: ReviewExpression;
+  surfaceCleanup: boolean;
   onDiagnostics?: ((details: AvatarDiagnostics) => void) | undefined;
 }) {
   const customization = useAvatarCustomizationStore((state) => state.customizations[type]);
@@ -143,6 +145,8 @@ function Avatar({
           previewSpeech={previewSpeech}
           reviewMode={reviewMode}
           reviewExpression={reviewExpression}
+          surfaceCleanup={surfaceCleanup}
+          sourceUrl={profile.modelUrl}
           onDiagnostics={onDiagnostics}
         />
       </Suspense>
@@ -168,6 +172,8 @@ export type ThreeDCharacterProps = {
   reviewMode?: boolean;
   /** Character-library expression test; never changes story tracking or recorded animation. */
   reviewExpression?: ReviewExpression;
+  /** Optional compare switch: applied only to pinned MPFB face/hair surfaces. */
+  surfaceCleanup?: boolean;
   transparent?: boolean;
   className?: string;
   /** صورة خلفية تُرسم داخل المشهد وتظهر أيضاً في الفيديو المسجل. */
@@ -186,6 +192,7 @@ export default function ThreeDCharacter({
   reviewAngle = "front",
   reviewMode = false,
   reviewExpression = "neutral",
+  surfaceCleanup = true,
   transparent = false,
   className,
   backgroundUrl,
@@ -254,7 +261,7 @@ export default function ThreeDCharacter({
       />
 
       <Suspense fallback={null}>
-        <Avatar type={type} animation={animation} spin={spin} previewSpeech={previewSpeech} reviewMode={reviewMode} reviewExpression={reviewExpression} onDiagnostics={handleDiagnostics} />
+        <Avatar type={type} animation={animation} spin={spin} previewSpeech={previewSpeech} reviewMode={reviewMode} reviewExpression={reviewExpression} surfaceCleanup={surfaceCleanup} onDiagnostics={handleDiagnostics} />
       </Suspense>
 
       {!transparent && (

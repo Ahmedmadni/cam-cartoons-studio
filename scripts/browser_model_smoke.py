@@ -246,6 +246,21 @@ def main():
                     assert f"توجيه العينين بالعظام: {eye_status}" in page.locator("body").inner_text(), (
                         f"{candidate_path.name}: eyeball joints mismatched in renderer"
                     )
+                    if candidate_path.stem.startswith("curated-mpfb-"):
+                        compare = page.get_by_role("button", name="التحسين مفعّل — اعرض الأصل للمقارنة")
+                        expect(compare).to_be_visible()
+                        expect(compare).to_have_attribute("aria-pressed", "true")
+                        # Confirm we can compare against genuine original materials,
+                        # and switch back without changing the source GLB.
+                        compare.dispatch_event("click")
+                        expect(page.get_by_role("button", name="عرض الأصل — فعّل التحسين")).to_have_attribute(
+                            "aria-pressed", "false"
+                        )
+                        page.get_by_role("button", name="عرض الأصل — فعّل التحسين").dispatch_event("click")
+                        expect(page.get_by_role("button", name="التحسين مفعّل — اعرض الأصل للمقارنة")).to_have_attribute(
+                            "aria-pressed", "true"
+                        )
+                        expect(page.get_by_text("طبقات الوجه المخفية:", exact=False)).to_be_visible()
                     if candidate_path.stem.startswith("curated-mpfb-") and reported["jaw_bone"]:
                         control = page.get_by_role("button", name="تجربة حركة الفك")
                         expect(control).to_be_enabled()
