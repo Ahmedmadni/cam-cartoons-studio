@@ -291,20 +291,31 @@ def main():
                     if name == "هند":
                         assert not page.get_by_role("button", name="ابتسامة", exact=True).is_enabled()
 
-                    mouth_button = page.get_by_role("button", name="تجربة حركة الفم")
+                    body = page.locator("body").inner_text()
+                    has_speech_morph = "تحريك الفم: مدعوم" in body
+                    has_jaw_bone = "عظمة الفك: متاحة" in body
+                    # A body-only GLB may legitimately expose a jaw control
+                    # without morph/viseme speech support. Never confuse them.
+                    preview_label = "تجربة حركة الفم" if has_speech_morph else "تجربة حركة الفك"
+                    mouth_button = page.get_by_role("button", name=preview_label)
                     expect(mouth_button).to_be_visible()
                     mouth_available = mouth_button.is_enabled()
+                    assert mouth_available == (has_speech_morph or has_jaw_bone), (
+                        f"{name}: button capability must reflect real jaw or morph anatomy"
+                    )
                     if name == "هند":
-                        assert not mouth_available, "هند must not claim unsupported lipsync"
+                        assert not has_speech_morph, "هند must not claim unsupported lip sync"
                     if name == "ريم":
-                        assert mouth_available, "ريم must expose the verified face morphs"
+                        assert has_speech_morph, "ريم must expose verified mouth morphs"
                     if mouth_available:
                         mouth_button.dispatch_event("click")
-                        expect(page.get_by_role("button", name="إيقاف تجربة الفم")).to_have_attribute(
+                        stop_label = "إيقاف تجربة الفم" if has_speech_morph else "إيقاف تجربة الفك"
+                        expect(page.get_by_role("button", name=stop_label)).to_have_attribute(
                             "aria-pressed", "true"
                         )
                     origin_results.append({"name": name, "browser_cors": "passed", "direct_glb_render": "passed",
-                                           "mouth_preview_available": mouth_available})
+                                           "mouth_preview_available": mouth_available,
+                                           "lip_morphs": has_speech_morph, "bone_jaw": has_jaw_bone})
                     print(f"PASS: publisher-origin CORS and real GLB render for {name}", flush=True)
                 (ARTIFACTS / "browser-origin-check.json").write_text(
                     json.dumps(origin_results, ensure_ascii=False, indent=2), encoding="utf-8"
