@@ -350,10 +350,10 @@ function LibraryPage() {
           className="mt-6 rounded-3xl border border-border bg-card p-4 sm:p-6">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <h2 id="art-candidates-heading" className="text-xl font-black">شخصيات بشرية جديدة قيد التقييم</h2>
+              <h2 id="art-candidates-heading" className="text-xl font-black">شخصيات أصلية وحيوانات للقصص</h2>
               <p className="mt-1 max-w-3xl text-sm font-semibold text-muted-foreground">
-                نماذج بشرية أصلية GLB من Rocketbox وMakeHuman / MPFB وTalkingHead؛ جميعها موجودة الآن في المكتبة وقابلة للمعاينة مباشرة.
-                أُدرجت ملفاتها كمصادر ثلاثية الأبعاد فعلية، من دون تنزيل الملفات الضخمة إلا عند فتح الشخصية. المطابقة الفنية للمراجع ما زالت بحاجة إلى تقييم.
+                نماذج بشرية GLB أصلية من VRoid وRocketbox وMakeHuman، ومعها شخصيات حيوانية متحركة بقصصها. كل ملف يُعرض بخاماته وهندسته الأصلية.
+                تُحمّل الملفات الكبيرة فقط عند فتح الشخصية. الحيوانات تؤدي حركاتها الأصلية؛ دعم الكلام والرمش لا يُعرض إلا إذا كان متوفرًا بالفعل.
               </p>
             </div>
             <span className="rounded-full border border-border px-3 py-1 text-xs font-bold text-muted-foreground">
