@@ -378,7 +378,8 @@ def main():
                     "Selecting an existing candidate must not create a duplicate"
                 )
                 candidate_page.get_by_role("button", name="فحص رابط GLB وCORS").dispatch_event("click")
-                expect(candidate_page.get_by_role("status")).to_contain_text("المصدر متاح", timeout=22000)
+                expect(candidate_page.locator("p[role='status']").last).to_contain_text(
+                    "المصدر متاح", timeout=22000)
                 await_gltf_ready(candidate_page, "ياسمين", expected_zero_bones=False)
                 candidate_context.close()
                 browser.close()
