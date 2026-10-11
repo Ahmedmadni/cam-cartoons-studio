@@ -139,6 +139,7 @@ def main():
                 expect(page.get_by_role("button", name="أضف كوفي للتقييم")).to_be_visible()
                 expect(page.get_by_role("button", name="أضف يوكي للتقييم")).to_be_visible()
                 expect(page.get_by_role("button", name="أضف ليام للتقييم")).to_be_visible()
+                expect(page.get_by_role("button", name="أضف نوران للتقييم")).to_be_visible()
                 # Keep heavy optional avatar downloads isolated from baseline
                 # renderer and IndexedDB regression tests.
                 add_character(page, "اختبار الجودة")
@@ -222,9 +223,17 @@ def main():
                     verified_count += 1
                     print(f"PASS: real hosted model binary loaded in WebGL: {featured_path.name}", flush=True)
                 print(f"Real publisher-hosted GLB models exercised: {verified_count}/5", flush=True)
-                candidate_files = sorted(Path("public/__qa__/candidates").glob("curated-*.glb"))
+                # Run the large, optional TalkingHead MPFB source last.
+                candidate_files = sorted(Path("public/__qa__/candidates").glob("curated-*.glb"),
+                                         key=lambda path: (path.stem == "curated-mpfb-nouran", path.stem))
                 model_report = json.loads((ARTIFACTS / "featured-asset-audit.json").read_text(encoding="utf-8"))
                 for candidate_path in candidate_files:
+                    if candidate_path.stem == "curated-mpfb-nouran":
+                        # Isolate ~35 MiB source and its GPU textures from earlier
+                        # snapshots to avoid resource exhaustion on CI SwiftShader.
+                        context.close()
+                        context = browser.new_context(viewport={"width": 1366, "height": 900})
+                        page = context.new_page()
                     page.goto(URL, wait_until="networkidle", timeout=60000)
                     add_character(
                         page, "فحص النموذج " + candidate_path.stem,
@@ -272,7 +281,7 @@ def main():
                         )
                     print(f"PASS: real optional GLB: {candidate_path.name}; lips={lips}; "
                           f"jaw={jaw_status}; eyes={eye_status}", flush=True)
-                print(f"Real candidate binary GLBs exercised: {len(candidate_files)}/5", flush=True)
+                print(f"Real candidate binary GLBs exercised: {len(candidate_files)}/6", flush=True)
 
                 # Close every heavy fixture-loaded GLB and WebGL program before
                 # testing remote featured URLs. Original avatars must be able to
