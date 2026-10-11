@@ -176,8 +176,8 @@ def candidate_urls() -> dict[str, dict[str, str]]:
     )
     candidates = {id_: {"name": name, "url": url}
                   for id_, name, url in entries if id_.startswith("curated-")}
-    if len(candidates) != 11 or len({item["url"] for item in candidates.values()}) != 11:
-        raise ValueError("Expected eleven distinct pinned candidate GLB sources")
+    if len(candidates) != 12 or len({item["url"] for item in candidates.values()}) != 12:
+        raise ValueError("Expected twelve distinct pinned candidate GLB sources")
     return candidates
 
 
@@ -240,7 +240,7 @@ def audit_live(save_browser_fixtures: bool = False) -> int:
     healthy = sum(item["status"] == "verified" for item in report["models"].values())
     reviewed = sum(item["status"] == "technically_verified"
                    for item in report["candidates"].values())
-    print(f"Featured GLBs: {healthy}/5; new technical candidates: {reviewed}/11; "
+    print(f"Featured GLBs: {healthy}/5; new technical candidates: {reviewed}/12; "
           f"report: {OUTPUT}", flush=True)
     # External domains can fail intermittently: the audit must report that failure,
     # without blocking local browser/TypeScript/test quality gates.

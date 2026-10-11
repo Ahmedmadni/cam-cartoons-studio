@@ -184,6 +184,21 @@ export const CURATED_CANDIDATES: CuratedCandidate[] = [
       preferredFraming: "full",
     },
   },
+  {
+    id: "curated-robot-hakim", name: "الروبوت حكيم",
+    description: "روبوت GLB أصلي ذو تعابير Morph وحركات مرفقة؛ رفيق لطيف لرواية القصص، دون افتراض توافر حركات شفاه صوتية.",
+    origin: "Three.js / Quaternius / RobotExpressive (CC0)",
+    sourceFilename: "RobotExpressive.glb", sizeBytes: 463988,
+    modelUrl: "https://raw.githubusercontent.com/mrdoob/three.js/11738a9d55e502fb484cefffcea3a66dc44e9fe9/examples/models/gltf/RobotExpressive/RobotExpressive.glb",
+    faceRig: "inspect-on-load",
+    draft: {
+      name: "الروبوت حكيم", category: "fantasy", provider: "imported-glb",
+      modelUrl: "https://raw.githubusercontent.com/mrdoob/three.js/11738a9d55e502fb484cefffcea3a66dc44e9fe9/examples/models/gltf/RobotExpressive/RobotExpressive.glb",
+      tags: ["قصص الأطفال", "روبوت", "تعابير أصلية", "حركات أصلية"],
+      voicePreset: "normal", basePreset: "man", scale: 1, yOffset: -1.62,
+      preferredFraming: "full",
+    },
+  },
 ];
 
 export function findImportedCandidate(

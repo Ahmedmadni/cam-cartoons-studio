@@ -166,6 +166,13 @@ export function upgradeStorytellerCharacters(previous: CharacterDefinition[]): C
   ];
 }
 
+/** One-time v6 registration; never restore a robot that the user later deletes. */
+export function upgradeRobotStoryteller(previous: CharacterDefinition[]): CharacterDefinition[] {
+  const robot = CURATED_CHARACTERS.find((item) => item.id === "curated-robot-hakim");
+  if (!robot || previous.some((item) => item.id === robot.id || item.modelUrl === robot.modelUrl)) return previous;
+  return [...previous, robot];
+}
+
 /**
  * Only rename untouched stock labels. Preserve all user-created names,
  * custom edits and deleted characters across the version 2 migration.
@@ -284,7 +291,7 @@ export const useCharacterLibrary = create<CharacterLibraryState>()(
     }),
     {
       name: "cam-cartoons-character-library-v1",
-      version: 5,
+      version: 6,
       migrate: (oldState: unknown, previousVersion: number) => {
         const persisted = oldState && typeof oldState === "object"
           ? oldState as { characters?: unknown }
@@ -302,7 +309,9 @@ export const useCharacterLibrary = create<CharacterLibraryState>()(
         const withPortrait = previousVersion < 3 ? seedPortraitForUpgrade(named) : named;
         const realOnly = previousVersion < 4 ? upgradeToRealGlbLibrary(withPortrait) : withPortrait;
         return {
-          characters: previousVersion < 5 ? upgradeStorytellerCharacters(realOnly) : realOnly,
+          characters: previousVersion < 6
+            ? upgradeRobotStoryteller(previousVersion < 5 ? upgradeStorytellerCharacters(realOnly) : realOnly)
+            : realOnly,
         };
       },
       partialize: (state) => ({ characters: state.characters }),

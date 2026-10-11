@@ -239,7 +239,7 @@ def main():
                                                            path.stem == "curated-mpfb-nouran", path.stem))
                 new_sources = {"curated-vroid-ayla", "curated-vroid-tala",
                                "curated-vroid-karim", "curated-vroid-lana",
-                               "curated-animal-forest-fox"}
+                               "curated-animal-forest-fox", "curated-robot-hakim"}
                 assert new_sources.issubset({path.stem for path in candidate_files}), (
                     "The five NEW GLB sources must be downloaded and actually exercised in WebGL"
                 )
@@ -311,7 +311,7 @@ def main():
                         )
                     print(f"PASS: real optional GLB: {candidate_path.name}; lips={lips}; "
                           f"jaw={jaw_status}; eyes={eye_status}", flush=True)
-                print(f"Real candidate binary GLBs exercised: {len(candidate_files)}/11", flush=True)
+                print(f"Real candidate binary GLBs exercised: {len(candidate_files)}/12", flush=True)
 
                 # Close every heavy fixture-loaded GLB and WebGL program before
                 # testing remote featured URLs. Original avatars must be able to
