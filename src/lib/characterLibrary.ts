@@ -5,7 +5,7 @@ import type { CameraFraming } from "./cameraComposition";
 import { CURATED_CANDIDATES } from "./curatedCharacters";
 
 export type CharacterProvider = "imported-glb" | "readyplayerme" | "procedural";
-export type CharacterCategory = "children" | "youth" | "men" | "women" | "fantasy" | "other";
+export type CharacterCategory = "children" | "youth" | "men" | "women" | "animals" | "fantasy" | "other";
 export type LegacyCharacterType = "boy" | "girl" | "man" | "woman";
 
 export type CharacterDefinition = {
@@ -35,6 +35,7 @@ export const CHARACTER_CATEGORIES: { value: CharacterCategory; label: string }[]
   { value: "youth", label: "شباب" },
   { value: "men", label: "رجال" },
   { value: "women", label: "نساء" },
+  { value: "animals", label: "حيوانات" },
   { value: "fantasy", label: "خيالية" },
   { value: "other", label: "أخرى" },
 ];
@@ -97,7 +98,7 @@ export function migrateFeaturedCharacters(previous: CharacterDefinition[]): Char
 
 /**
  * Production library has ONLY genuine, remotely hosted 3D GLB models.
- * This registers all six pinned curated GLBs without eagerly downloading
+ * This registers all pinned curated GLBs without eagerly downloading
  * their binary files. The large assets load only when the user selects one.
  */
 export const CURATED_CHARACTERS: CharacterDefinition[] = CURATED_CANDIDATES.map((candidate) => ({
@@ -150,6 +151,18 @@ export function upgradeToRealGlbLibrary(previous: CharacterDefinition[]): Charac
   return [
     ...updated,
     ...CURATED_CHARACTERS.filter((item) => !ids.has(item.id) && !urls.has(item.modelUrl)),
+  ];
+}
+
+/** Upgrade v5: add ONLY five NEW real storytellers, never restoring old deletions. */
+export function upgradeStorytellerCharacters(previous: CharacterDefinition[]): CharacterDefinition[] {
+  const ids = new Set(previous.map((item) => item.id));
+  const urls = new Set(previous.map((item) => item.modelUrl).filter(Boolean));
+  return [
+    ...previous,
+    ...CURATED_CHARACTERS.filter((item) =>
+      (item.id.startsWith("curated-vroid-") || item.id.startsWith("curated-animal-")) &&
+      !ids.has(item.id) && !urls.has(item.modelUrl)),
   ];
 }
 
@@ -271,7 +284,7 @@ export const useCharacterLibrary = create<CharacterLibraryState>()(
     }),
     {
       name: "cam-cartoons-character-library-v1",
-      version: 4,
+      version: 5,
       migrate: (oldState: unknown, previousVersion: number) => {
         const persisted = oldState && typeof oldState === "object"
           ? oldState as { characters?: unknown }
@@ -287,8 +300,9 @@ export const useCharacterLibrary = create<CharacterLibraryState>()(
         // Version 3 introduces ONE new portrait avatar. Do not re-add any
         // of the four existing models if a user has intentionally deleted them.
         const withPortrait = previousVersion < 3 ? seedPortraitForUpgrade(named) : named;
+        const realOnly = previousVersion < 4 ? upgradeToRealGlbLibrary(withPortrait) : withPortrait;
         return {
-          characters: previousVersion < 4 ? upgradeToRealGlbLibrary(withPortrait) : withPortrait,
+          characters: previousVersion < 5 ? upgradeStorytellerCharacters(realOnly) : realOnly,
         };
       },
       partialize: (state) => ({ characters: state.characters }),

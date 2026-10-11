@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
   DEFAULT_CHARACTERS,
   upgradeToRealGlbLibrary,
+  upgradeStorytellerCharacters,
   replaceProceduralWithRealGlb,
   getCharacterDefinition,
   getCharacterLabel,
@@ -10,8 +11,9 @@ import {
 } from "../src/lib/characterLibrary";
 
 describe("Open Character Library", () => {
-  test("starts with eleven real 3D GLBs and no old geometric stock models", () => {
-    expect(DEFAULT_CHARACTERS).toHaveLength(11);
+  test("starts with sixteen real 3D GLBs and no old geometric stock models", () => {
+    expect(DEFAULT_CHARACTERS).toHaveLength(16);
+    expect(DEFAULT_CHARACTERS.find((item) => item.id === "curated-animal-forest-fox")?.category).toBe("animals");
     expect(DEFAULT_CHARACTERS.every((item) => item.provider === "imported-glb" && !!item.modelUrl)).toBe(true);
     expect(DEFAULT_CHARACTERS.some((item) => ["boy", "girl", "man", "woman"].includes(item.id))).toBe(false);
   });
@@ -37,6 +39,17 @@ describe("Open Character Library", () => {
     expect(seeded.every((item) => item.provider !== "procedural")).toBe(true);
     expect(seeded.some((item) => item.id === "curated-mpfb-nouran")).toBe(true);
     expect(upgradeToRealGlbLibrary(seeded)).toEqual(seeded);
+  });
+
+  test("v5 adds only the five new storyteller sources exactly once", () => {
+    const prior = [{ ...DEFAULT_CHARACTERS[0]!, name: "اسمي المختار", isFavorite: true }];
+    const upgraded = upgradeStorytellerCharacters(prior);
+    expect(upgraded).toHaveLength(6);
+    expect(upgraded[0]?.name).toBe("اسمي المختار");
+    expect(upgraded[0]?.isFavorite).toBe(true);
+    expect(upgraded.filter((item) => item.id.startsWith("curated-vroid-"))).toHaveLength(4);
+    expect(upgraded.filter((item) => item.category === "animals")).toHaveLength(1);
+    expect(upgradeStorytellerCharacters(upgraded)).toEqual(upgraded);
   });
 
   test("refuses reintroduction of the old procedural mesh provider", () => {

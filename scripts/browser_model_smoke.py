@@ -134,13 +134,18 @@ def main():
 
                 # The entire stock library consists of real GLB sources; the
                 # six curated models are listed at startup without eager binary downloads.
-                expect(page.get_by_role("heading", name="شخصيات بشرية جديدة قيد التقييم")).to_be_visible()
+                expect(page.get_by_role("heading", name="شخصيات أصلية وحيوانات للقصص")).to_be_visible()
                 expect(page.get_by_role("button", name="افتح ياسمين في مكتبتي")).to_be_visible()
                 expect(page.get_by_role("button", name="افتح زياد في مكتبتي")).to_be_visible()
                 expect(page.get_by_role("button", name="افتح كوفي في مكتبتي")).to_be_visible()
                 expect(page.get_by_role("button", name="افتح يوكي في مكتبتي")).to_be_visible()
                 expect(page.get_by_role("button", name="افتح ليام في مكتبتي")).to_be_visible()
                 expect(page.get_by_role("button", name="افتح نوران في مكتبتي")).to_be_visible()
+                expect(page.get_by_role("button", name="افتح آيلا في مكتبتي")).to_be_visible()
+                expect(page.get_by_role("button", name="افتح تالا في مكتبتي")).to_be_visible()
+                expect(page.get_by_role("button", name="افتح كريم في مكتبتي")).to_be_visible()
+                expect(page.get_by_role("button", name="افتح لانا في مكتبتي")).to_be_visible()
+                expect(page.get_by_role("button", name="افتح الثعلب فلفل في مكتبتي")).to_be_visible()
                 assert "مدمجة (احتياطية)" not in page.locator("body").inner_text()
                 assert page.locator("option[value='procedural']").count() == 0
                 assert page.get_by_role("button", name="يوسف").count() == 0
@@ -227,14 +232,22 @@ def main():
                     verified_count += 1
                     print(f"PASS: real hosted model binary loaded in WebGL: {featured_path.name}", flush=True)
                 print(f"Real publisher-hosted GLB models exercised: {verified_count}/5", flush=True)
-                # Run the large, optional TalkingHead MPFB source last.
+                # Large source GLBs each get a new SwiftShader context so the
+                # CI renderer never hides GPU memory exhaustion or reuses meshes.
                 candidate_files = sorted(Path("public/__qa__/candidates").glob("curated-*.glb"),
-                                         key=lambda path: (path.stem == "curated-mpfb-nouran", path.stem))
+                                         key=lambda path: (path.stem.startswith("curated-vroid-") or
+                                                           path.stem == "curated-mpfb-nouran", path.stem))
+                new_sources = {"curated-vroid-ayla", "curated-vroid-tala",
+                               "curated-vroid-karim", "curated-vroid-lana",
+                               "curated-animal-forest-fox"}
+                assert new_sources.issubset({path.stem for path in candidate_files}), (
+                    "The five NEW GLB sources must be downloaded and actually exercised in WebGL"
+                )
                 model_report = json.loads((ARTIFACTS / "featured-asset-audit.json").read_text(encoding="utf-8"))
                 for candidate_path in candidate_files:
-                    if candidate_path.stem == "curated-mpfb-nouran":
-                        # Isolate ~35 MiB source and its GPU textures from earlier
-                        # snapshots to avoid resource exhaustion on CI SwiftShader.
+                    if candidate_path.stem == "curated-mpfb-nouran" or candidate_path.stem.startswith("curated-vroid-"):
+                        # Isolate high-resolution models to preserve memory budgets
+                        # and test each GLB in a fresh, real WebGL context.
                         context.close()
                         context = browser.new_context(viewport={"width": 1366, "height": 900})
                         page = context.new_page()
@@ -259,6 +272,14 @@ def main():
                     assert f"توجيه العينين بالعظام: {eye_status}" in page.locator("body").inner_text(), (
                         f"{candidate_path.name}: eyeball joints mismatched in renderer"
                     )
+                    if candidate_path.stem == "curated-animal-forest-fox":
+                        assert reported["animation_count"] >= 3, "Fox must contain native clips"
+                        expect(page.get_by_text("مقاطع الحركة المرفقة: 3", exact=False)).to_be_visible()
+                        expect(page.get_by_role("button", name="استكشاف")).to_have_attribute("aria-pressed", "true")
+                        page.get_by_role("button", name="مشي").dispatch_event("click")
+                        expect(page.get_by_role("button", name="مشي")).to_have_attribute("aria-pressed", "true")
+                        page.get_by_role("button", name="جري").dispatch_event("click")
+                        expect(page.get_by_role("button", name="جري")).to_have_attribute("aria-pressed", "true")
                     if candidate_path.stem == "curated-mpfb-kofi":
                         # One representative A/B check is sufficient. Repeated
                         # large avatar remounts can exhaust SwiftShader budgets.
@@ -290,7 +311,7 @@ def main():
                         )
                     print(f"PASS: real optional GLB: {candidate_path.name}; lips={lips}; "
                           f"jaw={jaw_status}; eyes={eye_status}", flush=True)
-                print(f"Real candidate binary GLBs exercised: {len(candidate_files)}/6", flush=True)
+                print(f"Real candidate binary GLBs exercised: {len(candidate_files)}/11", flush=True)
 
                 # Close every heavy fixture-loaded GLB and WebGL program before
                 # testing remote featured URLs. Original avatars must be able to
@@ -313,8 +334,13 @@ def main():
                 ]
                 for name, source_url in featured_names:
                     page.goto(URL, wait_until="networkidle", timeout=60000)
-                    page.get_by_role("button", name=re.compile(name)).first.dispatch_event("click")
-                    expect(page.get_by_role("heading", name=name).last).to_be_visible(timeout=12000)
+                    # "ريم" is a substring of the NEW "كريم": scope the
+                    # card to its exact <h2> identity before clicking.
+                    card = page.get_by_role("button").filter(
+                        has=page.get_by_role("heading", name=name, exact=True))
+                    expect(card).to_have_count(1)
+                    card.dispatch_event("click")
+                    expect(page.get_by_role("heading", name=name, exact=True).last).to_be_visible(timeout=12000)
                     page.get_by_role("button", name="فحص رابط GLB وCORS").dispatch_event("click")
                     # A real GLB now has an independent loading role=status.
                     # Scope this locator to the source-probe paragraph only.

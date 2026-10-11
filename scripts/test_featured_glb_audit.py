@@ -95,17 +95,21 @@ class GlbAuditTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             inspect_glb(sample_glb(meshes=[{"primitives": [{"attributes": {"NORMAL": 0}}]}]))
 
-    def test_candidate_sources_are_six_distinct_commit_pinned_glbs(self):
+    def test_candidate_sources_are_eleven_distinct_commit_pinned_glbs(self):
         candidates = candidate_urls()
         self.assertEqual(set(candidates), {
             "curated-rocketbox-yasmin", "curated-rocketbox-ziyad",
             "curated-mpfb-kofi", "curated-mpfb-yuki", "curated-mpfb-liam", "curated-mpfb-nouran",
+            "curated-vroid-ayla", "curated-vroid-tala", "curated-vroid-karim", "curated-vroid-lana",
+            "curated-animal-forest-fox",
         })
         for item in candidates.values():
             self.assertTrue(
                 "/8af29d456c4d4d4f7e8ac32ac0c2b2aaf02c27d3/" in item["url"] or
                 "/ff1b635eba22d782423a6d81233e8deca7f6d1bd/" in item["url"] or
-                "/b3e277b3b46f88e557bf28a2c5612a5b04e075c3/" in item["url"]
+                "/b3e277b3b46f88e557bf28a2c5612a5b04e075c3/" in item["url"] or
+                "/5e368bfff897d73090519f9f696c631a52d77397/" in item["url"] or
+                "/edc7c9e67c639d230715049ee31f9a96a6babbbe/" in item["url"]
             )
 
     def test_featured_source_has_five_distinct_real_urls(self):

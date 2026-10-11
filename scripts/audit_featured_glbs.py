@@ -176,8 +176,8 @@ def candidate_urls() -> dict[str, dict[str, str]]:
     )
     candidates = {id_: {"name": name, "url": url}
                   for id_, name, url in entries if id_.startswith("curated-")}
-    if len(candidates) != 6 or len({item["url"] for item in candidates.values()}) != 6:
-        raise ValueError("Expected six distinct pinned candidate GLB sources")
+    if len(candidates) != 11 or len({item["url"] for item in candidates.values()}) != 11:
+        raise ValueError("Expected eleven distinct pinned candidate GLB sources")
     return candidates
 
 
@@ -208,9 +208,12 @@ def audit_live(save_browser_fixtures: bool = False) -> int:
         try:
             binary, headers = read_limited(source["url"])
             details = inspect_glb(binary)
-            # Surface candidate weaknesses instead of trusting advertised morph support.
-            if not details["body_rigged"]:
-                raise ValueError("Candidate has no humanoid body skeleton")
+            # An animated quadruped does not need human bones/face morphs.
+            if identity.startswith("curated-animal-"):
+                if details["animation_count"] < 3:
+                    raise ValueError("Original Fox GLB must provide three authored animation clips")
+            elif not details["body_rigged"]:
+                raise ValueError("Human candidate has no actual body skeleton")
             # The two Rocketbox sources were specifically chosen for lip morphs.
             # MakeHuman/MPFB rigs may lack ARKit facial targets: report honestly.
             if identity.startswith("curated-rocketbox-") and not details["likely_lipsync"]:
@@ -237,7 +240,7 @@ def audit_live(save_browser_fixtures: bool = False) -> int:
     healthy = sum(item["status"] == "verified" for item in report["models"].values())
     reviewed = sum(item["status"] == "technically_verified"
                    for item in report["candidates"].values())
-    print(f"Featured GLBs: {healthy}/5; new technical candidates: {reviewed}/6; "
+    print(f"Featured GLBs: {healthy}/5; new technical candidates: {reviewed}/11; "
           f"report: {OUTPUT}", flush=True)
     # External domains can fail intermittently: the audit must report that failure,
     # without blocking local browser/TypeScript/test quality gates.
