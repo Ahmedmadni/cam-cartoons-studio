@@ -14,6 +14,7 @@ import { FRAMING_LABELS, REVIEW_ANGLE_LABELS, type CameraFraming, type ReviewCam
 import { LIGHTING_LABELS, type LightingStyle } from "@/lib/studioLighting";
 import { describeSurfaceLimitations } from "@/lib/avatarSurfaceQuality";
 import { isPinnedMpfbModel } from "@/lib/mpfbSurfaceFixes";
+import { isForestFoxSource } from "@/lib/authoredStoryMotion";
 import { REVIEW_BACKDROPS, REVIEW_STUDIO_GRADIENTS, type ReviewBackdropId } from "@/lib/reviewBackdrops";
 import { REVIEW_EXPRESSION_LABELS, type ReviewExpression } from "@/lib/facialPerformance";
 import { CURATED_CANDIDATES, findImportedCandidate, type CuratedCandidate } from "@/lib/curatedCharacters";
@@ -512,12 +513,18 @@ function LibraryPage() {
               </div>
               <p className="mt-1 text-xs text-muted-foreground">هذه تجربة تعابير من Morph Targets وعظام النموذج الحقيقي وليست مزامنة شفاه مع صوت عربي.</p>
               <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label="حركات فحص الشخصية">
-                {(["idle", "wave", "happy", "nod", "dance"] as AnimationType[]).map((animation) =>
+                {(isForestFoxSource(selected.modelUrl ?? "")
+                  ? ([
+                      ["idle", "استكشاف"], ["wave", "مشي"], ["dance", "جري"],
+                    ] as [AnimationType, string][])
+                  : (["idle", "wave", "happy", "nod", "dance"] as AnimationType[])
+                      .map((value): [AnimationType, string] => [value, ANIMATION_LABELS[value]])
+                ).map(([animation, label]) =>
                   <button key={animation} type="button" aria-pressed={reviewAnimation === animation}
                     onClick={() => setReviewAnimation(animation)}
                     className={"rounded-full px-3 py-2 text-xs font-bold " + (reviewAnimation === animation
                       ? "bg-primary text-primary-foreground" : "bg-card text-foreground")}>
-                    {ANIMATION_LABELS[animation]}
+                    {label}
                   </button>)}
                 <button type="button" aria-pressed={previewSpeech}
                   disabled={diagnostics?.status !== "ready" || (!diagnostics.hasLipSync && !diagnostics.hasJawBone)}
