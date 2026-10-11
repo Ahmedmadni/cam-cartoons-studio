@@ -5,6 +5,7 @@ describe("Source-authored animal movement", () => {
   const clips = ["Survey", "Walk", "Run"];
   test("recognizes the exact native Fox source, not unrelated GLBs", () => {
     expect(isForestFoxSource("https://raw.githubusercontent.com/x/y/Models/Fox/glTF-Binary/Fox.glb")).toBe(true);
+    expect(isForestFoxSource("/__qa__/candidates/curated-animal-forest-fox.glb")).toBe(true);
     expect(isForestFoxSource("blob:https://studio.example.com/fox.glb")).toBe(false);
     expect(isForestFoxSource("https://studio.example.com/custom.glb")).toBe(false);
   });
