@@ -19,7 +19,7 @@ describe("Optional human GLB candidate gallery", () => {
     expect(CURATED_CANDIDATES.filter((item) => item.faceRig === "body-only")).toHaveLength(3);
     expect(CURATED_CANDIDATES.filter((item) => item.faceRig === "inspect-on-load")).toHaveLength(1);
     expect(CURATED_CANDIDATES.find((item) => item.name === "نوران")?.modelUrl).toBe("https://raw.githubusercontent.com/met4citizen/TalkingHead/b3e277b3b46f88e557bf28a2c5612a5b04e075c3/avatars/mpfb.glb");
-    expect(DEFAULT_CHARACTERS).toHaveLength(9); // never seed unapproved candidates
+    expect(DEFAULT_CHARACTERS).toHaveLength(11); // real GLB sources available immediately; binaries lazy-loaded
   });
   test("detects an imported character by source URL despite renaming or offline caching", () => {
     const candidate = CURATED_CANDIDATES[0]!;
@@ -29,7 +29,7 @@ describe("Optional human GLB candidate gallery", () => {
     };
     expect(findImportedCandidate([saved], candidate)).toBe(saved);
     expect(findImportedCandidate([], candidate)).toBeUndefined();
-    expect(findImportedCandidate(DEFAULT_CHARACTERS, candidate)).toBeUndefined();
+    expect(findImportedCandidate(DEFAULT_CHARACTERS, candidate)?.id).toBe(candidate.id);
   });
   test("manual removal does not cause automatic re-insertion", () => {
     const candidate = CURATED_CANDIDATES[1]!;

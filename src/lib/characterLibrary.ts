@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { VoiceType } from "./store";
 import type { CameraFraming } from "./cameraComposition";
+import { CURATED_CANDIDATES } from "./curatedCharacters";
 
 export type CharacterProvider = "imported-glb" | "readyplayerme" | "procedural";
 export type CharacterCategory = "children" | "youth" | "men" | "women" | "fantasy" | "other";
@@ -41,7 +42,7 @@ export const CHARACTER_CATEGORIES: { value: CharacterCategory; label: string }[]
 export const PROVIDER_LABELS: Record<CharacterProvider, string> = {
   "imported-glb": "Premium GLB",
   readyplayerme: "Ready Player Me",
-  procedural: "مدمجة (احتياطية)",
+  procedural: "قديمة — تُحوّل إلى GLB",
 };
 
 /**
@@ -94,13 +95,63 @@ export function migrateFeaturedCharacters(previous: CharacterDefinition[]): Char
   return [...previous, ...FEATURED_CHARACTERS.filter((character) => !existingIds.has(character.id))];
 }
 
+/**
+ * Production library has ONLY genuine, remotely hosted 3D GLB models.
+ * This registers all six pinned curated GLBs without eagerly downloading
+ * their binary files. The large assets load only when the user selects one.
+ */
+export const CURATED_CHARACTERS: CharacterDefinition[] = CURATED_CANDIDATES.map((candidate) => ({
+  ...candidate.draft,
+  id: candidate.id,
+  isDefault: true,
+}));
+
 export const DEFAULT_CHARACTERS: CharacterDefinition[] = [
-  { id: "boy", name: "يوسف", category: "children", provider: "procedural", tags: ["مدمج"], basePreset: "boy", voicePreset: "boy", isDefault: true },
-  { id: "girl", name: "نور", category: "children", provider: "procedural", tags: ["مدمج"], basePreset: "girl", voicePreset: "girl", isDefault: true },
-  { id: "man", name: "أحمد", category: "youth", provider: "procedural", tags: ["مدمج"], basePreset: "man", voicePreset: "man", isDefault: true },
-  { id: "woman", name: "مريم", category: "women", provider: "procedural", tags: ["مدمج"], basePreset: "woman", voicePreset: "woman", isDefault: true },
   ...FEATURED_CHARACTERS,
+  ...CURATED_CHARACTERS,
 ];
+
+/**
+ * Keep IDs, names, favorites and custom user settings across the upgrade.
+ * A procedural-only entry is replaced with an actual shipped GLB source,
+ * never silently rendered as the old geometric mesh. Older "children"
+ * examples do not imply the adult GLBs used as interim replacements are
+ * realistic child assets: those require separately sourced child models.
+ */
+export function replaceProceduralWithRealGlb(characters: CharacterDefinition[]): CharacterDefinition[] {
+  const source = {
+    boy: CURATED_CANDIDATES.find((candidate) => candidate.id === "curated-rocketbox-ziyad")!.modelUrl,
+    girl: FEATURED_CHARACTERS.find((character) => character.id === "featured-selfie-girl")!.modelUrl!,
+    man: FEATURED_CHARACTERS.find((character) => character.id === "featured-cinematic-male")!.modelUrl!,
+    woman: FEATURED_CHARACTERS.find((character) => character.id === "featured-cinematic-female")!.modelUrl!,
+  };
+  return characters.map((character) => {
+    if (character.provider !== "procedural") return character;
+    const preset = character.basePreset ?? (
+      character.category === "women" ? "woman" : character.category === "children" ? "girl" : "man"
+    );
+    return {
+      ...character,
+      provider: "imported-glb",
+      modelUrl: source[preset],
+      assetId: undefined,
+      // Old thumbnails may contain the prohibited geometric characters.
+      thumbnail: undefined,
+      tags: [...new Set([...character.tags.filter((tag) => tag !== "مدمج"), "نموذج GLB حقيقي", "تم التحديث من إصدار قديم"])],
+    };
+  });
+}
+
+/** One-time v4 migration. Match by source too: never create duplicates. */
+export function upgradeToRealGlbLibrary(previous: CharacterDefinition[]): CharacterDefinition[] {
+  const updated = replaceProceduralWithRealGlb(previous);
+  const urls = new Set(updated.map((item) => item.modelUrl).filter(Boolean));
+  const ids = new Set(updated.map((item) => item.id));
+  return [
+    ...updated,
+    ...CURATED_CHARACTERS.filter((item) => !ids.has(item.id) && !urls.has(item.modelUrl)),
+  ];
+}
 
 /**
  * Only rename untouched stock labels. Preserve all user-created names,
@@ -155,7 +206,8 @@ function normalizeDraft(draft: CharacterDraft): CharacterDraft {
   const assetId = draft.assetId?.trim() || undefined;
   if (assetId && !/^glb-[a-z0-9-]{8,}$/i.test(assetId)) throw new Error("معرف ملف الشخصية غير صالح.");
   if (modelUrl && !isSafeAssetUrl(modelUrl, "glb")) throw new Error("رابط GLB غير صالح.");
-  if (draft.provider !== "procedural" && !modelUrl && !assetId) {
+  if (draft.provider === "procedural") throw new Error("الشخصيات الهندسية القديمة غير متاحة؛ استخدم ملف GLB حقيقيًا.");
+  if (!modelUrl && !assetId) {
     throw new Error("أدخل رابط GLB أو استورد ملف .glb من جهازك.");
   }
   const thumbnail = draft.thumbnail?.trim() || undefined;
@@ -173,8 +225,8 @@ function normalizeDraft(draft: CharacterDraft): CharacterDraft {
   return {
     ...draft,
     name,
-    modelUrl: draft.provider === "procedural" ? undefined : modelUrl,
-    assetId: draft.provider === "procedural" ? undefined : assetId,
+    modelUrl,
+    assetId,
     thumbnail,
     tags: [...new Set(draft.tags.map((tag) => tag.trim()).filter(Boolean))].slice(0, 12),
     scale,
@@ -219,7 +271,7 @@ export const useCharacterLibrary = create<CharacterLibraryState>()(
     }),
     {
       name: "cam-cartoons-character-library-v1",
-      version: 3,
+      version: 4,
       migrate: (oldState: unknown, previousVersion: number) => {
         const persisted = oldState && typeof oldState === "object"
           ? oldState as { characters?: unknown }
@@ -234,8 +286,9 @@ export const useCharacterLibrary = create<CharacterLibraryState>()(
         const named = upgradeDefaultCharacterNames(prior);
         // Version 3 introduces ONE new portrait avatar. Do not re-add any
         // of the four existing models if a user has intentionally deleted them.
+        const withPortrait = previousVersion < 3 ? seedPortraitForUpgrade(named) : named;
         return {
-          characters: previousVersion < 3 ? seedPortraitForUpgrade(named) : named,
+          characters: previousVersion < 4 ? upgradeToRealGlbLibrary(withPortrait) : withPortrait,
         };
       },
       partialize: (state) => ({ characters: state.characters }),
