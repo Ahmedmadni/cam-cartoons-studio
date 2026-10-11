@@ -9,7 +9,7 @@ describe("Original GLB human and animal storyteller catalog", () => {
     expect(new Set(CURATED_CANDIDATES.map((item) => item.id)).size).toBe(11);
     for (const item of CURATED_CANDIDATES) {
       expect(isSafeAssetUrl(item.modelUrl, "glb")).toBe(true);
-      expect(item.modelUrl).toMatch(/\/(8af29d456c4d4d4f7e8ac32ac0c2b2aaf02c27d3|ff1b635eba22d782423a6d81233e8deca7f6d1bd|b3e277b3b46f88e557bf28a2c5612a5b04e075c3|5e368bfff897d73090519f9f696c631a52d77397|edc7c9e67c639d230715049ee31f9a96a6babbbe)\/(assets\/avatars|public\/mpfb_models|avatars|Models\/Fox\/glTF-Binary)\/[^/]+\.glb$/);
+      expect(item.modelUrl).toMatch(/\/(8af29d456c4d4d4f7e8ac32ac0c2b2aaf02c27d3|ff1b635eba22d782423a6d81233e8deca7f6d1bd|b3e277b3b46f88e557bf28a2c5612a5b04e075c3|5e368bfff897d73090519f9f696c631a52d77397|edc7c9e67c639d230715049ee31f9a96a6babbbe)\/(assets\/avatars|public\/mpfb_models|public\/avatars|avatars|Models\/Fox\/glTF-Binary)\/[^/]+\.glb$/);
       expect(item.draft.modelUrl).toBe(item.modelUrl);
       expect(item.draft.name).toBe(item.name);
       expect(item.sizeBytes).toBeGreaterThan(100_000);
