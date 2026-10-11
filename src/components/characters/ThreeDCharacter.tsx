@@ -1,4 +1,4 @@
-import { ContactShadows, Environment, Lightformer, useTexture } from "@react-three/drei";
+import { ContactShadows, Environment, Html, Lightformer, useTexture } from "@react-three/drei";
 import { Canvas, useThree } from "@react-three/fiber";
 import { PerspectiveCamera } from "three";
 import { Component, Suspense, useCallback, useEffect, useState, type ReactNode } from "react";
@@ -122,7 +122,19 @@ function Avatar({
     }
   }, [assetId, localAsset.error, onDiagnostics]);
   const renderMode = useAvatarCustomizationStore((state) => state.renderModes[type]) ?? "auto";
+  // Procedural avatars are a separate explicit mode. Never display one while a
+  // real GLB is still downloading; that looks like a blocky "final" character.
   const fallback = <ProceduralAvatar type={type} animation={animation} spin={spin} />;
+  const loading = <Html center className="pointer-events-none" style={{ width: 240, textAlign: "center" }}>
+    <div role="status" className="rounded-2xl border border-border bg-background/95 px-5 py-4 text-sm font-bold text-foreground shadow-xl">
+      جارٍ تحميل الشخصية ثلاثية الأبعاد الأصلية…
+    </div>
+  </Html>;
+  const failed = <Html center className="pointer-events-none" style={{ width: 240, textAlign: "center" }}>
+    <div role="alert" className="rounded-2xl border border-border bg-background/95 px-5 py-4 text-sm font-bold text-destructive shadow-xl">
+      تعذر عرض المجسم الحقيقي. افحص مصدر ملف GLB أو استخدم النسخة المحلية.
+    </div>
+  </Html>;
 
   if (renderMode === "custom") return fallback;
   if (!modelUrl) return fallback;
@@ -130,13 +142,13 @@ function Avatar({
     return (
     <AvatarErrorBoundary
       resetKey={type + ":" + modelUrl}
-      fallback={fallback}
+      fallback={failed}
       onError={(error) => onDiagnostics?.({
         status: "error", modelUrl,
         message: error.message || "تعذر تحميل أو قراءة ملف GLB.",
       })}
     >
-      <Suspense fallback={fallback}>
+      <Suspense fallback={loading}>
         <ReadyPlayerMeAvatar
           type={type}
           url={modelUrl}
