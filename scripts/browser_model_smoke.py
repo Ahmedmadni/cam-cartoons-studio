@@ -334,8 +334,13 @@ def main():
                 ]
                 for name, source_url in featured_names:
                     page.goto(URL, wait_until="networkidle", timeout=60000)
-                    page.get_by_role("button", name=re.compile(name)).first.dispatch_event("click")
-                    expect(page.get_by_role("heading", name=name).last).to_be_visible(timeout=12000)
+                    # "ريم" is a substring of the NEW "كريم": scope the
+                    # card to its exact <h2> identity before clicking.
+                    card = page.get_by_role("button").filter(
+                        has=page.get_by_role("heading", name=name, exact=True))
+                    expect(card).to_have_count(1)
+                    card.dispatch_event("click")
+                    expect(page.get_by_role("heading", name=name, exact=True).last).to_be_visible(timeout=12000)
                     page.get_by_role("button", name="فحص رابط GLB وCORS").dispatch_event("click")
                     # A real GLB now has an independent loading role=status.
                     # Scope this locator to the source-probe paragraph only.
