@@ -275,8 +275,11 @@ def main():
                     if candidate_path.stem == "curated-animal-forest-fox":
                         assert reported["animation_count"] >= 3, "Fox must contain native clips"
                         expect(page.get_by_text("مقاطع الحركة المرفقة: 3", exact=False)).to_be_visible()
-                        page.get_by_role("button", name="قفز").dispatch_event("click")
-                        expect(page.get_by_role("button", name="قفز")).to_have_attribute("aria-pressed", "true")
+                        expect(page.get_by_role("button", name="استكشاف")).to_have_attribute("aria-pressed", "true")
+                        page.get_by_role("button", name="مشي").dispatch_event("click")
+                        expect(page.get_by_role("button", name="مشي")).to_have_attribute("aria-pressed", "true")
+                        page.get_by_role("button", name="جري").dispatch_event("click")
+                        expect(page.get_by_role("button", name="جري")).to_have_attribute("aria-pressed", "true")
                     if candidate_path.stem == "curated-mpfb-kofi":
                         # One representative A/B check is sufficient. Repeated
                         # large avatar remounts can exhaust SwiftShader budgets.
