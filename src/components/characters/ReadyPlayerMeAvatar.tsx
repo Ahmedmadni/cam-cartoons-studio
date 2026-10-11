@@ -1,11 +1,12 @@
 import { useGLTF } from "@react-three/drei";
 import { useFrame, useThree } from "@react-three/fiber";
 import { useEffect, useMemo, useRef } from "react";
-import { Box3, MathUtils, Vector3 } from "three";
+import { AnimationMixer, Box3, MathUtils, Vector3 } from "three";
 import type { Bone, Euler, Group, Mesh, Object3D } from "three";
 import { clone as cloneSkeleton } from "three/examples/jsm/utils/SkeletonUtils.js";
 
 import { getAvatarProfile } from "@/lib/avatarCatalog";
+import { chooseForestFoxClip, isForestFoxSource } from "@/lib/authoredStoryMotion";
 import { createBoneFaceDriver, findFacialBones, type FacialBoneRig } from "@/lib/boneFaceMotion";
 import { faceState } from "@/lib/faceState";
 import { getNaturalBlink, getReviewExpressionPose, resolveMorphIndices, type ReviewExpression } from "@/lib/facialPerformance";
@@ -223,6 +224,19 @@ export default function ReadyPlayerMeAvatar({ type, url, animation, spin, previe
     return { scene, report };
   }, [gltf.scene, sourceUrl, surfaceCleanup, url]);
   const avatar = corrected.scene;
+  // Only the exact authored animal source uses its native skeletal clips.
+  const authoredMotion = useMemo(() => isForestFoxSource(sourceUrl ?? url) && gltf.animations.length
+    ? new AnimationMixer(avatar) : null, [avatar, gltf.animations.length, sourceUrl, url]);
+  const authoredClip = chooseForestFoxClip(gltf.animations.map((clip) => clip.name), animation);
+  useEffect(() => {
+    if (!authoredMotion || !authoredClip) return;
+    const clip = gltf.animations.find((item) => item.name === authoredClip);
+    if (!clip) return;
+    const action = authoredMotion.clipAction(clip);
+    action.reset().fadeIn(0.2).play();
+    return () => { action.fadeOut(0.2); };
+  }, [authoredMotion, authoredClip, gltf.animations]);
+  useEffect(() => () => { authoredMotion?.stopAllAction(); }, [authoredMotion]);
   const surface = useMemo(() => {
     const enhancedTextureCount = enhanceSurfaceSampling(avatar, gpuAnisotropy);
     return { ...inspectSurfaceQuality(avatar), enhancedTextureCount };
@@ -338,6 +352,12 @@ export default function ReadyPlayerMeAvatar({ type, url, animation, spin, previe
 
     group.position.y = MathUtils.damp(group.position.y, targetY, 8, delta);
     group.rotation.z = MathUtils.damp(group.rotation.z, targetZ, 8, delta);
+
+    // Don't overwrite quadruped bones using synthetic human arm/head posing.
+    if (authoredMotion) {
+      authoredMotion.update(Math.min(delta, 0.1));
+      return;
+    }
 
     const pose = basePose.current;
     const tracking = useStudioStore.getState().isFaceTrackingEnabled;
