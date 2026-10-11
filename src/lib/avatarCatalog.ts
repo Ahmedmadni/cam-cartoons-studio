@@ -54,13 +54,14 @@ export function prepareReadyPlayerMeUrl(rawUrl: string | null | undefined) {
 
   try {
     const url = new URL(raw);
+    // Do not force a 1024px cap or WebP recompression on user-owned RPM
+    // assets. Preserve the publisher's original texture quality and any
+    // user-specified texture format/size query parameters unchanged.
     url.searchParams.set("morphTargets", RPM_MORPH_TARGETS);
-    url.searchParams.set("textureSizeLimit", "1024");
-    url.searchParams.set("textureFormat", "webp");
     return url.toString();
   } catch {
     const joiner = raw.includes("?") ? "&" : "?";
-    return `${raw}${joiner}morphTargets=${encodeURIComponent(RPM_MORPH_TARGETS)}&textureSizeLimit=1024&textureFormat=webp`;
+    return `${raw}${joiner}morphTargets=${encodeURIComponent(RPM_MORPH_TARGETS)}`;
   }
 }
 
