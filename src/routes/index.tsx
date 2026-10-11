@@ -76,7 +76,7 @@ function Editor({ initial, onClose, onSave }: {
           <div className="grid grid-cols-2 gap-3">
             <label className="text-sm font-bold">المصدر
               <select className={inputClass} value={draft.provider} onChange={(e) => patch({ provider: e.target.value as CharacterProvider })}>
-                {Object.entries(PROVIDER_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                {(["imported-glb", "readyplayerme"] as const).map((value) => <option key={value} value={value}>{PROVIDER_LABELS[value]}</option>)}
               </select>
             </label>
             <label className="text-sm font-bold">التصنيف
@@ -123,12 +123,9 @@ function Editor({ initial, onClose, onSave }: {
                 {VOICES.map((voice) => <option key={voice} value={voice}>{voice}</option>)}
               </select>
             </label>
-            <label className="text-sm font-bold">شكل احتياطي
-              <select className={inputClass} value={draft.basePreset ?? "man"} onChange={(e) => patch({ basePreset: e.target.value as CharacterDraft["basePreset"] })}>
-                <option value="boy">ولد</option><option value="girl">بنت</option>
-                <option value="man">شاب</option><option value="woman">فتاة</option>
-              </select>
-            </label>
+            <div className="rounded-xl border border-border bg-muted/50 p-3 text-xs font-semibold text-muted-foreground">
+              يُعرض ملف GLB الأصلي كما هو؛ لا توجد شخصيات هندسية احتياطية.
+            </div>
           </div>
           {draft.provider !== "procedural" && <label className="block text-sm font-bold">
             لقطة المعاينة الافتراضية
@@ -215,7 +212,7 @@ function LibraryPage() {
   const filters = [
     { value: "all", label: "الكل" }, { value: "imported-glb", label: "Premium GLB" },
     { value: "readyplayerme", label: "Ready Player Me" }, { value: "favorites", label: "المفضلة" },
-    ...CHARACTER_CATEGORIES, { value: "procedural", label: "المدمجة" },
+    ...CHARACTER_CATEGORIES,
   ];
   const visible = useMemo(() => characters.filter((item) => {
     const matchesFilter = filter === "all" || (filter === "favorites" ? item.isFavorite :
@@ -257,8 +254,8 @@ function LibraryPage() {
     }
   };
 
-  // Build a real model-specific portrait after the 3D stage has fully loaded.
-  // The model stays as an emoji placeholder only if WebGL/CORS capture fails.
+  // Build a real model-specific portrait after the actual 3D GLB stage loads.
+  // A neutral film glyph is shown only until a genuine screenshot exists.
   useEffect(() => {
     if (!selected || selected.provider === "procedural" || selected.thumbnail || diagnostics?.status !== "ready") return;
     const timer = window.setTimeout(() => captureThumbnail(true), 1400);
@@ -355,12 +352,12 @@ function LibraryPage() {
             <div>
               <h2 id="art-candidates-heading" className="text-xl font-black">شخصيات بشرية جديدة قيد التقييم</h2>
               <p className="mt-1 max-w-3xl text-sm font-semibold text-muted-foreground">
-                نماذج بشرية GLB من Rocketbox وMakeHuman / MPFB، بينها نموذج مستقل أكبر حجمًا من TalkingHead. يمكنك إضافتها وتجربتها هنا دون مغادرة التطبيق.
-                لم نعتمد بعد درجة مطابقتها للصور السينمائية المرجعية، ولن نضيفها تلقائيًا إلى مكتبتك.
+                نماذج بشرية أصلية GLB من Rocketbox وMakeHuman / MPFB وTalkingHead؛ جميعها موجودة الآن في المكتبة وقابلة للمعاينة مباشرة.
+                أُدرجت ملفاتها كمصادر ثلاثية الأبعاد فعلية، من دون تنزيل الملفات الضخمة إلا عند فتح الشخصية. المطابقة الفنية للمراجع ما زالت بحاجة إلى تقييم.
               </p>
             </div>
             <span className="rounded-full border border-border px-3 py-1 text-xs font-bold text-muted-foreground">
-              {CURATED_CANDIDATES.length} مرشحين — موافقة فنية مطلوبة
+              {CURATED_CANDIDATES.length} نماذج GLB أصلية
             </span>
           </div>
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
@@ -396,7 +393,7 @@ function LibraryPage() {
             <button type="button" onClick={() => choose(item)} aria-pressed={selectedCharacter === item.id} className="w-full text-right">
               <div className="relative flex aspect-[4/3] items-center justify-center overflow-hidden bg-gradient-to-br from-muted to-secondary/20">
                 {item.thumbnail ? <img src={item.thumbnail} alt={"معاينة " + item.name} loading="lazy" className="h-full w-full object-cover" />
-                  : <span className="text-7xl" aria-hidden>{item.provider === "imported-glb" ? "🎬" : item.basePreset === "boy" ? "👦" : item.basePreset === "girl" ? "👧" : item.basePreset === "woman" ? "👩" : "👨"}</span>}
+                  : <span className="text-7xl" aria-hidden>🎬</span>}
                 <span className="absolute right-3 top-3 rounded-full bg-background/90 px-2 py-1 text-xs font-black">{PROVIDER_LABELS[item.provider]}</span>
               </div>
               <div className="px-4 pt-3">
@@ -593,7 +590,7 @@ function LibraryPage() {
               <h3 className="font-black">تقرير جاهزية نموذج GLB</h3>
               {!diagnostics && <p className="mt-2 text-muted-foreground">جارٍ فحص النموذج وتحميله...</p>}
               {diagnostics?.status === "error" && <p role="alert" className="mt-2 text-destructive">
-                تعذر تحميل النموذج: {diagnostics.message}. يتم عرض الشخصية الاحتياطية.
+                تعذر تحميل النموذج: {diagnostics.message}. لن يتم عرض أي شخصية بديلة قديمة.
               </p>}
               {diagnostics?.status === "ready" && <div className="mt-2 space-y-1 font-semibold text-muted-foreground">
                 <p className="font-black text-foreground">حالة التوافق: {readiness.title}</p>

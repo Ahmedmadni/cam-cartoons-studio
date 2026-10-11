@@ -13,7 +13,6 @@ import type { AvatarDiagnostics } from "@/lib/modelPresentation";
 import { useAvatarCustomizationStore } from "@/lib/avatarCustomization";
 import type { AnimationType, CharacterType } from "@/lib/store";
 
-import ProceduralAvatar from "./ProceduralAvatar";
 import ReadyPlayerMeAvatar from "./ReadyPlayerMeAvatar";
 
 function ResponsiveCharacterCamera({
@@ -121,10 +120,8 @@ function Avatar({
       });
     }
   }, [assetId, localAsset.error, onDiagnostics]);
-  const renderMode = useAvatarCustomizationStore((state) => state.renderModes[type]) ?? "auto";
-  // Procedural avatars are a separate explicit mode. Never display one while a
-  // real GLB is still downloading; that looks like a blocky "final" character.
-  const fallback = <ProceduralAvatar type={type} animation={animation} spin={spin} />;
+  // Never display old geometric characters: neither at boot, during GLB
+  // download, after failures, nor for persisted v1 "custom" render modes.
   const loading = <Html center className="pointer-events-none" style={{ width: 240, textAlign: "center" }}>
     <div role="status" className="rounded-2xl border border-border bg-background/95 px-5 py-4 text-sm font-bold text-foreground shadow-xl">
       جارٍ تحميل الشخصية ثلاثية الأبعاد الأصلية…
@@ -136,10 +133,8 @@ function Avatar({
     </div>
   </Html>;
 
-  if (renderMode === "custom") return fallback;
-  if (!modelUrl) return fallback;
-  if (renderMode === "readyplayerme" || renderMode === "auto") {
-    return (
+  if (!modelUrl) return failed;
+  return (
     <AvatarErrorBoundary
       resetKey={type + ":" + modelUrl}
       fallback={failed}
@@ -164,9 +159,6 @@ function Avatar({
       </Suspense>
     </AvatarErrorBoundary>
     );
-  }
-
-  return fallback;
 }
 
 export type ThreeDCharacterProps = {
