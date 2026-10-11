@@ -60,6 +60,26 @@ class GlbAuditTests(unittest.TestCase):
         self.assertFalse(misleading["jaw_bone"])
         self.assertFalse(misleading["eye_bones"])
 
+    def test_triangle_and_embedded_image_stats_use_actual_gltf_accessors(self):
+        source = {
+            "asset": {"version": "2.0"},
+            "meshes": [{"primitives": [
+                {"attributes": {"POSITION": 0}, "indices": 1},
+                {"attributes": {"POSITION": 0}, "mode": 1},
+            ]}],
+            "accessors": [{"count": 9}, {"count": 12}],
+            "bufferViews": [{"byteLength": 77}],
+            "images": [{"bufferView": 0, "mimeType": "image/png"}],
+            "nodes": [], "skins": [],
+        }
+        data = json.dumps(source, separators=(",", ":")).encode()
+        data += b" " * (-len(data) % 4)
+        blob = struct.pack("<III", 0x46546C67, 2, 20 + len(data)) + struct.pack("<II", len(data), 0x4E4F534A) + data
+        report = inspect_glb(blob)
+        self.assertEqual(report["source_triangles"], 4)
+        self.assertEqual(report["source_vertices"], 18)
+        self.assertEqual(report["embedded_image_bytes"], 77)
+
     def test_truncated_and_wrong_header_are_rejected(self):
         blob = sample_glb()
         with self.assertRaises(ValueError):
@@ -75,16 +95,17 @@ class GlbAuditTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             inspect_glb(sample_glb(meshes=[{"primitives": [{"attributes": {"NORMAL": 0}}]}]))
 
-    def test_candidate_sources_are_five_distinct_commit_pinned_glbs(self):
+    def test_candidate_sources_are_six_distinct_commit_pinned_glbs(self):
         candidates = candidate_urls()
         self.assertEqual(set(candidates), {
             "curated-rocketbox-yasmin", "curated-rocketbox-ziyad",
-            "curated-mpfb-kofi", "curated-mpfb-yuki", "curated-mpfb-liam",
+            "curated-mpfb-kofi", "curated-mpfb-yuki", "curated-mpfb-liam", "curated-mpfb-nouran",
         })
         for item in candidates.values():
             self.assertTrue(
                 "/8af29d456c4d4d4f7e8ac32ac0c2b2aaf02c27d3/" in item["url"] or
-                "/ff1b635eba22d782423a6d81233e8deca7f6d1bd/" in item["url"]
+                "/ff1b635eba22d782423a6d81233e8deca7f6d1bd/" in item["url"] or
+                "/b3e277b3b46f88e557bf28a2c5612a5b04e075c3/" in item["url"]
             )
 
     def test_featured_source_has_five_distinct_real_urls(self):

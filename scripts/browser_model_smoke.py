@@ -139,6 +139,7 @@ def main():
                 expect(page.get_by_role("button", name="أضف كوفي للتقييم")).to_be_visible()
                 expect(page.get_by_role("button", name="أضف يوكي للتقييم")).to_be_visible()
                 expect(page.get_by_role("button", name="أضف ليام للتقييم")).to_be_visible()
+                expect(page.get_by_role("button", name="أضف نوران للتقييم")).to_be_visible()
                 # Keep heavy optional avatar downloads isolated from baseline
                 # renderer and IndexedDB regression tests.
                 add_character(page, "اختبار الجودة")
@@ -222,9 +223,17 @@ def main():
                     verified_count += 1
                     print(f"PASS: real hosted model binary loaded in WebGL: {featured_path.name}", flush=True)
                 print(f"Real publisher-hosted GLB models exercised: {verified_count}/5", flush=True)
-                candidate_files = sorted(Path("public/__qa__/candidates").glob("curated-*.glb"))
+                # Run the large, optional TalkingHead MPFB source last.
+                candidate_files = sorted(Path("public/__qa__/candidates").glob("curated-*.glb"),
+                                         key=lambda path: (path.stem == "curated-mpfb-nouran", path.stem))
                 model_report = json.loads((ARTIFACTS / "featured-asset-audit.json").read_text(encoding="utf-8"))
                 for candidate_path in candidate_files:
+                    if candidate_path.stem == "curated-mpfb-nouran":
+                        # Isolate ~35 MiB source and its GPU textures from earlier
+                        # snapshots to avoid resource exhaustion on CI SwiftShader.
+                        context.close()
+                        context = browser.new_context(viewport={"width": 1366, "height": 900})
+                        page = context.new_page()
                     page.goto(URL, wait_until="networkidle", timeout=60000)
                     add_character(
                         page, "فحص النموذج " + candidate_path.stem,
@@ -263,16 +272,21 @@ def main():
                             "aria-pressed", "true"
                         )
                         expect(page.get_by_text("طبقات الوجه المخفية:", exact=False)).to_be_visible()
-                    if candidate_path.stem.startswith("curated-mpfb-") and reported["jaw_bone"]:
-                        control = page.get_by_role("button", name="تجربة حركة الفك")
+                    if candidate_path.stem.startswith("curated-mpfb-") and (reported["jaw_bone"] or reported["likely_lipsync"]):
+                        # Morph-capable MPFB sources correctly use the full mouth
+                        # preview; jaw-only sources expose mechanical jaw motion.
+                        # Check actual GLB anatomy rather than inferring from brand.
+                        control_label = "تجربة حركة الفم" if reported["likely_lipsync"] else "تجربة حركة الفك"
+                        stop_label = "إيقاف تجربة الفم" if reported["likely_lipsync"] else "إيقاف تجربة الفك"
+                        control = page.get_by_role("button", name=control_label)
                         expect(control).to_be_enabled()
                         control.dispatch_event("click")
-                        expect(page.get_by_role("button", name="إيقاف تجربة الفك")).to_have_attribute(
+                        expect(page.get_by_role("button", name=stop_label)).to_have_attribute(
                             "aria-pressed", "true"
                         )
                     print(f"PASS: real optional GLB: {candidate_path.name}; lips={lips}; "
                           f"jaw={jaw_status}; eyes={eye_status}", flush=True)
-                print(f"Real candidate binary GLBs exercised: {len(candidate_files)}/5", flush=True)
+                print(f"Real candidate binary GLBs exercised: {len(candidate_files)}/6", flush=True)
 
                 # Close every heavy fixture-loaded GLB and WebGL program before
                 # testing remote featured URLs. Original avatars must be able to
@@ -298,7 +312,9 @@ def main():
                     page.get_by_role("button", name=re.compile(name)).first.dispatch_event("click")
                     expect(page.get_by_role("heading", name=name).last).to_be_visible(timeout=12000)
                     page.get_by_role("button", name="فحص رابط GLB وCORS").dispatch_event("click")
-                    source_status = page.get_by_role("status")
+                    # A real GLB now has an independent loading role=status.
+                    # Scope this locator to the source-probe paragraph only.
+                    source_status = page.locator("p[role='status']").last
                     expect(source_status).to_contain_text("المصدر متاح", timeout=22000)
                     await_gltf_ready(page, name, expected_zero_bones=False, source_url=source_url)
                     if name == "ريم":
@@ -362,7 +378,8 @@ def main():
                     "Selecting an existing candidate must not create a duplicate"
                 )
                 candidate_page.get_by_role("button", name="فحص رابط GLB وCORS").dispatch_event("click")
-                expect(candidate_page.get_by_role("status")).to_contain_text("المصدر متاح", timeout=22000)
+                expect(candidate_page.locator("p[role='status']").last).to_contain_text(
+                    "المصدر متاح", timeout=22000)
                 await_gltf_ready(candidate_page, "ياسمين", expected_zero_bones=False)
                 candidate_context.close()
                 browser.close()

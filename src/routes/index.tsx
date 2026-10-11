@@ -355,7 +355,7 @@ function LibraryPage() {
             <div>
               <h2 id="art-candidates-heading" className="text-xl font-black">شخصيات بشرية جديدة قيد التقييم</h2>
               <p className="mt-1 max-w-3xl text-sm font-semibold text-muted-foreground">
-                نماذج GLB بشرية من Microsoft Rocketbox وMakeHuman / PrivacyPuppet. يمكنك إضافتها وتجربتها هنا دون مغادرة التطبيق.
+                نماذج بشرية GLB من Rocketbox وMakeHuman / MPFB، بينها نموذج مستقل أكبر حجمًا من TalkingHead. يمكنك إضافتها وتجربتها هنا دون مغادرة التطبيق.
                 لم نعتمد بعد درجة مطابقتها للصور السينمائية المرجعية، ولن نضيفها تلقائيًا إلى مكتبتك.
               </p>
             </div>
@@ -373,8 +373,13 @@ function LibraryPage() {
                     {candidate.origin} · {(candidate.sizeBytes / 1024 / 1024).toFixed(1)} MB
                   </p>
                   <p className="mt-2 text-sm text-muted-foreground">{candidate.description}</p>
+                  {candidate.sizeBytes > 24 * 1024 * 1024 && <p className="mt-2 text-xs font-bold text-amber-700 dark:text-amber-300">
+                    ملف كبير (حوالي {(candidate.sizeBytes / 1024 / 1024).toFixed(0)} MB) يستهلك بيانات وذاكرة أكثر؛ أضفه فقط إذا أردت معاينته.
+                  </p>}
                   <p className="mt-2 text-xs font-bold text-muted-foreground">
-                    {candidate.faceRig === "blendshapes" ? "مورفات وجه موثّقة من المصدر" : "هيكل بشري — تعابير الوجه غير مضمونة"}
+                    {candidate.faceRig === "blendshapes" ? "مورفات وجه موثّقة من المصدر" :
+                      candidate.faceRig === "body-only" ? "هيكل بشري — تعابير الوجه غير مضمونة" :
+                      "تُفحص عظام الوجه وتعابيره من ملف GLB الحقيقي بعد التحميل"}
                   </p>
                 </div>
                 <button type="button" onClick={() => chooseCandidate(candidate)}

@@ -16,7 +16,7 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-MAX_BYTES = 32 * 1024 * 1024
+MAX_BYTES = 48 * 1024 * 1024
 FEATURED_SOURCE = Path("src/lib/characterLibrary.ts")
 CANDIDATE_SOURCE = Path("src/lib/curatedCharacters.ts")
 OUTPUT = Path("artifacts/model-review/featured-asset-audit.json")
@@ -67,6 +67,32 @@ def inspect_glb(data: bytes) -> dict:
     primitives = [p for m in meshes for p in m.get("primitives", [])]
     if not primitives or not any("POSITION" in p.get("attributes", {}) for p in primitives):
         raise ValueError("Meshes have no accessible POSITION attributes")
+    # Source mesh density: actual glTF accessor counts, triangle mode only.
+    # No artistic quality claims based on file size or triangle totals.
+    accessors = g.get("accessors", [])
+    source_triangles = 0
+    source_vertices = 0
+    for primitive in primitives:
+        position = primitive.get("attributes", {}).get("POSITION")
+        if isinstance(position, int) and 0 <= position < len(accessors):
+            source_vertices += max(0, accessors[position].get("count", 0))
+        if primitive.get("mode", 4) != 4:
+            continue
+        indices = primitive.get("indices")
+        if isinstance(indices, int) and 0 <= indices < len(accessors):
+            count = accessors[indices].get("count", 0)
+        elif isinstance(position, int) and 0 <= position < len(accessors):
+            count = accessors[position].get("count", 0)
+        else:
+            count = 0
+        source_triangles += max(0, count // 3)
+    views = g.get("bufferViews", [])
+    embedded_image_bytes = sum(
+        views[image["bufferView"]].get("byteLength", 0)
+        for image in g.get("images", [])
+        if isinstance(image.get("bufferView"), int)
+        and 0 <= image["bufferView"] < len(views)
+    )
     morph_count = max((len(p.get("targets", [])) for p in primitives), default=0)
     morph_names = sorted({
         str(name) for mesh in meshes for name in
@@ -82,6 +108,9 @@ def inspect_glb(data: bytes) -> dict:
         "sha256": hashlib.sha256(data).hexdigest(),
         "mesh_count": len(meshes),
         "primitive_count": len(primitives),
+        "source_triangles": source_triangles,
+        "source_vertices": source_vertices,
+        "embedded_image_bytes": embedded_image_bytes,
         "mesh_name_samples": mesh_name_samples[:36],
         "low_poly_overlays": sum("lowpoly" in re.sub(r"[^a-z0-9]", "", name.lower()) for name in mesh_name_samples),
         "high_poly_overlays": sum("highpoly" in re.sub(r"[^a-z0-9]", "", name.lower()) for name in mesh_name_samples),
@@ -113,7 +142,7 @@ def read_limited(url: str, timeout: int = 22) -> tuple[bytes, dict]:
     with urllib.request.urlopen(req, timeout=timeout) as res:
         size_header = res.headers.get("Content-Length")
         if size_header and int(size_header) > MAX_BYTES:
-            raise ValueError("Model exceeds 32 MiB audit ceiling")
+            raise ValueError("Model exceeds 48 MiB audit ceiling")
         data = res.read(MAX_BYTES + 1)
         headers = {
             "content_type": res.headers.get("Content-Type", ""),
@@ -121,7 +150,7 @@ def read_limited(url: str, timeout: int = 22) -> tuple[bytes, dict]:
             "final_url": res.url,
         }
     if len(data) > MAX_BYTES:
-        raise ValueError("Model exceeds 32 MiB audit ceiling")
+        raise ValueError("Model exceeds 48 MiB audit ceiling")
     return data, headers
 
 
@@ -147,8 +176,8 @@ def candidate_urls() -> dict[str, dict[str, str]]:
     )
     candidates = {id_: {"name": name, "url": url}
                   for id_, name, url in entries if id_.startswith("curated-")}
-    if len(candidates) != 5 or len({item["url"] for item in candidates.values()}) != 5:
-        raise ValueError("Expected five distinct pinned candidate GLB sources")
+    if len(candidates) != 6 or len({item["url"] for item in candidates.values()}) != 6:
+        raise ValueError("Expected six distinct pinned candidate GLB sources")
     return candidates
 
 
@@ -195,7 +224,10 @@ def audit_live(save_browser_fixtures: bool = False) -> int:
                 "face_rig_grade": "face_morphs" if details["likely_lipsync"] else "body_only",
                 **details,
             }
-            print(f"  candidate verified; joints={details['joints']}; morphs={details['morph_count']}", flush=True)
+            print(f"  candidate verified; joints={details['joints']}; morphs={details['morph_count']}; "
+                  f"triangles={details['source_triangles']}; "
+                  f"images={details['image_count']} / {details['embedded_image_bytes']} bytes",
+                  flush=True)
         except (ValueError, OSError, TimeoutError, urllib.error.URLError) as exc:
             report["candidates"][identity] = {**source, "status": "unavailable_or_invalid",
                                               "error": str(exc)}
@@ -205,7 +237,7 @@ def audit_live(save_browser_fixtures: bool = False) -> int:
     healthy = sum(item["status"] == "verified" for item in report["models"].values())
     reviewed = sum(item["status"] == "technically_verified"
                    for item in report["candidates"].values())
-    print(f"Featured GLBs: {healthy}/5; new technical candidates: {reviewed}/5; "
+    print(f"Featured GLBs: {healthy}/5; new technical candidates: {reviewed}/6; "
           f"report: {OUTPUT}", flush=True)
     # External domains can fail intermittently: the audit must report that failure,
     # without blocking local browser/TypeScript/test quality gates.

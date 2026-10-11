@@ -9,14 +9,14 @@ export type CuratedCandidate = {
   sizeBytes: number;
   modelUrl: string;
   /** Original converter reports face blendshapes, or only body skeleton. Never market both as equivalent. */
-  faceRig: "blendshapes" | "body-only";
+  faceRig: "blendshapes" | "body-only" | "inspect-on-load";
   draft: CharacterDraft;
 };
 
 /**
- * Two Microsoft Rocketbox human models plus three MakeHuman/MPFB humans from
- * PrivacyPuppet. Pin upstream commits; do not auto-seed or claim artistic approval.
- * Some MPFB human models have a skeleton without face blendshapes.
+ * Two Rocketbox human models, three MPFB/PrivacyPuppet humans, and one
+ * TalkingHead/MPFB CC0 sample. Pin source commits, do not auto-seed or claim
+ * artistic approval. Facial morph support varies per GLB.
  * They load into the user's own library only after an explicit click.
  */
 export const CURATED_CANDIDATES: CuratedCandidate[] = [
@@ -92,6 +92,21 @@ export const CURATED_CANDIDATES: CuratedCandidate[] = [
       modelUrl: "https://raw.githubusercontent.com/privacypuppet/privacypuppet/ff1b635eba22d782423a6d81233e8deca7f6d1bd/public/mpfb_models/liam-v2.glb",
       tags: ["شخصيات بشرية", "MakeHuman", "للتقييم الفني", "تعابير الوجه غير مؤكدة"],
       voicePreset: "man", basePreset: "man", scale: 1, yOffset: -1.62,
+      preferredFraming: "upper",
+    },
+  },
+  {
+    id: "curated-mpfb-nouran", name: "نوران",
+    description: "شخصية بشرية مستقلة من MakeHuman/MPFB بملف أكبر حجمًا وتفاصيل مصدر تحتاج للمقارنة. راجع الوجه والشعر والملابس والخامات فعليًا؛ حجم الملف وحده لا يضمن الجودة.",
+    origin: "TalkingHead / Blender-MPFB (CC0)",
+    sourceFilename: "mpfb.glb", sizeBytes: 36815920,
+    modelUrl: "https://raw.githubusercontent.com/met4citizen/TalkingHead/b3e277b3b46f88e557bf28a2c5612a5b04e075c3/avatars/mpfb.glb",
+    faceRig: "inspect-on-load",
+    draft: {
+      name: "نوران", category: "women", provider: "imported-glb",
+      modelUrl: "https://raw.githubusercontent.com/met4citizen/TalkingHead/b3e277b3b46f88e557bf28a2c5612a5b04e075c3/avatars/mpfb.glb",
+      tags: ["مرشحة فنية", "MakeHuman", "تفاصيل أصول أكبر", "الوجه بحاجة للفحص"],
+      voicePreset: "woman", basePreset: "woman", scale: 1, yOffset: -1.62,
       preferredFraming: "upper",
     },
   },
