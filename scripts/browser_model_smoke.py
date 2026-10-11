@@ -312,7 +312,9 @@ def main():
                     page.get_by_role("button", name=re.compile(name)).first.dispatch_event("click")
                     expect(page.get_by_role("heading", name=name).last).to_be_visible(timeout=12000)
                     page.get_by_role("button", name="فحص رابط GLB وCORS").dispatch_event("click")
-                    source_status = page.get_by_role("status")
+                    # A real GLB now has an independent loading role=status.
+                    # Scope this locator to the source-probe paragraph only.
+                    source_status = page.locator("p[role='status']").last
                     expect(source_status).to_contain_text("المصدر متاح", timeout=22000)
                     await_gltf_ready(page, name, expected_zero_bones=False, source_url=source_url)
                     if name == "ريم":
