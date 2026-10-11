@@ -19,4 +19,4 @@ describe("Source-authored animal movement", () => {
     expect(chooseForestFoxClip([], "idle")).toBeNull();
     expect(chooseForestFoxClip(["Other"], "happy")).toBe("Other");
   });
-}
+});
