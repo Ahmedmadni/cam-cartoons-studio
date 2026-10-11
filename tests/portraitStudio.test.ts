@@ -59,7 +59,7 @@ describe("Cinematic character preview", () => {
     const edited = old.map((item) => item.id === "featured-cinematic-female"
       ? { ...item, name: "اسمي الخاص", isFavorite: true } : item);
     const upgraded = seedPortraitForUpgrade(edited);
-    expect(upgraded).toHaveLength(16);
+    expect(upgraded).toHaveLength(17);
     expect(upgraded.find((item) => item.id === "featured-cinematic-female")?.name).toBe("اسمي الخاص");
     expect(upgraded.find((item) => item.id === "featured-cinematic-female")?.isFavorite).toBe(true);
     expect(seedPortraitForUpgrade(upgraded)).toEqual(upgraded);
