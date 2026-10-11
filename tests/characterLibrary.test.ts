@@ -11,8 +11,8 @@ import {
 } from "../src/lib/characterLibrary";
 
 describe("Open Character Library", () => {
-  test("starts with sixteen real 3D GLBs and no old geometric stock models", () => {
-    expect(DEFAULT_CHARACTERS).toHaveLength(16);
+  test("starts with seventeen real 3D GLBs and no old geometric stock models", () => {
+    expect(DEFAULT_CHARACTERS).toHaveLength(17);
     expect(DEFAULT_CHARACTERS.find((item) => item.id === "curated-animal-forest-fox")?.category).toBe("animals");
     expect(DEFAULT_CHARACTERS.every((item) => item.provider === "imported-glb" && !!item.modelUrl)).toBe(true);
     expect(DEFAULT_CHARACTERS.some((item) => ["boy", "girl", "man", "woman"].includes(item.id))).toBe(false);
