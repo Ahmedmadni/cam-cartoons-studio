@@ -272,11 +272,16 @@ def main():
                             "aria-pressed", "true"
                         )
                         expect(page.get_by_text("طبقات الوجه المخفية:", exact=False)).to_be_visible()
-                    if candidate_path.stem.startswith("curated-mpfb-") and reported["jaw_bone"]:
-                        control = page.get_by_role("button", name="تجربة حركة الفك")
+                    if candidate_path.stem.startswith("curated-mpfb-") and (reported["jaw_bone"] or reported["likely_lipsync"]):
+                        # Morph-capable MPFB sources correctly use the full mouth
+                        # preview; jaw-only sources expose mechanical jaw motion.
+                        # Check actual GLB anatomy rather than inferring from brand.
+                        control_label = "تجربة حركة الفم" if reported["likely_lipsync"] else "تجربة حركة الفك"
+                        stop_label = "إيقاف تجربة الفم" if reported["likely_lipsync"] else "إيقاف تجربة الفك"
+                        control = page.get_by_role("button", name=control_label)
                         expect(control).to_be_enabled()
                         control.dispatch_event("click")
-                        expect(page.get_by_role("button", name="إيقاف تجربة الفك")).to_have_attribute(
+                        expect(page.get_by_role("button", name=stop_label)).to_have_attribute(
                             "aria-pressed", "true"
                         )
                     print(f"PASS: real optional GLB: {candidate_path.name}; lips={lips}; "
