@@ -132,14 +132,18 @@ def main():
                 page.goto(URL, wait_until="networkidle", timeout=60000)
                 expect(page.get_by_role("heading", name="مكتبة الشخصيات المفتوحة")).to_be_visible(timeout=30000)
 
-                # Optional candidates must appear but should not be auto-seeded.
+                # The entire stock library consists of real GLB sources; the
+                # six curated models are listed at startup without eager binary downloads.
                 expect(page.get_by_role("heading", name="شخصيات بشرية جديدة قيد التقييم")).to_be_visible()
-                expect(page.get_by_role("button", name="أضف ياسمين للتقييم")).to_be_visible()
-                expect(page.get_by_role("button", name="أضف زياد للتقييم")).to_be_visible()
-                expect(page.get_by_role("button", name="أضف كوفي للتقييم")).to_be_visible()
-                expect(page.get_by_role("button", name="أضف يوكي للتقييم")).to_be_visible()
-                expect(page.get_by_role("button", name="أضف ليام للتقييم")).to_be_visible()
-                expect(page.get_by_role("button", name="أضف نوران للتقييم")).to_be_visible()
+                expect(page.get_by_role("button", name="افتح ياسمين في مكتبتي")).to_be_visible()
+                expect(page.get_by_role("button", name="افتح زياد في مكتبتي")).to_be_visible()
+                expect(page.get_by_role("button", name="افتح كوفي في مكتبتي")).to_be_visible()
+                expect(page.get_by_role("button", name="افتح يوكي في مكتبتي")).to_be_visible()
+                expect(page.get_by_role("button", name="افتح ليام في مكتبتي")).to_be_visible()
+                expect(page.get_by_role("button", name="افتح نوران في مكتبتي")).to_be_visible()
+                assert "مدمجة (احتياطية)" not in page.locator("body").inner_text()
+                assert page.locator("option[value='procedural']").count() == 0
+                assert page.get_by_role("button", name="يوسف").count() == 0
                 # Keep heavy optional avatar downloads isolated from baseline
                 # renderer and IndexedDB regression tests.
                 add_character(page, "اختبار الجودة")
@@ -369,8 +373,8 @@ def main():
                 candidate_context = browser.new_context(viewport={"width": 1366, "height": 900})
                 candidate_page = candidate_context.new_page()
                 candidate_page.goto(URL, wait_until="networkidle", timeout=60000)
-                expect(candidate_page.get_by_role("button", name="أضف ياسمين للتقييم")).to_be_visible()
-                candidate_page.get_by_role("button", name="أضف ياسمين للتقييم").dispatch_event("click")
+                expect(candidate_page.get_by_role("button", name="افتح ياسمين في مكتبتي")).to_be_visible()
+                candidate_page.get_by_role("button", name="افتح ياسمين في مكتبتي").dispatch_event("click")
                 expect(candidate_page.get_by_role("button", name="افتح ياسمين في مكتبتي")).to_be_visible()
                 expect(candidate_page.get_by_role("heading", name="ياسمين").last).to_be_visible()
                 candidate_page.get_by_role("button", name="افتح ياسمين في مكتبتي").dispatch_event("click")

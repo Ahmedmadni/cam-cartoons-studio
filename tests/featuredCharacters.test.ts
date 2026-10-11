@@ -22,9 +22,12 @@ describe("Featured premium GLB collection", () => {
   });
 
   test("migrates old persisted libraries without losing custom entries or favorites", () => {
-    const legacy = DEFAULT_CHARACTERS.slice(0, 4).map((a) => ({
-      ...a, isFavorite: a.id === "girl",
-    }));
+    const legacy = [
+      { id: "boy", name: "اسمي الشخصي", category: "children" as const, provider: "procedural" as const, tags: [], isFavorite: true },
+      { id: "girl", name: "نور", category: "children" as const, provider: "procedural" as const, tags: [] },
+      { id: "man", name: "أحمد", category: "men" as const, provider: "procedural" as const, tags: [] },
+      { id: "woman", name: "مريم", category: "women" as const, provider: "procedural" as const, tags: [] },
+    ];
     const custom = {
       id: "my-own", name: "شخصيتي", category: "youth" as const,
       provider: "imported-glb" as const, modelUrl: "https://example.com/avatar.glb",
@@ -32,7 +35,7 @@ describe("Featured premium GLB collection", () => {
     };
     const migrated = migrateFeaturedCharacters([...legacy, custom]);
     expect(migrated.length).toBe(10);
-    expect(migrated.find((c) => c.id === "girl")?.isFavorite).toBe(true);
+    expect(migrated.find((c) => c.id === "boy")?.isFavorite).toBe(true);
     expect(migrated.find((c) => c.id === "my-own")).toEqual(custom);
     expect(migrateFeaturedCharacters(migrated)).toEqual(migrated);
   });

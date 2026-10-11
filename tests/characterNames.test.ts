@@ -8,14 +8,15 @@ import {
 } from "../src/lib/characterLibrary";
 
 describe("Natural Arabic character names", () => {
-  test("all nine built-in characters have distinct, familiar personal names", () => {
+  test("all eleven built-in GLB characters have distinct names, no old geometry", () => {
     const names = DEFAULT_CHARACTERS.map((character) => character.name);
-    expect(names).toEqual(["يوسف", "نور", "أحمد", "مريم", "سارة", "عمر", "ليلى", "هند", "ريم"]);
-    expect(new Set(names).size).toBe(9);
+    expect(names).toEqual(["سارة", "عمر", "ليلى", "هند", "ريم", "ياسمين", "زياد", "كوفي", "يوكي", "ليام", "نوران"]);
+    expect(new Set(names).size).toBe(11);
+    expect(DEFAULT_CHARACTERS.every((item) => item.provider !== "procedural")).toBe(true);
     expect(FEATURED_CHARACTERS.every((character) => !character.name.includes("—"))).toBe(true);
   });
 
-  test("upgrades legacy stock labels without changing character IDs, models, tags or favorites", () => {
+  test("upgrades original GLB labels without changing IDs, models, tags or favorites", () => {
     const previous = DEFAULT_CHARACTERS.map((character) => ({
       ...character,
       name: PREVIOUS_DEFAULT_NAMES[character.id] ?? character.name,
