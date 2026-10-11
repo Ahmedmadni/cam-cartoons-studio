@@ -2,7 +2,8 @@ import type { AnimationType } from "./store";
 
 /** Match only the commit-pinned source path; blob URL playback uses model sourceUrl. */
 export function isForestFoxSource(url: string): boolean {
-  return /\/Models\/Fox\/glTF-Binary\/Fox\.glb(?:\?|$)/i.test(url);
+  return /\/Models\/Fox\/glTF-Binary\/Fox\.glb(?:\?|$)/i.test(url) ||
+    /\/__qa__\/candidates\/curated-animal-forest-fox\.glb(?:\?|$)/i.test(url);
 }
 
 /** Never invent action clips; select only names present in the decoded GLB. */
