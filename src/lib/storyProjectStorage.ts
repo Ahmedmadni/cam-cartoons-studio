@@ -25,7 +25,7 @@ function connect(): Promise<IDBDatabase> {
 async function transact<T>(mode: IDBTransactionMode, action: (store: IDBObjectStore) => IDBRequest<T>): Promise<T> {
   const db = await connect();
   return new Promise<T>((resolve, reject) => {
-    let result: T;
+    let result!: T;
     let settled = false;
     const fail = (error: Error) => {
       if (!settled) { settled = true; reject(error); }
