@@ -5,6 +5,8 @@ import { useCharacterLibrary } from "@/lib/characterLibrary";
 import { createStoryProject, type StoryProject, type StoryScene } from "@/lib/storyProject";
 import { addScene, updateScene, removeScene, moveScene, getTimeline } from "@/lib/storyProjectOperations";
 import { saveStoryProject, listStoryProjects, deleteStoryProject } from "@/lib/storyProjectStorage";
+import { deserializeStoryProject, duplicateImportedStoryProject, serializeStoryProject, MAX_STORY_BACKUP_BYTES } from "@/lib/storyProjectBackup";
+import { addCue } from "@/lib/storyCueOperations";
 
 export const Route = createFileRoute("/projects")({
   head: () => ({ meta: [{ title: "مشاريعي — استوديو القصص" }] }),
@@ -44,6 +46,26 @@ function ProjectsPage() {
     await save(next);
     setSelected(null);
   }
+  async function importBackup(file: File | undefined) {
+    if (!file) return;
+    if (file.size > MAX_STORY_BACKUP_BYTES) { setError("حجم النسخة الاحتياطية كبير جدًا"); return; }
+    setBusy(true); setError("");
+    try {
+      const imported = duplicateImportedStoryProject(deserializeStoryProject(await file.text()), uid());
+      await saveStoryProject(imported);
+      setProjects(prev => [imported, ...prev]); setProject(imported);
+      setSelected(imported.scenes[0]?.id ?? null); setMessage("تم استيراد نسخة مستقلة من المشروع");
+    } catch (e) { setError("تعذر استيراد المشروع: " + String(e)); }
+    finally { setBusy(false); }
+  }
+  function exportBackup(p: StoryProject) {
+    try {
+      const blob = new Blob([serializeStoryProject(p)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a"); a.href = url; a.download = "cartoon-story-" + p.id + ".json";
+      a.click(); window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (e) { setError(String(e)); }
+  }
   async function destroy(id: string) {
     if (!window.confirm("حذف المشروع نهائيًا من هذا المتصفح؟")) return;
     setBusy(true);
@@ -75,7 +97,7 @@ function ProjectsPage() {
       <div className="mx-auto max-w-7xl space-y-6">
         <header className="flex flex-wrap items-center justify-between gap-3">
           <div><h1 className="text-3xl font-black">استوديو مشاريعي</h1><p className="text-muted-foreground">بناء المشاهد وحفظها محليًا — لا يتم رفع القصص للسحابة.</p></div>
-          <div className="flex gap-2"><Link to="/" className="rounded-xl border px-4 py-2">مكتبة الشخصيات</Link><button disabled={busy} onClick={create} className="rounded-xl bg-primary px-4 py-2 text-primary-foreground">+ مشروع جديد</button></div>
+          <div className="flex gap-2"><Link to="/" className="rounded-xl border px-4 py-2">مكتبة الشخصيات</Link><label className="cursor-pointer rounded-xl border px-4 py-2">استيراد JSON<input aria-label="استيراد نسخة احتياطية" type="file" accept=".json,application/json" className="sr-only" onChange={e => { void importBackup(e.target.files?.[0]); e.target.value = ""; }} /></label><button disabled={busy} onClick={create} className="rounded-xl bg-primary px-4 py-2 text-primary-foreground">+ مشروع جديد</button></div>
         </header>
         {error && <div role="alert" className="rounded-xl border border-destructive p-3 text-destructive">{error}</div>}
         {message && <div role="status" className="rounded-xl border p-3">{message}</div>}
@@ -93,7 +115,7 @@ function ProjectsPage() {
               {!project ? <div className="rounded-2xl border p-10 text-center text-muted-foreground">اختر مشروعًا من القائمة أو أنشئ مشروعًا جديدًا.</div> : <>
                 <div className="flex flex-wrap items-end gap-3 rounded-2xl border p-4">
                   <label className="min-w-[220px] flex-1 space-y-1"><span className="text-sm font-bold">عنوان القصة</span><input className={control} value={project.title} onChange={e => { setProject({...project, title:e.target.value, updatedAt: new Date().toISOString()}); setMessage("تغييرات غير محفوظة"); }} /></label>
-                  <button disabled={busy || !project.title.trim()} className="rounded-xl bg-primary px-5 py-2 text-primary-foreground disabled:opacity-50" onClick={() => save(project)}>حفظ المشروع</button>
+                  <button disabled={busy} className="rounded-xl border px-4 py-2" onClick={() => exportBackup(project)}>تنزيل نسخة JSON</button><button disabled={busy || !project.title.trim()} className="rounded-xl bg-primary px-5 py-2 text-primary-foreground disabled:opacity-50" onClick={() => save(project)}>حفظ المشروع</button>
                 </div>
                 <div className="rounded-2xl border p-4">
                   <div className="mb-3 flex justify-between"><h2 className="font-bold">لوحة المشاهد — {project.scenes.length}</h2><button onClick={add} className="rounded-lg bg-secondary px-3 py-1">+ مشهد</button></div>
@@ -118,8 +140,8 @@ function ProjectsPage() {
                     <div className="relative aspect-video overflow-hidden rounded-xl bg-muted" style={backdrop?{backgroundImage:`url("${backdrop.src}")`,backgroundSize:"cover",backgroundPosition:"center"}:{}}><span className="absolute bottom-2 right-2 rounded bg-black/60 px-2 py-1 text-white">{scene.title} · {scene.actors.length} شخصيات</span></div>
                     <p className="text-sm text-muted-foreground">هذه معاينة للخلفية فقط؛ عرض الشخصيات وتحريكها عبر المحرر الزمني يأتي في المرحلة التالية.</p>
                     <h3 className="font-bold">الحوار والحركات</h3>
-                    {scene.cues.map(c=><div key={c.id} className="rounded-lg border p-2 text-sm"><span>{c.kind === "speech" ? "حوار" : "حركة"}: {c.value}</span><button className="float-left" onClick={()=>changeScene({...scene,cues:scene.cues.filter(x=>x.id!==c.id)})}>×</button></div>)}
-                    {scene.actors.length>0 && <button className="rounded-lg bg-secondary px-3 py-2" onClick={()=>{const id=scene.actors[0]!.id;changeScene({...scene,cues:[...scene.cues,{id:uid(),actorId:id,atMs:0,durationMs:Math.min(1000,scene.durationMs),kind:"speech",value:"مرحبًا بكم في قصتنا"}]});}}>+ أضف حوارًا نموذجيًا</button>}
+                    {scene.cues.map(c=><div key={c.id} className="space-y-2 rounded-lg border p-2 text-sm"><div className="flex justify-between"><span>{c.kind === "speech" ? "حوار" : "حركة"}</span><button aria-label="حذف الإشارة" onClick={()=>changeScene({...scene,cues:scene.cues.filter(x=>x.id!==c.id)})}>×</button></div><input aria-label="نص الحوار أو الحركة" className={control} value={c.value} onChange={e=>changeScene({...scene,cues:scene.cues.map(x=>x.id===c.id?{...x,value:e.target.value}:x)})}/><div className="grid grid-cols-2 gap-2"><label>البداية (ثانية)<input aria-label="بداية الإشارة" className={control} type="number" min="0" step="0.1" value={c.atMs/1000} onChange={e=>{const atMs=Math.round(Number(e.target.value)*1000);if(Number.isFinite(atMs) && atMs>=0)changeScene({...scene,cues:scene.cues.map(x=>x.id===c.id?{...x,atMs}:x)})}}/></label><label>المدة (ثانية)<input aria-label="مدة الإشارة" className={control} type="number" min="0.1" step="0.1" value={c.durationMs/1000} onChange={e=>{const durationMs=Math.round(Number(e.target.value)*1000);if(Number.isFinite(durationMs) && durationMs>0)changeScene({...scene,cues:scene.cues.map(x=>x.id===c.id?{...x,durationMs}:x)})}}/></label></div></div>)}
+                    {scene.actors.length>0 && <button className="rounded-lg bg-secondary px-3 py-2" onClick={()=>{const id=scene.actors[0]!.id;if(project) { try { const next = addCue(project,scene.id,{id:uid(),actorId:id,atMs:0,durationMs:Math.min(1000,scene.durationMs),kind:"speech",value:"مرحبًا بكم في قصتنا"}); setProject(next); setMessage("تغييرات غير محفوظة"); } catch (e) { setError(String(e)); } }}}>+ أضف حوارًا نموذجيًا</button>}
                   </div>
                 </div>}
               </>}
