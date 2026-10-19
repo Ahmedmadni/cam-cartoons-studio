@@ -1,23 +1,26 @@
-# Phase 19 — Story project foundation (increment 1)
+# Phase 19 — Story production foundation and storyboard editor
 
-## Implemented
-- New versioned `StoryProject` schema and parser (`src/lib/storyProject.ts`) with scene, actor, dialogue/animation cue and camera framing models.
-- Cross-reference validation for actor IDs and cue durations, duplicate IDs and invalid schema versions.
-- Isolated IndexedDB CRUD helpers (`src/lib/storyProjectStorage.ts`), with explicit errors on browser storage unavailability, blocked upgrades, and failed transactions.
-- Six unit tests for schema creation, parsing, scene duration and invalid data.
-- Zero changes to existing WebGL renderer, camera/video capture, character catalog or old persisted library.
+## Delivered to draft PR #31
+- Versioned, validated story project data model with actors, timed cues, scenes and camera framing.
+- Isolated IndexedDB CRUD for browser-local drafts without modifying the existing character library.
+- Immutable scene add/update/remove/reorder utilities and a deterministic, millisecond-based scene timeline.
+- New Arabic `/projects` route with a multi-scene storyboard editor: create/open/delete project, rename, explicitly save, add/remove/reorder scenes, choose backgrounds and camera framing, add/remove actors and add a sample speech cue.
+- Direct navigation into projects from the home character library.
+- Schema and timeline unit tests.
+- Existing `/story`, `/studio`, `/save`, GLB rendering, and audio recording logic remain untouched.
 
-## Scope / limitations
-This is **only the first increment**, not the entirety of Phase 19.
-- New project CRUD is an internal API, not yet wired into story editor UI or autosave.
-- No multi-scene playback, export fixes, browser recording tests or MP4 feature.
-- No automatic migration from the older transient Zustand state; do not silently overwrite existing user data.
-- Actual CI results should be reviewed on the pull request before merge.
-- The remote audio fallback limitations documented in `docs/AI_VOICE_API.md` still apply.
+## Important honest limitations
+- This is a story *authoring foundation*, not full multi-scene rendered video export. The storyboard preview intentionally shows the selected background and metadata; actor 3D stage integration, speech cue editing, playback and export remain to do.
+- Saving is currently explicit, not automatic; unsaved changes are labeled as such.
+- Saved story drafts are browser-local only. Browser data deletion can erase them; cloud backup/import/export is not yet implemented.
+- A failed early CI attempt on the new route showed a missing generated TanStack route registration. Route tree was subsequently updated; latest CI must be reviewed before merge.
+- No claim that Lip Sync, VRM animation retargeting or cross-browser MP4 are implemented.
 
-## Next increments
-1. Add draft editor UI with explicit save/open, autosave conflict handling and optimistic recovery.
-2. Extract story orchestration out of `src/routes/story.tsx` and support deterministic multi-scene playback.
-3. Test MediaRecorder MIME fallback, audio capture, cancellation and cleanup in Chromium.
-4. Verify realistic GLB loading/bandwidth under WebGL and preserve license metadata.
-5. Run all CI gates and merge only after green results and human review.
+## Follow-up acceptance gates
+1. Final TypeScript, Bun unit, build and WebGL CI all green on final branch SHA.
+2. Add editable cue timing/text and multiple scene actors, then runtime playback preview.
+3. Browser-native persistence tests including storage unavailable/quota, fresh reload and corrupted records.
+4. Add honest video/media capability detection and synchronized audio capture tests.
+5. Add downloadable project JSON backup / import with validation.
+6. Review UX/accessibility, and test on Android/iOS/desktop.
+7. Merge only after review.
