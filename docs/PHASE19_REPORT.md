@@ -31,3 +31,8 @@
 - Add tests for backup roundtrip, invalid format/oversized input, non-overwriting imports, and cue add/edit/remove and bounds.
 - The user must manually save changed scene content; project export may include current unsaved in-memory edits, so editor status must be checked.
 - Pending: autosave/conflict handling, 3D multi-actor preview, timeline playback, export, mobile/browser/device QA. No production completion claim.
+
+## Deterministic playback planning increment
+- Added a pure multi-scene playback scheduling layer that flattens scene-relative cues to absolute story-time intervals, maps actors to catalog IDs, and exposes frame lookups with boundary semantics.
+- Added tests for cue ordering, scene boundaries, absolute offsets and empty projects.
+- This is a scheduling foundation, **not** an operational renderer or synchronized exported movie yet.
