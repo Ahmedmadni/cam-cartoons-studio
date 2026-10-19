@@ -24,3 +24,10 @@
 5. Add downloadable project JSON backup / import with validation.
 6. Review UX/accessibility, and test on Android/iOS/desktop.
 7. Merge only after review.
+
+## Additional October 19 increment
+- Add strict JSON backup export/import with a 2 MiB import cap and validation of project schema and backup format; imports receive a fresh project ID to avoid replacing an existing draft.
+- Add cue editing inputs (text, start time and duration) to the storyboard and reusable immutable cue operations for future timeline controls.
+- Add tests for backup roundtrip, invalid format/oversized input, non-overwriting imports, and cue add/edit/remove and bounds.
+- The user must manually save changed scene content; project export may include current unsaved in-memory edits, so editor status must be checked.
+- Pending: autosave/conflict handling, 3D multi-actor preview, timeline playback, export, mobile/browser/device QA. No production completion claim.
