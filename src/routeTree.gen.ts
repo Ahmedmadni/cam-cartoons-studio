@@ -50,8 +50,6 @@ const StudioRoute = StudioRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/projects': typeof ProjectsRoute
-  '/projects': typeof ProjectsRoute
-  '/projects': typeof ProjectsRoute
   '/customize': typeof CustomizeRoute
   '/save': typeof SaveRoute
   '/story': typeof StoryRoute
@@ -59,6 +57,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/projects': typeof ProjectsRoute
   '/customize': typeof CustomizeRoute
   '/save': typeof SaveRoute
   '/story': typeof StoryRoute
@@ -67,6 +66,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/projects': typeof ProjectsRoute
   '/customize': typeof CustomizeRoute
   '/save': typeof SaveRoute
   '/story': typeof StoryRoute
