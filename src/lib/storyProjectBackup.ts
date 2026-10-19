@@ -15,8 +15,8 @@ export function deserializeStoryProject(json: string): StoryProject {
   if (!envelope || typeof envelope !== "object" || Array.isArray(envelope))
     throw new Error("Invalid story backup");
   const data = envelope as Record<string, unknown>;
-  if (data.format !== STORY_BACKUP_FORMAT) throw new Error("Unsupported story backup format");
-  return parseStoryProject(data.project);
+  if (data['format'] !== STORY_BACKUP_FORMAT) throw new Error("Unsupported story backup format");
+  return parseStoryProject(data['project']);
 }
 
 /** Import as a new project to avoid silently overwriting another locally saved draft. */
