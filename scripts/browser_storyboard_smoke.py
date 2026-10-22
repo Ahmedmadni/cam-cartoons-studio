@@ -35,10 +35,19 @@ def main():
             browser = playwright.chromium.launch(headless=True, args=["--no-sandbox"])
             context = browser.new_context(viewport={"width": 1360, "height": 900}, accept_downloads=True)
             page = context.new_page()
+            runtime_errors = []
+            page.on("pageerror", lambda error: runtime_errors.append(str(error)))
+            page.on("console", lambda message: runtime_errors.append("console: " + message.text) if message.type == "error" else None)
             page.goto(URL + "/projects", wait_until="domcontentloaded", timeout=45000)
             expect(page.get_by_role("heading", name="استوديو مشاريعي")).to_be_visible()
             page.get_by_role("button", name="مشروع جديد").click()
-            page.get_by_role("button", name="مشهد", exact=False).first.click()
+            try:
+                expect(page.get_by_label("عنوان القصة")).to_be_visible(timeout=12000)
+            except Exception:
+                print("PROJECT CREATION PAGE:", page.locator("body").inner_text()[:5000], flush=True)
+                print("PROJECT CREATION JS ERRORS:", runtime_errors, flush=True)
+                raise
+            page.get_by_role("button", name="+ مشهد", exact=True).click()
             expect(page.get_by_label("اسم المشهد")).to_be_visible()
             page.get_by_label("اسم المشهد").fill("الافتتاحية")
             page.get_by_label("المدة (ثوان)").fill("3")
