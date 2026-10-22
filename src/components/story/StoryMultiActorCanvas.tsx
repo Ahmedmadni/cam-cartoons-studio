@@ -11,6 +11,7 @@ type Props = {
   backgroundUrl?: string | undefined;
   actorAnimations: Record<string, AnimationType>;
   characterIds: readonly string[];
+  onCanvasReady?: ((canvas: HTMLCanvasElement) => void) | undefined;
 };
 
 function StoryCamera({ framing, actorCount }: { framing: StoryScene["camera"]["framing"]; actorCount: number }) {
@@ -34,7 +35,7 @@ function StoryCamera({ framing, actorCount }: { framing: StoryScene["camera"]["f
  * One WebGL context for the whole scene. Restrict preview to three genuine
  * GLB characters to avoid loading up to 20 high-resolution rigs on a phone.
  */
-export default function StoryMultiActorCanvas({ scene, backgroundUrl, actorAnimations, characterIds }: Props) {
+export default function StoryMultiActorCanvas({ scene, backgroundUrl, actorAnimations, characterIds, onCanvasReady }: Props) {
   const visible = scene.actors.filter(a => characterIds.includes(a.characterId)).slice(0, 3);
   const centered = visible.every(actor => actor.x === 0);
   return (
@@ -42,7 +43,8 @@ export default function StoryMultiActorCanvas({ scene, backgroundUrl, actorAnima
       className="h-full w-full"
       shadows
       dpr={[1, 1.5]}
-      gl={{ alpha: true, antialias: true, powerPreference: "high-performance" }}
+      gl={{ alpha: true, antialias: true, preserveDrawingBuffer: true, powerPreference: "high-performance" }}
+      onCreated={({ gl }) => onCanvasReady?.(gl.domElement)}
       camera={{ position: [0, 0.35, 6.8], fov: 43, near: 0.1, far: 80 }}
     >
       <StoryCamera framing={scene.camera.framing} actorCount={visible.length}/>
