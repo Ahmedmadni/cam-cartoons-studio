@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { BACKGROUNDS } from "@/lib/story";
 import { useCharacterLibrary } from "@/lib/characterLibrary";
 import { createStoryProject, type StoryProject, type StoryScene } from "@/lib/storyProject";
-import { addScene, updateScene, removeScene, moveScene, getTimeline } from "@/lib/storyProjectOperations";
+import { addScene, updateScene, removeScene, moveScene, getTimeline, duplicateScene } from "@/lib/storyProjectOperations";
 import { saveStoryProject, listStoryProjects, deleteStoryProject } from "@/lib/storyProjectStorage";
 import { deserializeStoryProject, duplicateImportedStoryProject, serializeStoryProject, MAX_STORY_BACKUP_BYTES } from "@/lib/storyProjectBackup";
 import { addCue } from "@/lib/storyCueOperations";
@@ -176,7 +176,12 @@ function ProjectsPage() {
                     <div key={s.id} className={"rounded-xl border p-2 " + (selected===s.id ? "border-primary" : "")}>
                       <button className="block min-w-28 text-right font-bold" onClick={() => setSelected(s.id)}>{i+1}. {s.title}</button>
                       <small>{Math.round(s.durationMs/1000)} ثانية</small>
-                      <div className="flex gap-1"><button aria-label="للأمام" disabled={i===0} onClick={()=>{markDirty(moveScene(project,i,i-1));}}>→</button><button aria-label="للخلف" disabled={i===project.scenes.length-1} onClick={()=>{markDirty(moveScene(project,i,i+1));}}>←</button><button aria-label="حذف المشهد" onClick={()=>{markDirty(removeScene(project,s.id));if(selected===s.id)setSelected(null);}}>×</button></div>
+                      <div className="flex gap-1"><button aria-label="للأمام" disabled={i===0} onClick={()=>{markDirty(moveScene(project,i,i-1));}}>→</button><button aria-label="للخلف" disabled={i===project.scenes.length-1} onClick={()=>{markDirty(moveScene(project,i,i+1));}}>←</button><button type="button" aria-label="تكرار المشهد" className="rounded px-2 hover:bg-muted" onClick={()=>{
+                        try {
+                          const copy=duplicateScene(project,s.id,uid);
+                          markDirty(copy); setSelected(copy.scenes[i+1]!.id);
+                        } catch(e){setError("تعذر نسخ المشهد: "+String(e));}
+                      }}>نسخ</button><button aria-label="حذف المشهد" onClick={()=>{markDirty(removeScene(project,s.id));if(selected===s.id)setSelected(null);}}>×</button></div>
                     </div>)}</div>
                   <p className="mt-3 text-sm text-muted-foreground">إجمالي المدة: {(getTimeline(project).at(-1)?.endMs ?? 0)/1000} ثانية</p>
                 </div>
