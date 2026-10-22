@@ -39,4 +39,7 @@ test("failed saves report an error without blocking subsequent writes", async ()
   await autosave.saveNow(createStoryProject("b","الثانية"));
   expect(errors).toHaveLength(1);
   expect(writes).toEqual(["b"]);
+  expect(autosave.hasUnwrittenChanges()).toBe(true);
+  autosave.cancel("a");
+  expect(autosave.hasUnwrittenChanges()).toBe(false);
 });
