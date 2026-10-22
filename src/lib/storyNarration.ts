@@ -42,16 +42,22 @@ export class BrowserStoryNarrator {
   speak(cue: ScheduledStoryCue, voice: VoiceType = "normal"): boolean {
     if (!this.synth || !this.makeUtterance) return false;
     this.stop();
-    const utterance = this.makeUtterance(cue.value);
-    utterance.lang = "ar-SA";
-    utterance.rate = 0.95;
-    utterance.pitch = VOICE_PITCH[voice];
-    const arabicVoice = this.synth.getVoices().find(v => v.lang.toLowerCase().startsWith("ar"));
-    if (arabicVoice) utterance.voice = arabicVoice;
-    this.activeUntil = cue.endMs;
-    this.activeId = cue.cueId;
-    this.synth.speak(utterance);
-    return true;
+    try {
+      const utterance = this.makeUtterance(cue.value);
+      utterance.lang = "ar-SA";
+      utterance.rate = 0.95;
+      utterance.pitch = VOICE_PITCH[voice];
+      const arabicVoice = this.synth.getVoices().find(v => v.lang.toLowerCase().startsWith("ar"));
+      if (arabicVoice) utterance.voice = arabicVoice;
+      this.activeUntil = cue.endMs;
+      this.activeId = cue.cueId;
+      this.synth.speak(utterance);
+      return true;
+    } catch {
+      // Voice synthesis can fail even when APIs are exposed (platform voice packs).
+      this.stop();
+      return false;
+    }
   }
 
   /** Stop a line when its authored cue ends; it must not bleed into the next scene. */
