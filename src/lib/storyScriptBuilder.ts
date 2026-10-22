@@ -20,7 +20,12 @@ export function parseSpeakerScript(script: string, speakers: readonly ScriptSpea
   const lines = script.split(/\r?\n/u).map(line => line.trim()).filter(Boolean);
   if (lines.length > MAX_DIALOGUE_LINES) throw new Error("يمكن إضافة 80 سطر حوار في المرة الواحدة");
   const lookup = new Map<string, string>();
-  for (const speaker of speakers) lookup.set(speaker.displayName.trim().toLocaleLowerCase("ar"), speaker.actorId);
+  for (const speaker of speakers) {
+    const name = speaker.displayName.trim().toLocaleLowerCase("ar");
+    if (lookup.has(name) && lookup.get(name) !== speaker.actorId)
+      throw new Error("أسماء الشخصيات مكررة؛ غيّر أسماء الشخصيات لتوزيع الحوار دون التباس");
+    lookup.set(name, speaker.actorId);
+  }
   return lines.map((line, index) => {
     const colon = line.indexOf(":");
     const ArabicColon = line.indexOf("：");
