@@ -5,6 +5,7 @@ export class StoryAutosave {
   private pending = new Map<string, { project: StoryProject; timer: ReturnType<typeof setTimeout> }>();
   private tail: Promise<void> = Promise.resolve();
   private writing = 0;
+  private failed = new Set<string>();
 
   constructor(
     private readonly write: (project: StoryProject) => Promise<void>,
@@ -36,10 +37,12 @@ export class StoryAutosave {
     return operation.then(
       () => {
         this.writing -= 1;
+        this.failed.delete(item.project.id);
         this.onSaved(item.project);
       },
       (error: unknown) => {
         this.writing -= 1;
+        this.failed.add(item.project.id);
         this.onError(item.project, error);
         throw error;
       },
@@ -50,10 +53,11 @@ export class StoryAutosave {
     const item = this.pending.get(id);
     if (item) clearTimeout(item.timer);
     this.pending.delete(id);
+    this.failed.delete(id);
   }
 
   hasUnwrittenChanges(): boolean {
-    return this.pending.size > 0 || this.writing > 0;
+    return this.pending.size > 0 || this.writing > 0 || this.failed.size > 0;
   }
 
   /** Complete scheduled writes before destructive operations, unless explicitly cancelled. */
