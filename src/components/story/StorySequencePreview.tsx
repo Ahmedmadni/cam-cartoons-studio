@@ -82,7 +82,7 @@ export default function StorySequencePreview({ project, characters }: Props) {
             key={leadCharacter.id}
             type={leadCharacter.id}
             animation={action}
-            backgroundUrl={backdrop?.src}
+            {...(backdrop ? { backgroundUrl: backdrop.src } : {})}
             framing={scene.camera.framing === "wide" ? "full" : scene.camera.framing === "medium" ? "upper" : "portrait"}
             spin={false}
             className="h-full w-full"
