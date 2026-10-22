@@ -7,6 +7,8 @@ import { addScene, updateScene, removeScene, moveScene, getTimeline } from "@/li
 import { saveStoryProject, listStoryProjects, deleteStoryProject } from "@/lib/storyProjectStorage";
 import { deserializeStoryProject, duplicateImportedStoryProject, serializeStoryProject, MAX_STORY_BACKUP_BYTES } from "@/lib/storyProjectBackup";
 import { addCue } from "@/lib/storyCueOperations";
+import StorySequencePreview from "@/components/story/StorySequencePreview";
+import { ANIMATION_LABELS } from "@/lib/store";
 
 export const Route = createFileRoute("/projects")({
   head: () => ({ meta: [{ title: "مشاريعي — استوديو القصص" }] }),
@@ -127,6 +129,7 @@ function ProjectsPage() {
                     </div>)}</div>
                   <p className="mt-3 text-sm text-muted-foreground">إجمالي المدة: {(getTimeline(project).at(-1)?.endMs ?? 0)/1000} ثانية</p>
                 </div>
+                <StorySequencePreview project={project} characters={characters}/>
                 {scene && <div className="grid gap-4 rounded-2xl border p-4 md:grid-cols-2">
                   <div className="space-y-3">
                     <label className="block space-y-1"><span>اسم المشهد</span><input className={control} value={scene.title} onChange={e=>changeScene({...scene,title:e.target.value})}/></label>
@@ -134,14 +137,31 @@ function ProjectsPage() {
                     <label className="block space-y-1"><span>الخلفية</span><select className={control} value={scene.backgroundId} onChange={e=>changeScene({...scene,backgroundId:e.target.value})}>{BACKGROUNDS.map(b=><option value={b.id} key={b.id}>{b.label}</option>)}</select></label>
                     <label className="block space-y-1"><span>الكاميرا</span><select className={control} value={scene.camera.framing} onChange={e=>changeScene({...scene,camera:{framing:e.target.value as "wide"|"medium"|"close"}})}><option value="wide">لقطة واسعة</option><option value="medium">لقطة متوسطة</option><option value="close">لقطة قريبة</option></select></label>
                     <label className="block space-y-1"><span>إضافة شخصية</span><select className={control} value="" onChange={e=>{if(!e.target.value)return;changeScene({...scene,actors:[...scene.actors,{id:uid(),characterId:e.target.value,x:0,scale:1}]});}}><option value="">اختر شخصية…</option>{characters.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
-                    {scene.actors.map(a=><div key={a.id} className="flex flex-wrap items-center gap-2 rounded-lg border p-2"><span className="flex-1">{characters.find(c=>c.id===a.characterId)?.name ?? a.characterId}</span><button onClick={()=>changeScene({...scene,actors:scene.actors.filter(x=>x.id!==a.id),cues:scene.cues.filter(c=>c.actorId!==a.id)})}>حذف</button></div>)}
+                    {scene.actors.map(a=><div key={a.id} className="space-y-2 rounded-lg border p-2">
+                      <div className="flex items-center gap-2"><strong className="flex-1 text-sm">{characters.find(c=>c.id===a.characterId)?.name ?? a.characterId}</strong><button type="button" aria-label="حذف الشخصية" onClick={()=>changeScene({...scene,actors:scene.actors.filter(x=>x.id!==a.id),cues:scene.cues.filter(c=>c.actorId!==a.id)})}>حذف</button></div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <label className="text-xs">الموقع الأفقي<input aria-label="موقع الشخصية" className={control} type="number" step="0.1" min="-1" max="1" value={a.x} onChange={e=>{const x=Number(e.target.value);if(Number.isFinite(x) && x>=-1 && x<=1)changeScene({...scene,actors:scene.actors.map(v=>v.id===a.id?{...v,x}:v)});}}/></label>
+                        <label className="text-xs">الحجم<input aria-label="حجم الشخصية" className={control} type="number" step="0.1" min="0.1" max="10" value={a.scale} onChange={e=>{const scale=Number(e.target.value);if(Number.isFinite(scale) && scale>0 && scale<=10)changeScene({...scene,actors:scene.actors.map(v=>v.id===a.id?{...v,scale}:v)});}}/></label>
+                      </div>
+                    </div>)}
                   </div>
                   <div className="space-y-3">
                     <div className="relative aspect-video overflow-hidden rounded-xl bg-muted" style={backdrop?{backgroundImage:`url("${backdrop.src}")`,backgroundSize:"cover",backgroundPosition:"center"}:{}}><span className="absolute bottom-2 right-2 rounded bg-black/60 px-2 py-1 text-white">{scene.title} · {scene.actors.length} شخصيات</span></div>
                     <p className="text-sm text-muted-foreground">هذه معاينة للخلفية فقط؛ عرض الشخصيات وتحريكها عبر المحرر الزمني يأتي في المرحلة التالية.</p>
                     <h3 className="font-bold">الحوار والحركات</h3>
-                    {scene.cues.map(c=><div key={c.id} className="space-y-2 rounded-lg border p-2 text-sm"><div className="flex justify-between"><span>{c.kind === "speech" ? "حوار" : "حركة"}</span><button aria-label="حذف الإشارة" onClick={()=>changeScene({...scene,cues:scene.cues.filter(x=>x.id!==c.id)})}>×</button></div><input aria-label="نص الحوار أو الحركة" className={control} value={c.value} onChange={e=>changeScene({...scene,cues:scene.cues.map(x=>x.id===c.id?{...x,value:e.target.value}:x)})}/><div className="grid grid-cols-2 gap-2"><label>البداية (ثانية)<input aria-label="بداية الإشارة" className={control} type="number" min="0" step="0.1" value={c.atMs/1000} onChange={e=>{const atMs=Math.round(Number(e.target.value)*1000);if(Number.isFinite(atMs) && atMs>=0)changeScene({...scene,cues:scene.cues.map(x=>x.id===c.id?{...x,atMs}:x)})}}/></label><label>المدة (ثانية)<input aria-label="مدة الإشارة" className={control} type="number" min="0.1" step="0.1" value={c.durationMs/1000} onChange={e=>{const durationMs=Math.round(Number(e.target.value)*1000);if(Number.isFinite(durationMs) && durationMs>0)changeScene({...scene,cues:scene.cues.map(x=>x.id===c.id?{...x,durationMs}:x)})}}/></label></div></div>)}
+                    {scene.cues.map(c=><div key={c.id} className="space-y-2 rounded-lg border p-2 text-sm"><div className="flex justify-between"><span>{c.kind === "speech" ? "حوار" : "حركة"}</span><button aria-label="حذف الإشارة" onClick={()=>changeScene({...scene,cues:scene.cues.filter(x=>x.id!==c.id)})}>×</button></div><div className="grid grid-cols-2 gap-2">
+                      <label className="text-xs">النوع<select aria-label="نوع الإشارة" className={control} value={c.kind} onChange={e=>changeScene({...scene,cues:scene.cues.map(x=>x.id===c.id?{...x,kind:e.target.value as "speech" | "animation",value:e.target.value==="animation"?"wave":"مرحبًا"}:x)})}><option value="speech">حوار</option><option value="animation">حركة</option></select></label>
+                      <label className="text-xs">الشخصية<select aria-label="الشخصية المتحدثة" className={control} value={c.actorId} onChange={e=>changeScene({...scene,cues:scene.cues.map(x=>x.id===c.id?{...x,actorId:e.target.value}:x)})}>{scene.actors.map(a=><option key={a.id} value={a.id}>{characters.find(ch=>ch.id===a.characterId)?.name ?? a.characterId}</option>)}</select></label>
+                    </div>
+                    {c.kind === "animation" ? <select aria-label="الحركة" className={control} value={c.value} onChange={e=>changeScene({...scene,cues:scene.cues.map(x=>x.id===c.id?{...x,value:e.target.value}:x)})}>{Object.entries(ANIMATION_LABELS).map(([value,label])=><option key={value} value={value}>{label}</option>)}</select> :
+                    <input aria-label="نص الحوار أو الحركة" className={control} value={c.value} onChange={e=>changeScene({...scene,cues:scene.cues.map(x=>x.id===c.id?{...x,value:e.target.value}:x)})}/> }<div className="grid grid-cols-2 gap-2"><label>البداية (ثانية)<input aria-label="بداية الإشارة" className={control} type="number" min="0" step="0.1" value={c.atMs/1000} onChange={e=>{const atMs=Math.round(Number(e.target.value)*1000);if(Number.isFinite(atMs) && atMs>=0)changeScene({...scene,cues:scene.cues.map(x=>x.id===c.id?{...x,atMs}:x)})}}/></label><label>المدة (ثانية)<input aria-label="مدة الإشارة" className={control} type="number" min="0.1" step="0.1" value={c.durationMs/1000} onChange={e=>{const durationMs=Math.round(Number(e.target.value)*1000);if(Number.isFinite(durationMs) && durationMs>0)changeScene({...scene,cues:scene.cues.map(x=>x.id===c.id?{...x,durationMs}:x)})}}/></label></div></div>)}
                     {scene.actors.length>0 && <button className="rounded-lg bg-secondary px-3 py-2" onClick={()=>{const id=scene.actors[0]!.id;if(project) { try { const next = addCue(project,scene.id,{id:uid(),actorId:id,atMs:0,durationMs:Math.min(1000,scene.durationMs),kind:"speech",value:"مرحبًا بكم في قصتنا"}); setProject(next); setMessage("تغييرات غير محفوظة"); } catch (e) { setError(String(e)); } }}}>+ أضف حوارًا نموذجيًا</button>}
+                    {scene.actors.length>0 && <button type="button" className="ms-2 rounded-lg border px-3 py-2" onClick={()=>{
+                      if (!project) return;
+                      const actorId=scene.actors[0]!.id;
+                      try {const next=addCue(project,scene.id,{id:uid(),actorId,atMs:0,durationMs:Math.min(1000,scene.durationMs),kind:"animation",value:"wave"});setProject(next);setMessage("تغييرات غير محفوظة");}
+                      catch(e){setError(String(e));}
+                    }}>+ إضافة حركة</button>}
                   </div>
                 </div>}
               </>}
