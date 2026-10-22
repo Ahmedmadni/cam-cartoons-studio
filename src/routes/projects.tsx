@@ -9,6 +9,7 @@ import { deserializeStoryProject, duplicateImportedStoryProject, serializeStoryP
 import { addCue } from "@/lib/storyCueOperations";
 import StorySequencePreview from "@/components/story/StorySequencePreview";
 import { StoryAutosave } from "@/lib/storyAutosave";
+import { exportStorySrt } from "@/lib/storySubtitles";
 import { ANIMATION_LABELS } from "@/lib/store";
 
 export const Route = createFileRoute("/projects")({
@@ -99,6 +100,21 @@ function ProjectsPage() {
       a.click(); window.setTimeout(() => URL.revokeObjectURL(url), 1000);
     } catch (e) { setError(String(e)); }
   }
+  function downloadSubtitles(project: StoryProject) {
+    try {
+      const subtitles = exportStorySrt(project);
+      if (!subtitles) { setError("أضف حوارًا واحدًا على الأقل لتصدير الترجمة."); return; }
+      const blob = new Blob(["\uFEFF", subtitles], { type: "text/plain;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = "cartoon-story-" + project.id + ".srt";
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (failure) { setError("تعذر تصدير الترجمة: " + String(failure)); }
+  }
   async function destroy(id: string) {
     if (!window.confirm("حذف المشروع نهائيًا من هذا المتصفح؟")) return;
     setBusy(true);
@@ -150,7 +166,7 @@ function ProjectsPage() {
               {!project ? <div className="rounded-2xl border p-10 text-center text-muted-foreground">اختر مشروعًا من القائمة أو أنشئ مشروعًا جديدًا.</div> : <>
                 <div className="flex flex-wrap items-end gap-3 rounded-2xl border p-4">
                   <label className="min-w-[220px] flex-1 space-y-1"><span className="text-sm font-bold">عنوان القصة</span><input className={control} value={project.title} onChange={e => { markDirty({...project, title:e.target.value, updatedAt: new Date().toISOString()}); }} /></label>
-                  <button disabled={busy} className="rounded-xl border px-4 py-2" onClick={() => exportBackup(project)}>تنزيل نسخة JSON</button><button disabled={busy || !project.title.trim()} className="rounded-xl bg-primary px-5 py-2 text-primary-foreground disabled:opacity-50" onClick={() => save(project)}>حفظ المشروع</button>
+                  <button disabled={busy} className="rounded-xl border px-4 py-2" onClick={() => downloadSubtitles(project)}>تصدير ترجمة SRT</button><button disabled={busy} className="rounded-xl border px-4 py-2" onClick={() => exportBackup(project)}>تنزيل نسخة JSON</button><button disabled={busy || !project.title.trim()} className="rounded-xl bg-primary px-5 py-2 text-primary-foreground disabled:opacity-50" onClick={() => save(project)}>حفظ المشروع</button>
                 </div>
                 <div className="rounded-2xl border p-4">
                   <div className="mb-3 flex justify-between"><h2 className="font-bold">لوحة المشاهد — {project.scenes.length}</h2><button onClick={add} className="rounded-lg bg-secondary px-3 py-1">+ مشهد</button></div>
