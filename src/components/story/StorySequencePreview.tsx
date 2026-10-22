@@ -27,7 +27,6 @@ export default function StorySequencePreview({ project, characters }: Props) {
       if (previous !== null) {
         setPosition(current => {
           const next = Math.min(plan.durationMs, current + Math.max(0, now - previous));
-          if (next >= plan.durationMs) setPlaying(false);
           return next;
         });
       }
@@ -49,6 +48,10 @@ export default function StorySequencePreview({ project, characters }: Props) {
     setPlaying(false);
     setPosition(0);
   }, [project.id]);
+
+  useEffect(() => {
+    if (playing && position >= plan.durationMs) setPlaying(false);
+  }, [playing, position, plan.durationMs]);
 
   const safePosition = Math.min(position, plan.durationMs);
   const frame = plan.durationMs > 0
