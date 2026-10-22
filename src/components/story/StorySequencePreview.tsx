@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Pause, Play, RotateCcw, Volume2, VolumeX } from "lucide-react";
+import { Pause, Play, RotateCcw, Volume2, VolumeX, Video, Download, XCircle } from "lucide-react";
 import StoryMultiActorStage from "@/components/story/StoryMultiActorStage";
 import { BACKGROUNDS } from "@/lib/story";
 import { ANIMATION_LABELS, type AnimationType } from "@/lib/store";
@@ -7,6 +7,9 @@ import type { CharacterDefinition } from "@/lib/characterLibrary";
 import type { StoryProject } from "@/lib/storyProject";
 import { buildStoryPlaybackPlan, getPlaybackFrame } from "@/lib/storyPlaybackPlan";
 import { BrowserStoryNarrator, speechCuesStartingBetween } from "@/lib/storyNarration";
+import { recordVisualStoryPreview } from "@/lib/storyVisualCapture";
+import { previewDurationMs } from "@/lib/storyExportPlan";
+import { selectWebmMime } from "@/lib/mediaCapabilities";
 
 type Props = { project: StoryProject; characters: CharacterDefinition[] };
 const seconds = (ms: number) => (ms / 1000).toFixed(1);
@@ -18,6 +21,51 @@ export default function StorySequencePreview({ project, characters }: Props) {
   const [audioEnabled, setAudioEnabled] = useState(false);
   const [audioMessage, setAudioMessage] = useState("");
   const narratorRef = useRef<BrowserStoryNarrator | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const captureAbortRef = useRef<AbortController | null>(null);
+  const previewTickRef = useRef(-1);
+  const [capturing, setCapturing] = useState(false);
+  const [exportMessage, setExportMessage] = useState("");
+  const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
+
+  useEffect(() => () => { captureAbortRef.current?.abort(); }, []);
+  useEffect(() => () => { if (downloadUrl) URL.revokeObjectURL(downloadUrl); }, [downloadUrl]);
+
+  async function capturePreview() {
+    if (capturing) return;
+    const controller = new AbortController();
+    captureAbortRef.current = controller;
+    setCapturing(true);
+    setPlaying(false);
+    setAudioEnabled(false);
+    narratorRef.current?.stop();
+    setPosition(0);
+    setExportMessage("جارٍ تجهيز فيديو معاينة صامت بأقصى مدة 30 ثانية...");
+    try {
+      const blob = await recordVisualStoryPreview({
+        project,
+        backgrounds: new Map(BACKGROUNDS.map(bg => [bg.id, bg.src])),
+        getWebglCanvas: () => canvasRef.current?.isConnected ? canvasRef.current : null,
+        onPosition: ms => {
+          const tick = Math.floor(ms / 100);
+          if (tick !== previewTickRef.current) {
+            previewTickRef.current = tick;
+            setPosition(ms);
+          }
+        },
+        signal: controller.signal,
+      });
+      const url = URL.createObjectURL(blob);
+      setDownloadUrl(url);
+      setExportMessage("اكتمل ملف المعاينة الصامتة. يمكنك تنزيله بتنسيق WebM.");
+    } catch (caught) {
+      setExportMessage(caught instanceof Error ? caught.message : "فشل تسجيل المعاينة.");
+    } finally {
+      captureAbortRef.current = null;
+      previewTickRef.current = -1;
+      setCapturing(false);
+    }
+  }
 
   // Elapsed-time transport with voice cues triggered only on forward boundary crossings.
   // Browser TTS is preview-only; it is not mixed into exported video.
@@ -99,6 +147,7 @@ export default function StorySequencePreview({ project, characters }: Props) {
             backgroundUrl={backdrop?.src}
             actorAnimations={actorAnimations}
             characterIds={characters.map(c => c.id)}
+            onCanvasReady={canvas => { canvasRef.current = canvas; }}
           />
         ) : <div className="flex h-full items-center justify-center bg-black/30 text-sm font-bold text-white">
           {scene ? "المشهد بدون شخصية قابلة للمعاينة" : "أضف مشهدًا لمعاينة القصة"}
@@ -112,7 +161,7 @@ export default function StorySequencePreview({ project, characters }: Props) {
       </div>
       {!!scene?.actors.length && <p className="text-xs text-muted-foreground">الشخصيات: {scene.actors.map(a => characters.find(c => c.id === a.characterId)?.name ?? "شخصية غير متاحة").join("، ")}. تعرض المعاينة ثلاثية الأبعاد أول ثلاث شخصيات متاحة في المشهد، داخل عارض WebGL واحد. مواضع الشخصيات تقريبية ولا يشمل هذا تصدير فيديو.</p>}
       <div className="flex flex-wrap items-center gap-2">
-        <button type="button" aria-pressed={audioEnabled} onClick={() => {
+        <button type="button" disabled={capturing} aria-pressed={audioEnabled} onClick={() => {
           if (audioEnabled) {
             narratorRef.current?.stop();
             setAudioEnabled(false);
@@ -130,24 +179,44 @@ export default function StorySequencePreview({ project, characters }: Props) {
           {audioEnabled ? <Volume2 className="size-4"/> : <VolumeX className="size-4"/>}
           {audioEnabled ? "إيقاف الصوت" : "تفعيل الصوت"}
         </button>
-        <button type="button" disabled={!plan.durationMs} onClick={() => {
+        <button type="button" disabled={capturing || !plan.durationMs} onClick={() => {
           if (!playing && safePosition >= plan.durationMs) setPosition(0);
           setPlaying(v => !v);
         }} className="flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-primary-foreground disabled:opacity-50">
           {playing ? <Pause className="size-4" /> : <Play className="size-4" />} {playing ? "إيقاف مؤقت" : "تشغيل"}
         </button>
-        <button type="button" onClick={() => { setPlaying(false); setPosition(0); }} className="flex items-center gap-2 rounded-xl border px-3 py-2">
+        <button type="button" disabled={capturing} onClick={() => { setPlaying(false); setPosition(0); }} className="flex items-center gap-2 rounded-xl border px-3 py-2">
           <RotateCcw className="size-4"/> البداية
         </button>
         <input aria-label="الانتقال إلى توقيت القصة" className="min-w-40 flex-1 accent-primary"
           type="range" min={0} max={Math.max(1, plan.durationMs)} step={100}
-          disabled={!plan.durationMs} value={safePosition} onChange={e => { setPlaying(false); narratorRef.current?.stop(); setPosition(Number(e.target.value)); }} />
+          disabled={capturing || !plan.durationMs} value={safePosition} onChange={e => { setPlaying(false); narratorRef.current?.stop(); setPosition(Number(e.target.value)); }} />
       </div>
+      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border p-3">
+        {capturing ? (
+          <button type="button" className="flex items-center gap-2 rounded-xl bg-destructive px-4 py-2 text-destructive-foreground"
+            onClick={() => captureAbortRef.current?.abort()}>
+            <XCircle className="size-4"/> إلغاء التسجيل
+          </button>
+        ) : (
+          <button type="button" className="flex items-center gap-2 rounded-xl bg-secondary px-4 py-2 disabled:opacity-50"
+            disabled={!previewDurationMs(project) || !selectWebmMime("video")}
+            onClick={() => { void capturePreview(); }}>
+            <Video className="size-4"/> تسجيل معاينة WebM صامتة
+          </button>
+        )}
+        {downloadUrl && !capturing && <a href={downloadUrl} download={`story-preview-${project.id}.webm`}
+          className="flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-primary-foreground">
+          <Download className="size-4"/> تنزيل الفيديو
+        </a>}
+        <span className="text-xs text-muted-foreground">بحد أقصى 30 ثانية، 854×480، بلا صوت. حوار النص يظهر داخل الفيديو، وSRT منفصل.</span>
+      </div>
+      {exportMessage && <p role="status" className="text-xs text-muted-foreground">{exportMessage}</p>}
       {audioMessage && <p role="status" className="text-xs text-muted-foreground">{audioMessage}</p>}
       <div className="flex gap-1" aria-label="الشريط الزمني للمشاهد">
         {plan.scenes.map(item => (
           <button type="button" key={item.sceneId} title={project.scenes[item.index]?.title}
-            onClick={() => { setPlaying(false); setPosition(item.startMs); }}
+            onClick={() => { if (capturing) return; setPlaying(false); setPosition(item.startMs); }}
             className={"min-w-0 rounded-md border p-2 text-xs " + (frame?.sceneId === item.sceneId ? "border-primary bg-primary/10" : "bg-muted")}
             style={{ flex: Math.max(1, item.endMs - item.startMs) }}>
             <span className="block truncate">{project.scenes[item.index]?.title}</span>
