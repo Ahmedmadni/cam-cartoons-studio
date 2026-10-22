@@ -59,6 +59,9 @@ jobs:
           python -m pip install playwright==1.56.0
           python -m playwright install --with-deps chromium
 
+      - name: Chromium storyboard creation and autosave smoke
+        run: python scripts/browser_storyboard_smoke.py
+
       - name: Generate deterministic GLB browser fixture
         run: python scripts/generate_qa_glb.py
 
