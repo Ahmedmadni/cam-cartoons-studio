@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Pause, Play, RotateCcw } from "lucide-react";
+import { Pause, Play, RotateCcw, Volume2, VolumeX } from "lucide-react";
 import StoryMultiActorStage from "@/components/story/StoryMultiActorStage";
 import { BACKGROUNDS } from "@/lib/story";
 import { ANIMATION_LABELS, type AnimationType } from "@/lib/store";
 import type { CharacterDefinition } from "@/lib/characterLibrary";
 import type { StoryProject } from "@/lib/storyProject";
 import { buildStoryPlaybackPlan, getPlaybackFrame } from "@/lib/storyPlaybackPlan";
+import { BrowserStoryNarrator, speechCuesStartingBetween } from "@/lib/storyNarration";
 
 type Props = { project: StoryProject; characters: CharacterDefinition[] };
 const seconds = (ms: number) => (ms / 1000).toFixed(1);
@@ -14,23 +15,36 @@ export default function StorySequencePreview({ project, characters }: Props) {
   const plan = useMemo(() => buildStoryPlaybackPlan(project), [project]);
   const [position, setPosition] = useState(0);
   const [playing, setPlaying] = useState(false);
-  const previousFrame = useRef<number | null>(null);
+  const [audioEnabled, setAudioEnabled] = useState(false);
+  const [audioMessage, setAudioMessage] = useState("");
+  const narratorRef = useRef<BrowserStoryNarrator | null>(null);
 
-  // The preview clock is driven by elapsed time rather than counting frames.
+  // Elapsed-time transport with voice cues triggered only on forward boundary crossings.
+  // Browser TTS is preview-only; it is not mixed into exported video.
   useEffect(() => {
-    if (!playing || plan.durationMs <= 0) return;
+    if (!playing || plan.durationMs <= 0) {
+      narratorRef.current?.stop();
+      return;
+    }
     let raf = 0;
-    previousFrame.current = null;
+    const from = Math.min(position, plan.durationMs);
+    const startedAt = performance.now();
+    let previousTime = from === 0 ? -1 : from;
+    const narrator = audioEnabled ? (narratorRef.current ??= new BrowserStoryNarrator()) : null;
     const tick = (now: number) => {
-      const previous = previousFrame.current;
-      previousFrame.current = now;
-      if (previous !== null) {
-        setPosition(current => {
-          const next = Math.min(plan.durationMs, current + Math.max(0, now - previous));
-          return next;
-        });
+      const nextTime = Math.min(plan.durationMs, from + Math.max(0, now - startedAt));
+      if (narrator?.supported) {
+        narrator.reconcile(nextTime);
+        const starts = speechCuesStartingBetween(plan, previousTime, nextTime);
+        const latestAudibleCue = starts.filter(c => nextTime < c.endMs).at(-1);
+        if (latestAudibleCue) {
+          const voice = characters.find(c => c.id === latestAudibleCue.characterId)?.voicePreset ?? "normal";
+          narrator.speak(latestAudibleCue, voice);
+        }
       }
-      raf = requestAnimationFrame(tick);
+      previousTime = nextTime;
+      setPosition(nextTime);
+      if (nextTime < plan.durationMs) raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
     const onVisibility = () => {
@@ -39,10 +53,12 @@ export default function StorySequencePreview({ project, characters }: Props) {
     document.addEventListener("visibilitychange", onVisibility);
     return () => {
       cancelAnimationFrame(raf);
+      narrator?.stop();
       document.removeEventListener("visibilitychange", onVisibility);
-      previousFrame.current = null;
     };
-  }, [playing, plan.durationMs]);
+  // Position is an initial transport offset only; including it would restart on every animation frame.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [playing, plan, audioEnabled, characters]);
 
   useEffect(() => {
     setPlaying(false);
@@ -71,7 +87,7 @@ export default function StorySequencePreview({ project, characters }: Props) {
   return (
     <section aria-label="معاينة القصة الزمنية" className="space-y-3 rounded-2xl border border-border p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div><h2 className="font-black">معاينة القصة</h2><p className="text-xs text-muted-foreground">المعاينة صامتة وتعتمد على توقيت المشاهد والحركات؛ ليست فيديو مصدّرًا.</p></div>
+        <div><h2 className="font-black">معاينة القصة</h2><p className="text-xs text-muted-foreground">معاينة المشاهد والحركات؛ يمكنك تفعيل صوت عربي تجريبي من المتصفح. الصوت لا يدخل في الفيديو المصدّر.</p></div>
         <span className="rounded-lg bg-muted px-3 py-1 font-mono text-xs" dir="ltr">{seconds(safePosition)}s / {seconds(plan.durationMs)}s</span>
       </div>
       <div className="relative aspect-video overflow-hidden rounded-xl bg-muted" style={backdrop
@@ -96,6 +112,24 @@ export default function StorySequencePreview({ project, characters }: Props) {
       </div>
       {!!scene?.actors.length && <p className="text-xs text-muted-foreground">الشخصيات: {scene.actors.map(a => characters.find(c => c.id === a.characterId)?.name ?? "شخصية غير متاحة").join("، ")}. تعرض المعاينة ثلاثية الأبعاد أول ثلاث شخصيات متاحة في المشهد، داخل عارض WebGL واحد. مواضع الشخصيات تقريبية ولا يشمل هذا تصدير فيديو.</p>}
       <div className="flex flex-wrap items-center gap-2">
+        <button type="button" aria-pressed={audioEnabled} onClick={() => {
+          if (audioEnabled) {
+            narratorRef.current?.stop();
+            setAudioEnabled(false);
+            setAudioMessage("");
+          } else {
+            const narrator = narratorRef.current ??= new BrowserStoryNarrator();
+            if (!narrator.supported) {
+              setAudioMessage("الصوت العربي غير مدعوم بواسطة هذا المتصفح.");
+              return;
+            }
+            setAudioMessage("سيبدأ الكلام عند بداية كل حوار جديد. قد لا ينتهي نطق الجملة بالضبط عند نهاية مدتها.");
+            setAudioEnabled(true);
+          }
+        }} className="flex items-center gap-2 rounded-xl border px-3 py-2">
+          {audioEnabled ? <Volume2 className="size-4"/> : <VolumeX className="size-4"/>}
+          {audioEnabled ? "إيقاف الصوت" : "تفعيل الصوت"}
+        </button>
         <button type="button" disabled={!plan.durationMs} onClick={() => {
           if (!playing && safePosition >= plan.durationMs) setPosition(0);
           setPlaying(v => !v);
@@ -109,6 +143,7 @@ export default function StorySequencePreview({ project, characters }: Props) {
           type="range" min={0} max={Math.max(1, plan.durationMs)} step={100}
           disabled={!plan.durationMs} value={safePosition} onChange={e => setPosition(Number(e.target.value))} />
       </div>
+      {audioMessage && <p role="status" className="text-xs text-muted-foreground">{audioMessage}</p>}
       <div className="flex gap-1" aria-label="الشريط الزمني للمشاهد">
         {plan.scenes.map(item => (
           <button type="button" key={item.sceneId} title={project.scenes[item.index]?.title}
