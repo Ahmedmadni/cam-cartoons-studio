@@ -17,6 +17,7 @@ import { ANIMATION_LABELS, useStudioStore, type AnimationType } from "@/lib/stor
 import { getCharacterLabel } from "@/lib/characterLibrary";
 import { VOICE_PRESETS } from "@/lib/voiceChanger";
 import { VoicePlaybackBus, isRemoteVoiceConfigured, synthesizeRemoteVoice } from "@/lib/voiceEngine";
+import { selectWebmMime } from "@/lib/mediaCapabilities";
 
 export const Route = createFileRoute("/story")({
   head: () => ({
@@ -224,6 +225,11 @@ function StoryPage() {
     async (withRecording: boolean) => {
       const steps = parseStory(text);
       if (!steps.length) return;
+      const videoMime = withRecording ? selectWebmMime("video") : null;
+      if (withRecording && !videoMime) {
+        setNote("المتصفح لا يدعم تسجيل WebM؛ جرّب متصفحًا يدعم MediaRecorder وWebM.");
+        return;
+      }
       cancelledRef.current = false;
       setPlaying(true);
       setNote(null);
@@ -259,7 +265,7 @@ function StoryPage() {
           }
 
           chunksRef.current = [];
-          const recorder = new MediaRecorder(stream, { mimeType: "video/webm" });
+          const recorder = new MediaRecorder(stream, { mimeType: videoMime! });
           recorder.ondataavailable = (e) => {
             if (e.data.size) chunksRef.current.push(e.data);
           };
