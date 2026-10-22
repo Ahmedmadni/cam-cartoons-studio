@@ -132,7 +132,7 @@ function ProjectsPage() {
       <div className="mx-auto max-w-7xl space-y-6">
         <header className="flex flex-wrap items-center justify-between gap-3">
           <div><h1 className="text-3xl font-black">استوديو مشاريعي</h1><p className="text-muted-foreground">بناء المشاهد وحفظها محليًا — لا يتم رفع القصص للسحابة.</p></div>
-          <div className="flex gap-2"><Link to="/" className="rounded-xl border px-4 py-2">مكتبة الشخصيات</Link><label className="cursor-pointer rounded-xl border px-4 py-2">استيراد JSON<input aria-label="استيراد نسخة احتياطية" type="file" accept=".json,application/json" className="sr-only" onChange={e => { void importBackup(e.target.files?.[0]); e.target.value = ""; }} /></label><button disabled={busy} onClick={create} className="rounded-xl bg-primary px-4 py-2 text-primary-foreground">+ مشروع جديد</button></div>
+          <div className="flex gap-2"><Link to="/" className="rounded-xl border px-4 py-2">مكتبة الشخصيات</Link><label className="cursor-pointer rounded-xl border px-4 py-2">استيراد JSON<input aria-label="استيراد نسخة احتياطية" type="file" accept=".json,application/json" disabled={busy || loading} className="sr-only" onChange={e => { void importBackup(e.target.files?.[0]); e.target.value = ""; }} /></label><button disabled={busy || loading} onClick={create} className="rounded-xl bg-primary px-4 py-2 text-primary-foreground disabled:opacity-50">+ مشروع جديد</button></div>
         </header>
         {error && <div role="alert" className="rounded-xl border border-destructive p-3 text-destructive">{error}</div>}
         {message && <div role="status" className="rounded-xl border p-3">{message}</div>}
