@@ -26,19 +26,23 @@ export class BrowserStoryNarrator {
   private activeId: string | null = null;
   private readonly synth: SpeechSynthesis | null;
 
-  constructor(synth: SpeechSynthesis | null = typeof window !== "undefined" && "speechSynthesis" in window
-    ? window.speechSynthesis : null) {
+  constructor(
+    synth: SpeechSynthesis | null = typeof window !== "undefined" && "speechSynthesis" in window
+      ? window.speechSynthesis : null,
+    private readonly makeUtterance: ((text: string) => SpeechSynthesisUtterance) | null =
+      typeof SpeechSynthesisUtterance !== "undefined" ? text => new SpeechSynthesisUtterance(text) : null,
+  ) {
     this.synth = synth;
   }
 
   get supported(): boolean {
-    return !!this.synth && typeof SpeechSynthesisUtterance !== "undefined";
+    return !!this.synth && !!this.makeUtterance;
   }
 
   speak(cue: ScheduledStoryCue, voice: VoiceType = "normal"): boolean {
-    if (!this.synth || !this.supported) return false;
+    if (!this.synth || !this.makeUtterance) return false;
     this.stop();
-    const utterance = new SpeechSynthesisUtterance(cue.value);
+    const utterance = this.makeUtterance(cue.value);
     utterance.lang = "ar-SA";
     utterance.rate = 0.95;
     utterance.pitch = VOICE_PITCH[voice];
