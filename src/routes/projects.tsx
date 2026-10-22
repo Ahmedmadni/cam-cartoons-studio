@@ -10,6 +10,7 @@ import { addCue } from "@/lib/storyCueOperations";
 import StorySequencePreview from "@/components/story/StorySequencePreview";
 import { StoryAutosave } from "@/lib/storyAutosave";
 import { exportStorySrt } from "@/lib/storySubtitles";
+import { appendDialogueScript } from "@/lib/storyScriptBuilder";
 import { ANIMATION_LABELS } from "@/lib/store";
 
 export const Route = createFileRoute("/projects")({
@@ -26,6 +27,7 @@ function ProjectsPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  const [scripts, setScripts] = useState<Record<string, string>>({});
   const latestProjectRef = useRef<StoryProject | null>(null);
   latestProjectRef.current = project;
   const [autosave] = useState(() => new StoryAutosave(
@@ -196,8 +198,33 @@ function ProjectsPage() {
                   </div>
                   <div className="space-y-3">
                     <div className="relative aspect-video overflow-hidden rounded-xl bg-muted" style={backdrop?{backgroundImage:`url("${backdrop.src}")`,backgroundSize:"cover",backgroundPosition:"center"}:{}}><span className="absolute bottom-2 right-2 rounded bg-black/60 px-2 py-1 text-white">{scene.title} · {scene.actors.length} شخصيات</span></div>
-                    <p className="text-sm text-muted-foreground">هذه معاينة للخلفية فقط؛ عرض الشخصيات وتحريكها عبر المحرر الزمني يأتي في المرحلة التالية.</p>
+                    <p className="text-sm text-muted-foreground">صورة مرجعية للخلفية؛ المعاينة المتحركة متعددة الشخصيات في لوحة التشغيل أعلاه.</p>
                     <h3 className="font-bold">الحوار والحركات</h3>
+                    <div className="space-y-2 rounded-xl border border-primary/30 bg-primary/5 p-3">
+                      <label className="block space-y-1 text-sm font-bold">نص حوارات متعدد الشخصيات
+                        <textarea className={control} rows={4} maxLength={10000}
+                          aria-label="نص الحوارات"
+                          placeholder={"حكيم: مرحبًا بكم!\\nفلفل: لنبدأ مغامرتنا!"}
+                          value={scripts[scene.id] ?? ""}
+                          onChange={e=>setScripts(current=>({...current,[scene.id]:e.target.value}))}/>
+                      </label>
+                      <p className="text-xs text-muted-foreground">ضع كل جملة بسطر مستقل. ابدأ السطر باسم شخصية موجودة في المشهد ثم نقطتين، أو اكتب الحوار مباشرة للشخصية الأولى. الأوقات تقديرية وقابلة للتعديل.</p>
+                      <button type="button" className="rounded-xl bg-secondary px-4 py-2 text-sm font-bold disabled:opacity-50"
+                        disabled={!scene.actors.length || !(scripts[scene.id] ?? "").trim()}
+                        onClick={()=>{
+                          if(!project) return;
+                          try {
+                            const namedActors = scene.actors.map(actor=>({
+                              actorId:actor.id,
+                              displayName:characters.find(ch=>ch.id===actor.characterId)?.name ?? actor.characterId,
+                            }));
+                            const next=appendDialogueScript(project,scene.id,scripts[scene.id] ?? "",namedActors,uid);
+                            markDirty(next);
+                            setScripts(current=>({...current,[scene.id]:""}));
+                            setMessage("تم توزيع الحوارات على الشريط الزمني؛ جارٍ الحفظ تلقائيًا");
+                          } catch(failure) { setError("تعذر توزيع الحوار: "+String(failure)); }
+                        }}>توزيع الحوارات تلقائيًا على المشهد</button>
+                    </div>
                     {scene.cues.map(c=><div key={c.id} className="space-y-2 rounded-lg border p-2 text-sm"><div className="flex justify-between"><span>{c.kind === "speech" ? "حوار" : "حركة"}</span><button aria-label="حذف الإشارة" onClick={()=>changeScene({...scene,cues:scene.cues.filter(x=>x.id!==c.id)})}>×</button></div><div className="grid grid-cols-2 gap-2">
                       <label className="text-xs">النوع<select aria-label="نوع الإشارة" className={control} value={c.kind} onChange={e=>changeScene({...scene,cues:scene.cues.map(x=>x.id===c.id?{...x,kind:e.target.value as "speech" | "animation",value:e.target.value==="animation"?"wave":"مرحبًا"}:x)})}><option value="speech">حوار</option><option value="animation">حركة</option></select></label>
                       <label className="text-xs">الشخصية<select aria-label="الشخصية المتحدثة" className={control} value={c.actorId} onChange={e=>changeScene({...scene,cues:scene.cues.map(x=>x.id===c.id?{...x,actorId:e.target.value}:x)})}>{scene.actors.map(a=><option key={a.id} value={a.id}>{characters.find(ch=>ch.id===a.characterId)?.name ?? a.characterId}</option>)}</select></label>
