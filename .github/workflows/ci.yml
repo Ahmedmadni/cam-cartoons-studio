@@ -8,6 +8,12 @@ on:
 permissions:
   contents: read
 
+# New commits cancel superseded runs, preventing parallel large GLB downloads
+# from overloading source hosting and exhausting GitHub Actions minutes.
+concurrency:
+  group: character-studio-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   validate:
     runs-on: ubuntu-latest
@@ -52,6 +58,9 @@ jobs:
         run: |
           python -m pip install playwright==1.56.0
           python -m playwright install --with-deps chromium
+
+      - name: Chromium storyboard creation and autosave smoke
+        run: python scripts/browser_storyboard_smoke.py
 
       - name: Generate deterministic GLB browser fixture
         run: python scripts/generate_qa_glb.py

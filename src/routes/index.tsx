@@ -19,6 +19,7 @@ import { REVIEW_BACKDROPS, REVIEW_STUDIO_GRADIENTS, type ReviewBackdropId } from
 import { REVIEW_EXPRESSION_LABELS, type ReviewExpression } from "@/lib/facialPerformance";
 import { CURATED_CANDIDATES, findImportedCandidate, type CuratedCandidate } from "@/lib/curatedCharacters";
 import ArtReviewWorkbench from "@/components/characters/ArtReviewWorkbench";
+import { Link } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/")({
   head: () => ({ meta: [
@@ -321,6 +322,7 @@ function LibraryPage() {
   return (
     <main dir="rtl" className="min-h-screen bg-background px-4 py-8">
       <div className="mx-auto max-w-7xl">
+        <div className="mb-4"><Link to="/projects" className="inline-flex rounded-xl bg-primary px-5 py-3 font-bold text-primary-foreground">🎬 إنشاء وإدارة قصص متعددة المشاهد</Link></div>
         <header className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <span className="inline-flex items-center gap-2 rounded-full bg-accent px-4 py-1.5 text-sm font-black"><Sparkles className="size-4" /> Cam Cartoons Studio</span>

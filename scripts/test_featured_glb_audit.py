@@ -3,8 +3,9 @@
 import json
 import struct
 import unittest
+from unittest.mock import patch
 
-from audit_featured_glbs import inspect_glb, parse_glb, featured_urls, candidate_urls
+from audit_featured_glbs import inspect_glb, parse_glb, featured_urls, candidate_urls, read_with_retries
 
 
 def sample_glb(*, meshes=None, skins=None, nodes=None, morph_names=None):
@@ -24,6 +25,18 @@ def sample_glb(*, meshes=None, skins=None, nodes=None, morph_names=None):
 
 
 class GlbAuditTests(unittest.TestCase):
+    def test_transient_large_glb_failure_is_retried_without_skipping_validation(self):
+        with patch("audit_featured_glbs.read_limited", side_effect=[TimeoutError("timeout"), (b"real-bytes", {})]) as downloader, patch("audit_featured_glbs.time.sleep"):
+            payload, _ = read_with_retries("https://example.test/VRoid_Sample_A.glb")
+            self.assertEqual(payload, b"real-bytes")
+            self.assertEqual(downloader.call_count, 2)
+
+    def test_corrupt_payload_is_not_falsely_recovered_by_network_retry(self):
+        with patch("audit_featured_glbs.read_limited", side_effect=ValueError("bad GLB")) as downloader:
+            with self.assertRaises(ValueError):
+                read_with_retries("https://example.test/VRoid_Sample_B.glb")
+            self.assertEqual(downloader.call_count, 1)
+
     def test_valid_geometry_without_rig_does_not_claim_animated(self):
         result = inspect_glb(sample_glb())
         self.assertEqual(result["mesh_count"], 1)

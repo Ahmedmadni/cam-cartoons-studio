@@ -43,7 +43,7 @@ function ResponsiveCharacterCamera({
   return null;
 }
 
-function Backdrop({ url }: { url: string }) {
+export function Backdrop({ url }: { url: string }) {
   const texture = useTexture(url);
   return (
     <mesh position={[0, 0.25, -6]}>
@@ -86,7 +86,7 @@ class AvatarErrorBoundary extends Component<BoundaryProps, BoundaryState> {
   }
 }
 
-function Avatar({
+export function Avatar({
   type,
   animation,
   spin,

@@ -6,6 +6,7 @@ import { ANIMATION_LABELS, VOICES, useStudioStore } from "@/lib/store";
 import { VOICE_PRESETS } from "@/lib/voiceChanger";
 import { playSfx } from "@/lib/sfx";
 import { useFaceTracking } from "@/lib/useFaceTracking";
+import { selectWebmMime } from "@/lib/mediaCapabilities";
 
 
 
@@ -113,6 +114,11 @@ function StudioPage() {
 
   const startRecording = useCallback(async () => {
     setError(null);
+    const videoMime = selectWebmMime("video");
+    if (!videoMime) {
+      setError("المتصفح لا يدعم تسجيل WebM. يمكنك معاينة الشخصية لكن التسجيل غير متاح هنا.");
+      return;
+    }
     const video = webcamRef.current?.video ?? null;
     const three = threeCanvasRef.current;
     if (!video || !three || video.readyState < 2) {
@@ -165,26 +171,30 @@ function StudioPage() {
 
       // تسجيل صوت الميكروفون بشكل منفصل ليُمرَّر لاحقاً لمحوّل الصوت
       const micStream = new MediaStream(audio.getAudioTracks());
-      const audioMime = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
-        ? "audio/webm;codecs=opus"
-        : "audio/webm";
-      const audioRecorder = new MediaRecorder(micStream, { mimeType: audioMime });
-      audioRecorder.ondataavailable = (e) => {
-        if (e.data.size > 0) audioChunksRef.current.push(e.data);
-      };
-      audioRecorder.onstop = () => {
-        setRecordedAudio(new Blob(audioChunksRef.current, { type: "audio/webm" }));
-      };
-      audioRecorderRef.current = audioRecorder;
-      audioRecorder.start();
+      const audioMime = selectWebmMime("audio");
+      if (audioMime) {
+        const audioRecorder = new MediaRecorder(micStream, { mimeType: audioMime });
+        audioRecorder.ondataavailable = (e) => {
+          if (e.data.size > 0) audioChunksRef.current.push(e.data);
+        };
+        audioRecorder.onstop = () => {
+          setRecordedAudio(new Blob(audioChunksRef.current, { type: "audio/webm" }));
+        };
+        audioRecorderRef.current = audioRecorder;
+        audioRecorder.start();
+      }
     } catch {
       /* التسجيل يستمر بدون صوت */
     }
 
-    const mimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp9,opus")
-      ? "video/webm;codecs=vp9,opus"
-      : "video/webm";
-    const recorder = new MediaRecorder(stream, { mimeType });
+    let recorder: MediaRecorder;
+    try {
+      recorder = new MediaRecorder(stream, { mimeType: videoMime });
+    } catch {
+      cleanup();
+      setError("تعذّر تهيئة مسجل الفيديو لهذا المتصفح.");
+      return;
+    }
     chunksRef.current = [];
     recorder.ondataavailable = (e) => {
       if (e.data.size > 0) chunksRef.current.push(e.data);

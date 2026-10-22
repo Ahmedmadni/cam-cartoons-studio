@@ -12,6 +12,7 @@ import json
 import re
 import struct
 import sys
+import time
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -154,6 +155,27 @@ def read_limited(url: str, timeout: int = 22) -> tuple[bytes, dict]:
     return data, headers
 
 
+def read_with_retries(url: str) -> tuple[bytes, dict]:
+    """Retry only transient transport errors; invalid meshes still fail validation."""
+    is_large_vroid = "VRoid_Sample_" in url
+    attempts = 3 if is_large_vroid else 2
+    timeout = 42 if is_large_vroid else 22
+    for attempt in range(attempts):
+        try:
+            return read_limited(url, timeout=timeout)
+        except urllib.error.HTTPError as exc:
+            if exc.code < 500 and exc.code != 429:
+                raise
+            if attempt + 1 == attempts:
+                raise
+        except (OSError, TimeoutError, urllib.error.URLError):
+            if attempt + 1 == attempts:
+                raise
+        print(f"  temporary upstream download issue; retry {attempt + 2}/{attempts}", flush=True)
+        time.sleep(1.5 * (attempt + 1))
+    raise AssertionError("unreachable")
+
+
 def featured_urls() -> dict[str, str]:
     catalog = FEATURED_SOURCE.read_text(encoding="utf-8")
     entries = re.findall(
@@ -189,7 +211,7 @@ def audit_live(save_browser_fixtures: bool = False) -> int:
     for identity, source in featured_urls().items():
         print(f"Inspecting {source['name']}: {source['url']}", flush=True)
         try:
-            binary, headers = read_limited(source["url"])
+            binary, headers = read_with_retries(source["url"])
             details = inspect_glb(binary)
             if save_browser_fixtures:
                 path = Path("public/__qa__/featured") / (identity + ".glb")
