@@ -10,8 +10,8 @@
 - Existing `/story`, `/studio`, `/save`, GLB rendering, and audio recording logic remain untouched.
 
 ## Important honest limitations
-- This is a story *authoring foundation*, not full multi-scene rendered video export. The storyboard preview intentionally shows the selected background and metadata; actor 3D stage integration, speech cue editing, playback and export remain to do.
-- Saving is currently explicit, not automatic; unsaved changes are labeled as such.
+- Updated October 22: timeline preview, speech cue editing and a shared multi-GLB canvas are implemented; this remains *authoring and live preview*, NOT a full audio/video export or calibrated dubbing engine. See `docs/PHASE20_PREVIEW.md`.
+- Updated October 22: editor changes now use debounced, serialized autosave. Explicit Save is also supported, with a warning before leaving if a write is pending or failed.
 - Saved story drafts are browser-local only. Browser data deletion can erase them; cloud backup/import/export is not yet implemented.
 - A failed early CI attempt on the new route showed a missing generated TanStack route registration. Route tree was subsequently updated; latest CI must be reviewed before merge.
 - No claim that Lip Sync, VRM animation retargeting or cross-browser MP4 are implemented.
