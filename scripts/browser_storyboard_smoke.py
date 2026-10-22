@@ -57,7 +57,7 @@ def main():
             expect(page.get_by_role("button", name="تشغيل")).to_be_enabled()
             expect(page.get_by_text("تم الحفظ التلقائي", exact=False)).to_be_visible(timeout=8000)
             page.reload(wait_until="networkidle")
-            page.get_by_role("button", name="قصة جديدة").click()
+            page.get_by_role("button", name="قصة جديدة", exact=True).click()
             expect(page.get_by_label("اسم المشهد")).to_have_value("الافتتاحية")
             page.get_by_role("button", name="تشغيل").click()
             expect(page.get_by_role("button", name="إيقاف مؤقت")).to_be_visible()
@@ -68,8 +68,8 @@ def main():
             if not path:
                 raise RuntimeError("JSON backup was not saved")
             page.get_by_label("استيراد نسخة احتياطية").set_input_files(str(path))
-            expect(page.get_by_role("button", name="قصة جديدة — نسخة")).to_be_visible(timeout=8000)
-            assert page.get_by_role("button", name="قصة جديدة").count() >= 1
+            expect(page.get_by_role("button", name="قصة جديدة — نسخة", exact=True)).to_be_visible(timeout=8000)
+            assert page.get_by_role("button", name="قصة جديدة", exact=True).count() >= 1
             browser.close()
     finally:
         server.terminate()
