@@ -38,8 +38,10 @@ def main():
             runtime_errors = []
             page.on("pageerror", lambda error: runtime_errors.append(str(error)))
             page.on("console", lambda message: runtime_errors.append("console: " + message.text) if message.type == "error" else None)
-            page.goto(URL + "/projects", wait_until="domcontentloaded", timeout=45000)
+            page.goto(URL + "/projects", wait_until="networkidle", timeout=60000)
             expect(page.get_by_role("heading", name="استوديو مشاريعي")).to_be_visible()
+            # Wait for hydration and IndexedDB load: SSR button clicks before handlers mount are lost.
+            expect(page.get_by_text("ابدأ بإنشاء مشروعك الأول.")).to_be_visible(timeout=15000)
             page.get_by_role("button", name="مشروع جديد").click()
             try:
                 expect(page.get_by_label("عنوان القصة")).to_be_visible(timeout=12000)
@@ -54,7 +56,7 @@ def main():
             expect(page.get_by_role("region", name="معاينة القصة الزمنية")).to_be_visible()
             expect(page.get_by_role("button", name="تشغيل")).to_be_enabled()
             expect(page.get_by_text("تم الحفظ التلقائي", exact=False)).to_be_visible(timeout=8000)
-            page.reload(wait_until="domcontentloaded")
+            page.reload(wait_until="networkidle")
             page.get_by_role("button", name="قصة جديدة").click()
             expect(page.get_by_label("اسم المشهد")).to_have_value("الافتتاحية")
             page.get_by_role("button", name="تشغيل").click()
