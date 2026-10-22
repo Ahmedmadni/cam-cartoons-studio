@@ -9,6 +9,7 @@ type Props = {
   backgroundUrl?: string | undefined;
   actorAnimations: Record<string, AnimationType>;
   characterIds: readonly string[];
+  onCanvasReady?: ((canvas: HTMLCanvasElement) => void) | undefined;
 };
 
 /** Keep R3F/WebGL completely out of server-side rendering. */
