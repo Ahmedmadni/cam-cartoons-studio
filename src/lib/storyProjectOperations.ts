@@ -33,3 +33,28 @@ export function sceneAt(project: StoryProject, atMs: number) {
   const timeline = getTimeline(project);
   return timeline.find((s) => atMs >= s.startMs && atMs < s.endMs) ?? null;
 }
+
+/** Clone a scene with fresh actor and cue IDs so originals remain independent. */
+export function duplicateScene(
+  project: StoryProject,
+  sceneId: string,
+  nextId: () => string,
+): StoryProject {
+  if (project.scenes.length >= 100) throw new Error("Maximum scene count reached");
+  const index = project.scenes.findIndex(scene => scene.id === sceneId);
+  if (index < 0) throw new Error("Scene not found");
+  const original = project.scenes[index]!;
+  const actorIds = new Map(original.actors.map(actor => [actor.id, nextId()]));
+  const duplicate: StoryScene = {
+    ...original,
+    id: nextId(),
+    title: (original.title.slice(0, 188) + " — نسخة").slice(0, 200),
+    actors: original.actors.map(actor => ({ ...actor, id: actorIds.get(actor.id)! })),
+    cues: original.cues.map(cue => ({
+      ...cue, id: nextId(), actorId: actorIds.get(cue.actorId) ?? cue.actorId,
+    })),
+  };
+  const scenes = [...project.scenes];
+  scenes.splice(index + 1, 0, duplicate);
+  return parseStoryProject({ ...project, updatedAt: new Date().toISOString(), scenes });
+}
