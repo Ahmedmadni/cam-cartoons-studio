@@ -62,6 +62,16 @@ def main():
             page.get_by_role("button", name="تشغيل").click()
             expect(page.get_by_role("button", name="إيقاف مؤقت")).to_be_visible()
             page.get_by_role("button", name="إيقاف مؤقت").click()
+            # Exercise a real short, silent WebM capture through MediaRecorder.
+            export_button = page.get_by_role("button", name="تسجيل معاينة WebM صامتة")
+            expect(export_button).to_be_enabled()
+            export_button.click()
+            expect(page.get_by_role("link", name="تنزيل الفيديو")).to_be_visible(timeout=18000)
+            with page.expect_download() as webm_download:
+                page.get_by_role("link", name="تنزيل الفيديو").click()
+            webm = webm_download.value.path()
+            if not webm or webm.stat().st_size < 1000:
+                raise RuntimeError("WebM preview did not produce a usable file")
             with page.expect_download() as download:
                 page.get_by_role("button", name="تنزيل نسخة JSON").click()
             path = download.value.path()
