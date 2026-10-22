@@ -141,7 +141,7 @@ export default function StorySequencePreview({ project, characters }: Props) {
         </button>
         <input aria-label="الانتقال إلى توقيت القصة" className="min-w-40 flex-1 accent-primary"
           type="range" min={0} max={Math.max(1, plan.durationMs)} step={100}
-          disabled={!plan.durationMs} value={safePosition} onChange={e => setPosition(Number(e.target.value))} />
+          disabled={!plan.durationMs} value={safePosition} onChange={e => { setPlaying(false); narratorRef.current?.stop(); setPosition(Number(e.target.value)); }} />
       </div>
       {audioMessage && <p role="status" className="text-xs text-muted-foreground">{audioMessage}</p>}
       <div className="flex gap-1" aria-label="الشريط الزمني للمشاهد">
