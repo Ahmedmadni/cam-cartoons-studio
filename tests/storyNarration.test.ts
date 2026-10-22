@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { speechCuesStartingBetween } from "../src/lib/storyNarration";
+import { BrowserStoryNarrator, speechCuesStartingBetween } from "../src/lib/storyNarration";
 import type { StoryPlaybackPlan } from "../src/lib/storyPlaybackPlan";
 
 const plan: StoryPlaybackPlan = {
@@ -28,4 +28,33 @@ test("ignore backwards transport, invalid offsets, and post-end cues", () => {
 test("resume from mid-scene never replays an earlier cue", () => {
   expect(speechCuesStartingBetween(plan, 1700, 2300)).toEqual([]);
   expect(speechCuesStartingBetween(plan, 2300, 3600).map(c=>c.cueId)).toEqual(["c"]);
+});
+
+test("browser narration stops at cue end and uses per-character voice pitch", () => {
+  const utterances: Array<{ text: string; lang: string; rate: number; pitch: number; voice: SpeechSynthesisVoice | null }> = [];
+  const actions: string[] = [];
+  const synth = {
+    getVoices: () => [],
+    speak: (utterance: SpeechSynthesisUtterance) => actions.push("speak:" + utterance.text),
+    cancel: () => actions.push("cancel"),
+  } as unknown as SpeechSynthesis;
+  const makeUtterance = (text: string) => {
+    const utterance = { text, lang: "", rate: 1, pitch: 1, voice: null };
+    utterances.push(utterance);
+    return utterance as unknown as SpeechSynthesisUtterance;
+  };
+  const narrator = new BrowserStoryNarrator(synth, makeUtterance);
+  expect(narrator.supported).toBe(true);
+  expect(narrator.speak(plan.cues[0]!, "child")).toBe(true);
+  expect(utterances[0]?.pitch).toBeGreaterThan(1);
+  narrator.reconcile(800);
+  expect(actions).toEqual(["cancel", "speak:أهلًا"]);
+  narrator.reconcile(900);
+  expect(actions.at(-1)).toBe("cancel");
+});
+test("missing synthesis capability refuses narration without throwing", () => {
+  const narrator = new BrowserStoryNarrator(null, null);
+  expect(narrator.supported).toBe(false);
+  expect(narrator.speak(plan.cues[0]!)).toBe(false);
+  narrator.stop();
 });
