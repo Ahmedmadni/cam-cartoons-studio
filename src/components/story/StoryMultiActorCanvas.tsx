@@ -1,5 +1,6 @@
-import { Suspense } from "react";
-import { Canvas } from "@react-three/fiber";
+import { Suspense, useEffect } from "react";
+import { Canvas, useThree } from "@react-three/fiber";
+import { PerspectiveCamera } from "three";
 import { ContactShadows } from "@react-three/drei";
 import { Avatar, Backdrop } from "@/components/characters/ThreeDCharacter";
 import type { StoryScene } from "@/lib/storyProject";
@@ -11,6 +12,23 @@ type Props = {
   actorAnimations: Record<string, AnimationType>;
   characterIds: readonly string[];
 };
+
+function StoryCamera({ framing, actorCount }: { framing: StoryScene["camera"]["framing"]; actorCount: number }) {
+  const { camera, size, invalidate } = useThree();
+  useEffect(() => {
+    if (!(camera instanceof PerspectiveCamera)) return;
+    const aspect = size.width / Math.max(1, size.height);
+    const wide = actorCount > 1;
+    const distance = framing === "close" && !wide ? 4.2 : framing === "medium" && !wide ? 5.1 : wide ? 7.2 : 6.7;
+    const eyeLevel = framing === "close" && !wide ? 0.72 : 0.35;
+    camera.position.set(0, eyeLevel, distance);
+    camera.fov = aspect < 1 ? 49 : 43;
+    camera.lookAt(0, eyeLevel, 0);
+    camera.updateProjectionMatrix();
+    invalidate();
+  }, [camera, framing, actorCount, size.width, size.height, invalidate]);
+  return null;
+}
 
 /**
  * One WebGL context for the whole scene. Restrict preview to three genuine
@@ -27,6 +45,7 @@ export default function StoryMultiActorCanvas({ scene, backgroundUrl, actorAnima
       gl={{ alpha: true, antialias: true, powerPreference: "high-performance" }}
       camera={{ position: [0, 0.35, 6.8], fov: 43, near: 0.1, far: 80 }}
     >
+      <StoryCamera framing={scene.camera.framing} actorCount={visible.length}/>
       <color attach="background" args={["#192032"]} />
       {backgroundUrl && <Suspense fallback={null}><Backdrop url={backgroundUrl} /></Suspense>}
       <ambientLight intensity={1.1}/>
