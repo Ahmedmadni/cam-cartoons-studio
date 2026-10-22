@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Pause, Play, RotateCcw } from "lucide-react";
-import CharacterStage from "@/components/characters/CharacterStage";
+import StoryMultiActorStage from "@/components/story/StoryMultiActorStage";
 import { BACKGROUNDS } from "@/lib/story";
 import { ANIMATION_LABELS, type AnimationType } from "@/lib/store";
 import type { CharacterDefinition } from "@/lib/characterLibrary";
@@ -59,14 +59,14 @@ export default function StorySequencePreview({ project, characters }: Props) {
     : null;
   const scene = frame ? project.scenes[frame.sceneIndex] : null;
   const backdrop = BACKGROUNDS.find(b => b.id === scene?.backgroundId);
-  const activeCue = frame?.activeCues.find(c => c.kind === "animation");
   const speechCues = frame?.activeCues.filter(c => c.kind === "speech") ?? [];
-  const activeActorId = (frame?.activeCues[0]?.actorId ?? scene?.actors[0]?.id) || null;
-  const leadActor = scene?.actors.find(a => a.id === activeActorId);
-  const leadCharacter = characters.find(c => c.id === leadActor?.characterId);
-  const cueName = activeCue?.value;
-  const action: AnimationType = cueName && Object.prototype.hasOwnProperty.call(ANIMATION_LABELS, cueName)
-    ? cueName as AnimationType : "idle";
+  const visibleCharacters = scene?.actors.filter(actor => characters.some(ch => ch.id === actor.characterId)) ?? [];
+  const actorAnimations: Record<string, AnimationType> = {};
+  for (const cue of frame?.activeCues ?? []) {
+    if (cue.kind === "animation" && Object.prototype.hasOwnProperty.call(ANIMATION_LABELS, cue.value)) {
+      actorAnimations[cue.actorId] = cue.value as AnimationType;
+    }
+  }
 
   return (
     <section aria-label="معاينة القصة الزمنية" className="space-y-3 rounded-2xl border border-border p-4">
@@ -77,15 +77,12 @@ export default function StorySequencePreview({ project, characters }: Props) {
       <div className="relative aspect-video overflow-hidden rounded-xl bg-muted" style={backdrop
         ? { backgroundImage: `url("${backdrop.src}")`, backgroundSize: "cover", backgroundPosition: "center" }
         : undefined}>
-        {leadCharacter && scene ? (
-          <CharacterStage
-            key={leadCharacter.id}
-            type={leadCharacter.id}
-            animation={action}
-            {...(backdrop ? { backgroundUrl: backdrop.src } : {})}
-            framing={scene.camera.framing === "wide" ? "full" : scene.camera.framing === "medium" ? "upper" : "portrait"}
-            spin={false}
-            className="h-full w-full"
+        {visibleCharacters.length && scene ? (
+          <StoryMultiActorStage
+            scene={scene}
+            backgroundUrl={backdrop?.src}
+            actorAnimations={actorAnimations}
+            characterIds={characters.map(c => c.id)}
           />
         ) : <div className="flex h-full items-center justify-center bg-black/30 text-sm font-bold text-white">
           {scene ? "المشهد بدون شخصية قابلة للمعاينة" : "أضف مشهدًا لمعاينة القصة"}
@@ -97,7 +94,7 @@ export default function StorySequencePreview({ project, characters }: Props) {
           {speechCues.map(c => c.value).join(" — ")}
         </div>}
       </div>
-      {!!scene?.actors.length && <p className="text-xs text-muted-foreground">الشخصيات: {scene.actors.map(a => characters.find(c => c.id === a.characterId)?.name ?? "شخصية غير متاحة").join("، ")}. تعرض المعاينة ثلاثية الأبعاد شخصية نشطة واحدة حاليًا؛ دعم ظهور عدة شخصيات في إطار واحد قيد التطوير.</p>}
+      {!!scene?.actors.length && <p className="text-xs text-muted-foreground">الشخصيات: {scene.actors.map(a => characters.find(c => c.id === a.characterId)?.name ?? "شخصية غير متاحة").join("، ")}. تعرض المعاينة ثلاثية الأبعاد أول ثلاث شخصيات متاحة في المشهد، داخل عارض WebGL واحد. مواضع الشخصيات تقريبية ولا يشمل هذا تصدير فيديو.</p>}
       <div className="flex flex-wrap items-center gap-2">
         <button type="button" disabled={!plan.durationMs} onClick={() => {
           if (!playing && safePosition >= plan.durationMs) setPosition(0);
