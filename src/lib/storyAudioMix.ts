@@ -1,7 +1,10 @@
 import type { StoryProject } from "./storyProject";
 import { buildStoryPlaybackPlan } from "./storyPlaybackPlan";
 
+export const storyCueAudioKey = (sceneId: string, cueId: string): string => JSON.stringify([sceneId, cueId]);
+
 export type StoryAudioWindow = {
+  sceneId: string;
   cueId: string;
   startMs: number;
   durationMs: number;
@@ -16,8 +19,9 @@ export function buildStoryAudioWindows(
   if (!Number.isFinite(exportDurationMs) || exportDurationMs < 0) throw new Error("Invalid export duration");
   const limit = Math.min(exportDurationMs, buildStoryPlaybackPlan(project).durationMs);
   return buildStoryPlaybackPlan(project).cues
-    .filter(c => c.kind === "speech" && availableCueIds.has(c.cueId) && c.startMs < limit)
+    .filter(c => c.kind === "speech" && availableCueIds.has(storyCueAudioKey(c.sceneId, c.cueId)) && c.startMs < limit)
     .map(c => ({
+      sceneId: c.sceneId,
       cueId: c.cueId,
       startMs: c.startMs,
       durationMs: Math.min(c.endMs, limit) - c.startMs,
@@ -57,10 +61,10 @@ export async function prepareStoryAudioSession(
     const decoded = new Map<string, AudioBuffer>();
     for (const window of windows) {
       if (signal?.aborted) throw new Error("أُلغى التسجيل");
-      if (decoded.has(window.cueId)) continue;
-      const blob = clips.get(window.cueId)!;
+      if (decoded.has(storyCueAudioKey(window.sceneId, window.cueId))) continue;
+      const blob = clips.get(storyCueAudioKey(window.sceneId, window.cueId))!;
       try {
-        decoded.set(window.cueId, await context.decodeAudioData(await blob.arrayBuffer()));
+        decoded.set(storyCueAudioKey(window.sceneId, window.cueId), await context.decodeAudioData(await blob.arrayBuffer()));
       } catch {
         throw new Error("تعذر فك ترميز الصوت للحوار: " + window.cueId);
       }
@@ -74,7 +78,7 @@ export async function prepareStoryAudioSession(
         started = true;
         const now = context.currentTime + 0.04;
         for (const window of windows) {
-          const buffer = decoded.get(window.cueId)!;
+          const buffer = decoded.get(storyCueAudioKey(window.sceneId, window.cueId))!;
           const clipSeconds = Math.min(buffer.duration, window.durationMs / 1000);
           if (!(clipSeconds > 0)) continue;
           const source = context.createBufferSource();
