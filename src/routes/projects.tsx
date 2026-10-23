@@ -9,7 +9,7 @@ import { deserializeStoryProject, duplicateImportedStoryProject, serializeStoryP
 import { addCue } from "@/lib/storyCueOperations";
 import StorySequencePreview from "@/components/story/StorySequencePreview";
 import StoryVoiceClipControl from "@/components/story/StoryVoiceClipControl";
-import { deleteProjectVoiceClips, deleteStoryVoiceClip } from "@/lib/storyVoiceClips";
+import { deleteProjectVoiceClips, deleteSceneVoiceClips, deleteStoryVoiceClip } from "@/lib/storyVoiceClips";
 import { StoryAutosave } from "@/lib/storyAutosave";
 import { exportStorySrt } from "@/lib/storySubtitles";
 import { appendDialogueScript } from "@/lib/storyScriptBuilder";
@@ -184,7 +184,7 @@ function ProjectsPage() {
                           const copy=duplicateScene(project,s.id,uid);
                           markDirty(copy); setSelected(copy.scenes[i+1]!.id);
                         } catch(e){setError("تعذر نسخ المشهد: "+String(e));}
-                      }}>نسخ</button><button aria-label="حذف المشهد" onClick={()=>{markDirty(removeScene(project,s.id));if(selected===s.id)setSelected(null);}}>×</button></div>
+                      }}>نسخ</button><button aria-label="حذف المشهد" onClick={()=>{markDirty(removeScene(project,s.id));if(selected===s.id)setSelected(null);void deleteSceneVoiceClips(project.id,s.id).catch(failure=>setError(String(failure)));}}>×</button></div>
                     </div>)}</div>
                   <p className="mt-3 text-sm text-muted-foreground">إجمالي المدة: {(getTimeline(project).at(-1)?.endMs ?? 0)/1000} ثانية</p>
                 </div>
