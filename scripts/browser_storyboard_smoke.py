@@ -7,6 +7,7 @@ import subprocess
 import math
 import struct
 import wave
+from pathlib import Path
 import time
 import urllib.error
 import urllib.request
@@ -89,6 +90,7 @@ def main():
             page.get_by_role("button", name="قصة جديدة", exact=True).click()
             expect(page.get_by_label("رفع ملف صوتي للحوار")).to_be_visible()
             voice_path = "artifacts/model-review/voice-smoke.wav"
+            Path(voice_path).parent.mkdir(parents=True, exist_ok=True)
             with wave.open(voice_path, "wb") as voice:
                 voice.setnchannels(1)
                 voice.setsampwidth(2)
