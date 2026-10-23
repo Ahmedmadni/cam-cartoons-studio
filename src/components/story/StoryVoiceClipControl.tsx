@@ -36,7 +36,7 @@ export default function StoryVoiceClipControl({ projectId, sceneId, cueId }: Pro
     return () => {
       abandoned.current = true;
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
-      recorderRef.current?.stop();
+      if (recorderRef.current?.state === "recording") recorderRef.current.stop();
       streamRef.current?.getTracks().forEach(track => track.stop());
     };
   }, []);
