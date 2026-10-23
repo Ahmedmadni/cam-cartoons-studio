@@ -102,3 +102,12 @@ export async function deleteProjectVoiceClips(projectId: string): Promise<void> 
   // Individual deletes are intentionally awaited; never purge a different project.
   for (const clip of clips) await deleteStoryVoiceClip(projectId, clip.sceneId, clip.cueId);
 }
+
+/** Purge orphaned audio when a scene is removed from its project. */
+export async function deleteSceneVoiceClips(projectId: string, sceneId: string): Promise<void> {
+  validateKey(projectId, sceneId);
+  const clips = await listStoryVoiceClips(projectId);
+  for (const clip of clips.filter(clip => clip.sceneId === sceneId)) {
+    await deleteStoryVoiceClip(projectId, sceneId, clip.cueId);
+  }
+}
