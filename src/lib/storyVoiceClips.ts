@@ -5,6 +5,7 @@ const MIME_TYPES = new Set(["audio/webm", "audio/wav", "audio/x-wav", "audio/wav
 
 export type StoryVoiceClip = {
   projectId: string;
+  sceneId: string;
   cueId: string;
   blob: Blob;
   name: string;
@@ -30,7 +31,7 @@ function openDatabase(): Promise<IDBDatabase> {
     req.onupgradeneeded = () => {
       const db = req.result;
       if (!db.objectStoreNames.contains(STORE)) {
-        const store = db.createObjectStore(STORE, { keyPath: ["projectId", "cueId"] });
+        const store = db.createObjectStore(STORE, { keyPath: ["projectId", "sceneId", "cueId"] });
         store.createIndex("projectId", "projectId");
       }
     };
@@ -66,21 +67,21 @@ function transaction<T>(mode: IDBTransactionMode, execute: (store: IDBObjectStor
   }));
 }
 
-function validateKey(projectId: string, cueId?: string) {
-  if (!projectId || (cueId !== undefined && !cueId)) throw new Error("معرف المشروع أو الحوار غير صالح");
+function validateKey(projectId: string, sceneId?: string, cueId?: string) {
+  if (!projectId || (sceneId !== undefined && !sceneId) || (cueId !== undefined && !cueId)) throw new Error("معرف المشروع أو الحوار غير صالح");
 }
 
 /** Audio data lives in IndexedDB, not story JSON backups or public storage. */
-export async function saveStoryVoiceClip(projectId: string, cueId: string, file: File): Promise<void> {
-  validateKey(projectId, cueId);
+export async function saveStoryVoiceClip(projectId: string, sceneId: string, cueId: string, file: File): Promise<void> {
+  validateKey(projectId, sceneId, cueId);
   validateVoiceClip(file, file.name);
-  const entry: StoryVoiceClip = { projectId, cueId, blob: file, name: file.name, updatedAt: Date.now() };
+  const entry: StoryVoiceClip = { projectId, sceneId, cueId, blob: file, name: file.name, updatedAt: Date.now() };
   await transaction("readwrite", store => store.put(entry));
 }
 
-export async function getStoryVoiceClip(projectId: string, cueId: string): Promise<StoryVoiceClip | null> {
-  validateKey(projectId, cueId);
-  const entry = await transaction<StoryVoiceClip | undefined>("readonly", store => store.get([projectId, cueId]));
+export async function getStoryVoiceClip(projectId: string, sceneId: string, cueId: string): Promise<StoryVoiceClip | null> {
+  validateKey(projectId, sceneId, cueId);
+  const entry = await transaction<StoryVoiceClip | undefined>("readonly", store => store.get([projectId, sceneId, cueId]));
   return entry ?? null;
 }
 
@@ -90,14 +91,14 @@ export async function listStoryVoiceClips(projectId: string): Promise<StoryVoice
     store.index("projectId").getAll(IDBKeyRange.only(projectId)));
 }
 
-export async function deleteStoryVoiceClip(projectId: string, cueId: string): Promise<void> {
-  validateKey(projectId, cueId);
-  await transaction("readwrite", store => store.delete([projectId, cueId]));
+export async function deleteStoryVoiceClip(projectId: string, sceneId: string, cueId: string): Promise<void> {
+  validateKey(projectId, sceneId, cueId);
+  await transaction("readwrite", store => store.delete([projectId, sceneId, cueId]));
 }
 
 export async function deleteProjectVoiceClips(projectId: string): Promise<void> {
   validateKey(projectId);
   const clips = await listStoryVoiceClips(projectId);
   // Individual deletes are intentionally awaited; never purge a different project.
-  for (const clip of clips) await deleteStoryVoiceClip(projectId, clip.cueId);
+  for (const clip of clips) await deleteStoryVoiceClip(projectId, clip.sceneId, clip.cueId);
 }
