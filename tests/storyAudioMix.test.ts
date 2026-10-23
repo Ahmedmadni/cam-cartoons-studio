@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { createStoryProject, parseStoryProject } from "../src/lib/storyProject";
-import { buildStoryAudioWindows } from "../src/lib/storyAudioMix";
+import { buildStoryAudioWindows, storyCueAudioKey } from "../src/lib/storyAudioMix";
 const project = parseStoryProject({ ...createStoryProject("test","قصة"), scenes: [
   {id:"first", title:"مقدمة", durationMs: 2000, backgroundId:"park",
    actors:[{id:"a",characterId:"robot"}],
@@ -11,17 +11,17 @@ const project = parseStoryProject({ ...createStoryProject("test","قصة"), scen
          {id:"wave",actorId:"b",kind:"animation",value:"wave",atMs:600,durationMs:1000}]},
 ]});
 test("maps real dialogue audio to absolute scene time", () => {
-  const windows = buildStoryAudioWindows(project,new Set(["s1","s2","wave"]),6000);
+  const windows = buildStoryAudioWindows(project,new Set([storyCueAudioKey("first","s1"),storyCueAudioKey("second","s2"),storyCueAudioKey("second","wave")]),6000);
   expect(windows).toEqual([
-    {cueId:"s1",startMs:300,durationMs:1400},
-    {cueId:"s2",startMs:3500,durationMs:2000},
+    {sceneId:"first",cueId:"s1",startMs:300,durationMs:1400},
+    {sceneId:"second",cueId:"s2",startMs:3500,durationMs:2000},
   ]);
 });
 test("clamps audio to export cutoff and ignores missing clips", () => {
-  expect(buildStoryAudioWindows(project,new Set(["s1","s2"]),4200)).toEqual([
+  expect(buildStoryAudioWindows(project,new Set([storyCueAudioKey("first","s1"),storyCueAudioKey("second","s2")]),4200)).toEqual([
     {cueId:"s1",startMs:300,durationMs:1400},
     {cueId:"s2",startMs:3500,durationMs:700},
   ]);
   expect(buildStoryAudioWindows(project,new Set(),4200)).toEqual([]);
-  expect(() => buildStoryAudioWindows(project,new Set(["s1"]),-1)).toThrow();
+  expect(() => buildStoryAudioWindows(project,new Set([storyCueAudioKey("first","s1")]),-1)).toThrow();
 });
