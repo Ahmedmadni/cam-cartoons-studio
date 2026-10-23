@@ -19,8 +19,8 @@ test("maps real dialogue audio to absolute scene time", () => {
 });
 test("clamps audio to export cutoff and ignores missing clips", () => {
   expect(buildStoryAudioWindows(project,new Set([storyCueAudioKey("first","s1"),storyCueAudioKey("second","s2")]),4200)).toEqual([
-    {cueId:"s1",startMs:300,durationMs:1400},
-    {cueId:"s2",startMs:3500,durationMs:700},
+    {sceneId:"first",cueId:"s1",startMs:300,durationMs:1400},
+    {sceneId:"second",cueId:"s2",startMs:3500,durationMs:700},
   ]);
   expect(buildStoryAudioWindows(project,new Set(),4200)).toEqual([]);
   expect(() => buildStoryAudioWindows(project,new Set([storyCueAudioKey("first","s1")]),-1)).toThrow();
