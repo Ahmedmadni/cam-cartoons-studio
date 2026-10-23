@@ -8,6 +8,8 @@ import { saveStoryProject, listStoryProjects, deleteStoryProject } from "@/lib/s
 import { deserializeStoryProject, duplicateImportedStoryProject, serializeStoryProject, MAX_STORY_BACKUP_BYTES } from "@/lib/storyProjectBackup";
 import { addCue } from "@/lib/storyCueOperations";
 import StorySequencePreview from "@/components/story/StorySequencePreview";
+import StoryVoiceClipControl from "@/components/story/StoryVoiceClipControl";
+import { deleteProjectVoiceClips, deleteSceneVoiceClips, deleteStoryVoiceClip } from "@/lib/storyVoiceClips";
 import { StoryAutosave } from "@/lib/storyAutosave";
 import { exportStorySrt } from "@/lib/storySubtitles";
 import { appendDialogueScript } from "@/lib/storyScriptBuilder";
@@ -124,6 +126,7 @@ function ProjectsPage() {
       autosave.cancel(id);
       await autosave.flushAll();
       await deleteStoryProject(id);
+      await deleteProjectVoiceClips(id);
       setProjects((prev) => prev.filter((p) => p.id !== id));
       if (project?.id === id) { setProject(null); setSelected(null); }
     } catch (e) { setError(String(e)); }
@@ -181,11 +184,12 @@ function ProjectsPage() {
                           const copy=duplicateScene(project,s.id,uid);
                           markDirty(copy); setSelected(copy.scenes[i+1]!.id);
                         } catch(e){setError("تعذر نسخ المشهد: "+String(e));}
-                      }}>نسخ</button><button aria-label="حذف المشهد" onClick={()=>{markDirty(removeScene(project,s.id));if(selected===s.id)setSelected(null);}}>×</button></div>
+                      }}>نسخ</button><button aria-label="حذف المشهد" onClick={()=>{markDirty(removeScene(project,s.id));if(selected===s.id)setSelected(null);void deleteSceneVoiceClips(project.id,s.id).catch(failure=>setError(String(failure)));}}>×</button></div>
                     </div>)}</div>
                   <p className="mt-3 text-sm text-muted-foreground">إجمالي المدة: {(getTimeline(project).at(-1)?.endMs ?? 0)/1000} ثانية</p>
                 </div>
                 <StorySequencePreview project={project} characters={characters}/>
+                <p className="text-xs text-muted-foreground">ملفات الصوت محفوظة في هذا المتصفح فقط، ولا تُضمّن في نسخ JSON الاحتياطية؛ احتفظ بأصل الملفات الصوتية على جهازك.</p>
                 {scene && <div className="grid gap-4 rounded-2xl border p-4 md:grid-cols-2">
                   <div className="space-y-3">
                     <label className="block space-y-1"><span>اسم المشهد</span><input className={control} value={scene.title} onChange={e=>changeScene({...scene,title:e.target.value})}/></label>
@@ -230,12 +234,14 @@ function ProjectsPage() {
                           } catch(failure) { setError("تعذر توزيع الحوار: "+String(failure)); }
                         }}>توزيع الحوارات تلقائيًا على المشهد</button>
                     </div>
-                    {scene.cues.map(c=><div key={c.id} className="space-y-2 rounded-lg border p-2 text-sm"><div className="flex justify-between"><span>{c.kind === "speech" ? "حوار" : "حركة"}</span><button aria-label="حذف الإشارة" onClick={()=>changeScene({...scene,cues:scene.cues.filter(x=>x.id!==c.id)})}>×</button></div><div className="grid grid-cols-2 gap-2">
+                    {scene.cues.map(c=><div key={c.id} className="space-y-2 rounded-lg border p-2 text-sm"><div className="flex justify-between"><span>{c.kind === "speech" ? "حوار" : "حركة"}</span><button aria-label="حذف الإشارة" onClick={()=>{ changeScene({...scene,cues:scene.cues.filter(x=>x.id!==c.id)}); void deleteStoryVoiceClip(project.id,scene.id,c.id).catch(failure=>setError(String(failure))); }}>×</button></div><div className="grid grid-cols-2 gap-2">
                       <label className="text-xs">النوع<select aria-label="نوع الإشارة" className={control} value={c.kind} onChange={e=>changeScene({...scene,cues:scene.cues.map(x=>x.id===c.id?{...x,kind:e.target.value as "speech" | "animation",value:e.target.value==="animation"?"wave":"مرحبًا"}:x)})}><option value="speech">حوار</option><option value="animation">حركة</option></select></label>
                       <label className="text-xs">الشخصية<select aria-label="الشخصية المتحدثة" className={control} value={c.actorId} onChange={e=>changeScene({...scene,cues:scene.cues.map(x=>x.id===c.id?{...x,actorId:e.target.value}:x)})}>{scene.actors.map(a=><option key={a.id} value={a.id}>{characters.find(ch=>ch.id===a.characterId)?.name ?? a.characterId}</option>)}</select></label>
                     </div>
                     {c.kind === "animation" ? <select aria-label="الحركة" className={control} value={c.value} onChange={e=>changeScene({...scene,cues:scene.cues.map(x=>x.id===c.id?{...x,value:e.target.value}:x)})}>{Object.entries(ANIMATION_LABELS).map(([value,label])=><option key={value} value={value}>{label}</option>)}</select> :
-                    <input aria-label="نص الحوار أو الحركة" className={control} value={c.value} onChange={e=>changeScene({...scene,cues:scene.cues.map(x=>x.id===c.id?{...x,value:e.target.value}:x)})}/> }<div className="grid grid-cols-2 gap-2"><label>البداية (ثانية)<input aria-label="بداية الإشارة" className={control} type="number" min="0" step="0.1" value={c.atMs/1000} onChange={e=>{const atMs=Math.round(Number(e.target.value)*1000);if(Number.isFinite(atMs) && atMs>=0)changeScene({...scene,cues:scene.cues.map(x=>x.id===c.id?{...x,atMs}:x)})}}/></label><label>المدة (ثانية)<input aria-label="مدة الإشارة" className={control} type="number" min="0.1" step="0.1" value={c.durationMs/1000} onChange={e=>{const durationMs=Math.round(Number(e.target.value)*1000);if(Number.isFinite(durationMs) && durationMs>0)changeScene({...scene,cues:scene.cues.map(x=>x.id===c.id?{...x,durationMs}:x)})}}/></label></div></div>)}
+                    <input aria-label="نص الحوار أو الحركة" className={control} value={c.value} onChange={e=>changeScene({...scene,cues:scene.cues.map(x=>x.id===c.id?{...x,value:e.target.value}:x)})}/> }
+                    {c.kind === "speech" && <StoryVoiceClipControl projectId={project.id} sceneId={scene.id} cueId={c.id}/>}
+                    <div className="grid grid-cols-2 gap-2"><label>البداية (ثانية)<input aria-label="بداية الإشارة" className={control} type="number" min="0" step="0.1" value={c.atMs/1000} onChange={e=>{const atMs=Math.round(Number(e.target.value)*1000);if(Number.isFinite(atMs) && atMs>=0)changeScene({...scene,cues:scene.cues.map(x=>x.id===c.id?{...x,atMs}:x)})}}/></label><label>المدة (ثانية)<input aria-label="مدة الإشارة" className={control} type="number" min="0.1" step="0.1" value={c.durationMs/1000} onChange={e=>{const durationMs=Math.round(Number(e.target.value)*1000);if(Number.isFinite(durationMs) && durationMs>0)changeScene({...scene,cues:scene.cues.map(x=>x.id===c.id?{...x,durationMs}:x)})}}/></label></div></div>)}
                     {scene.actors.length>0 && <button className="rounded-lg bg-secondary px-3 py-2" onClick={()=>{const id=scene.actors[0]!.id;if(project) { try { const next = addCue(project,scene.id,{id:uid(),actorId:id,atMs:0,durationMs:Math.min(1000,scene.durationMs),kind:"speech",value:"مرحبًا بكم في قصتنا"}); markDirty(next); } catch (e) { setError(String(e)); } }}}>+ أضف حوارًا نموذجيًا</button>}
                     {scene.actors.length>0 && <button type="button" className="ms-2 rounded-lg border px-3 py-2" onClick={()=>{
                       if (!project) return;

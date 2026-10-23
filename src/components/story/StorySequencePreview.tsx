@@ -10,6 +10,8 @@ import { BrowserStoryNarrator, speechCuesStartingBetween } from "@/lib/storyNarr
 import { recordVisualStoryPreview } from "@/lib/storyVisualCapture";
 import { previewDurationMs } from "@/lib/storyExportPlan";
 import { selectWebmMime } from "@/lib/mediaCapabilities";
+import { listStoryVoiceClips } from "@/lib/storyVoiceClips";
+import { storyCueAudioKey } from "@/lib/storyAudioMix";
 
 type Props = { project: StoryProject; characters: CharacterDefinition[] };
 const seconds = (ms: number) => (ms / 1000).toFixed(1);
@@ -40,10 +42,15 @@ export default function StorySequencePreview({ project, characters }: Props) {
     setAudioEnabled(false);
     narratorRef.current?.stop();
     setPosition(0);
-    setExportMessage("جارٍ تجهيز فيديو معاينة صامت بأقصى مدة 30 ثانية...");
+    setDownloadUrl(null);
+    setExportMessage("جارٍ تجهيز فيديو المعاينة مع تسجيلات الحوار المتاحة...");
     try {
+      const clips = await listStoryVoiceClips(project.id);
+      if (controller.signal.aborted) throw new Error("أُلغى التسجيل");
+      const voiceClips = new Map(clips.map(clip => [storyCueAudioKey(clip.sceneId, clip.cueId), clip.blob]));
       const blob = await recordVisualStoryPreview({
         project,
+        voiceClips,
         backgrounds: new Map(BACKGROUNDS.map(bg => [bg.id, bg.src])),
         getWebglCanvas: () => canvasRef.current?.isConnected ? canvasRef.current : null,
         onPosition: ms => {
@@ -57,7 +64,7 @@ export default function StorySequencePreview({ project, characters }: Props) {
       });
       const url = URL.createObjectURL(blob);
       setDownloadUrl(url);
-      setExportMessage("اكتمل ملف المعاينة الصامتة. يمكنك تنزيله بتنسيق WebM.");
+      setExportMessage(voiceClips.size ? "اكتمل فيديو WebM بالتسجيلات الصوتية المرتبطة بالحوار." : "اكتمل فيديو WebM صامت؛ أرفق ملفات صوتية بالحوارات لتضمينها.");
     } catch (caught) {
       setExportMessage(caught instanceof Error ? caught.message : "فشل تسجيل المعاينة.");
     } finally {
@@ -202,14 +209,14 @@ export default function StorySequencePreview({ project, characters }: Props) {
           <button type="button" className="flex items-center gap-2 rounded-xl bg-secondary px-4 py-2 disabled:opacity-50"
             disabled={!previewDurationMs(project) || !selectWebmMime("video")}
             onClick={() => { void capturePreview(); }}>
-            <Video className="size-4"/> تسجيل معاينة WebM صامتة
+            <Video className="size-4"/> تسجيل معاينة WebM
           </button>
         )}
         {downloadUrl && !capturing && <a href={downloadUrl} download={`story-preview-${project.id}.webm`}
           className="flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-primary-foreground">
           <Download className="size-4"/> تنزيل الفيديو
         </a>}
-        <span className="text-xs text-muted-foreground">بحد أقصى 30 ثانية، 854×480، بلا صوت. حوار النص يظهر داخل الفيديو، وSRT منفصل.</span>
+        <span className="text-xs text-muted-foreground">بحد أقصى 30 ثانية، 854×480. يُضمّن الصوت المسجّل أو المرفوع للحوار إن وجد؛ الصوت الآلي للمتصفح لا يُسجّل.</span>
       </div>
       {exportMessage && <p role="status" className="text-xs text-muted-foreground">{exportMessage}</p>}
       {audioMessage && <p role="status" className="text-xs text-muted-foreground">{audioMessage}</p>}
