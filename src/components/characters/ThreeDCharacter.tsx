@@ -224,7 +224,7 @@ export default function ThreeDCharacter({
   return (
     <Canvas
       className={className}
-      shadows
+      shadows="basic"
       dpr={[1, 1.75]}
       gl={{
         alpha: true,

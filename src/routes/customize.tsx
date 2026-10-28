@@ -120,9 +120,9 @@ function CustomizePage() {
                   className="inline-flex items-center justify-center gap-2 rounded-full bg-primary px-5 py-3 font-black text-primary-foreground">
                   <ExternalLink className="size-4" /> تعديل ملف الشخصية أو استيراد GLB
                 </button>
-                <button type="button" onClick={() => navigate({ to: "/studio" })}
+                <button type="button" onClick={() => navigate({ to: "/story" })}
                   className="inline-flex items-center justify-center gap-2 rounded-full border border-border px-5 py-3 font-black">
-                  <Camera className="size-4" /> الذهاب إلى الاستوديو
+                  <Camera className="size-4" /> الذهاب إلى القصة
                 </button>
               </div>
             </div>

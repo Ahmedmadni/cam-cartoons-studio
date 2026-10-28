@@ -2,6 +2,10 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowRight, Palette, Play, Sparkles, Square, Video, Wand2 } from "lucide-react";
 
+import { Button } from "@/components/ui/button";
+import { StoryRecording } from "@/lib/storyRecording";
+import { playStorySpeech } from "@/lib/storySpeech";
+import type { AvatarDiagnostics } from "@/lib/modelPresentation";
 import CharacterStage from "@/components/characters/CharacterStage";
 import { faceState } from "@/lib/faceState";
 import {
@@ -50,7 +54,7 @@ function StoryPage() {
   const voiceTone = useStudioStore((s) => s.voiceTone);
 
   const [text, setText] = useState(EXAMPLE);
-  const [bgId, setBgId] = useState(BACKGROUNDS[0]!.id);
+  const [bgId, setBgId] = useState(BACKGROUNDS[0]?.id ?? "");
   const [bgFilter, setBgFilter] = useState<BackgroundFilter>("premium");
   const [action, setAction] = useState<AnimationType>("idle");
   const [playing, setPlaying] = useState(false);
@@ -59,15 +63,18 @@ function StoryPage() {
   const [note, setNote] = useState<string | null>(null);
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const recorderRef = useRef<MediaRecorder | null>(null);
-  const chunksRef = useRef<Blob[]>([]);
-  const extraTracksRef = useRef<MediaStreamTrack[]>([]);
+  const recorderRef = useRef<StoryRecording | null>(null);
+  const activeSpeechRef = useRef<ReturnType<typeof playStorySpeech> | null>(null);
+  const generationRef = useRef(0);
+  const busyRef = useRef(false);
+  const mountedRef = useRef(true);
+  const [diagnostics, setDiagnostics] = useState<AvatarDiagnostics | null>(null);
   const mouthTimerRef = useRef<number | null>(null);
   const cancelledRef = useRef(false);
   const voiceBusRef = useRef<VoicePlaybackBus | null>(null);
 
   const remoteVoiceConfigured = isRemoteVoiceConfigured();
-  const background = BACKGROUNDS.find((b) => b.id === bgId) ?? BACKGROUNDS[0]!;
+  const background = BACKGROUNDS.find((b) => b.id === bgId) ?? BACKGROUNDS[0];
   const visibleBackgrounds = filterBackgrounds(bgFilter);
 
   useEffect(() => {
@@ -95,64 +102,29 @@ function StoryPage() {
   /** ينفّذ حركة واحدة (مكتبة الحركات) لمدة محددة */
   const performAction = useCallback((next: AnimationType) => setAction(next), []);
 
-  const speakBrowser = useCallback(
-    (line: string) =>
-      new Promise<void>((resolve) => {
-        if (typeof window === "undefined" || !("speechSynthesis" in window)) {
-          setTimeout(resolve, 1200);
-          return;
-        }
-
-        const utter = new SpeechSynthesisUtterance(line);
-        const preset = VOICE_PRESETS[selectedVoice];
-        const semitones = preset.semitones + voicePitch;
-        utter.lang = "ar-SA";
-        utter.rate = 0.95;
-        utter.pitch = Math.max(0.5, Math.min(2, 1 + (semitones / 12) * 0.45));
-        const arabic = window.speechSynthesis.getVoices().find((v) => v.lang.startsWith("ar"));
-        if (arabic) utter.voice = arabic;
-
-        let gotBoundary = false;
-        let rafId = 0;
-        let target = 0;
-        const animate = () => {
-          faceState.mouthOpen += (target - faceState.mouthOpen) * 0.35;
-          target *= 0.88;
-          rafId = requestAnimationFrame(animate);
-        };
-
-        utter.onstart = () => {
-          rafId = requestAnimationFrame(animate);
-        };
-        utter.onboundary = (e) => {
-          if (e.name && e.name !== "word") return;
-          if (!gotBoundary) {
-            gotBoundary = true;
-            stopMouth();
-          }
-          const len = e.charLength || line.slice(e.charIndex).split(/\\s/)[0]?.length || 3;
-          target = Math.min(1, 0.45 + len * 0.07);
-          if (len > 4) {
-            window.setTimeout(() => {
-              target = Math.max(target, 0.55 + Math.random() * 0.3);
-            }, 140);
-          }
-        };
-
-        const done = () => {
-          cancelAnimationFrame(rafId);
-          faceState.mouthOpen = 0;
-          resolve();
-        };
-        utter.onend = done;
-        utter.onerror = done;
-        window.speechSynthesis.speak(utter);
-      }),
-    [selectedVoice, stopMouth, voicePitch],
-  );
+  const speakBrowser = useCallback(async (line: string) => {
+    if (!("speechSynthesis" in window) || typeof SpeechSynthesisUtterance === "undefined") {
+      setNote("قراءة النص غير متاحة في هذا المتصفح؛ جرّب جهازًا يدعم قراءة النصوص.");
+      return;
+    }
+    stopMouth();
+    const utter = new SpeechSynthesisUtterance(line);
+    const semitones = VOICE_PRESETS[selectedVoice].semitones + voicePitch;
+    utter.lang = "ar-SA";
+    utter.rate = 0.95;
+    utter.pitch = Math.max(0.5, Math.min(2, 1 + (semitones / 12) * 0.45));
+    const arabic = window.speechSynthesis.getVoices().find(v => v.lang.toLowerCase().startsWith("ar"));
+    if (arabic) utter.voice = arabic;
+    const speech = playStorySpeech({ synth: window.speechSynthesis, utterance: utter,
+      onMouth: amount => { faceState.mouthOpen = amount; } });
+    activeSpeechRef.current = speech;
+    await speech.done;
+    if (activeSpeechRef.current === speech) activeSpeechRef.current = null;
+  }, [selectedVoice, stopMouth, voicePitch]);
 
   const speak = useCallback(
     async (line: string) => {
+      const generation = generationRef.current;
       if (remoteVoiceConfigured) {
         try {
           const audio = await synthesizeRemoteVoice(line, selectedVoice, {
@@ -161,6 +133,7 @@ function StoryPage() {
             tone: voiceTone,
           });
 
+          if (cancelledRef.current || generation !== generationRef.current) return;
           if (audio) {
             stopMouth();
             const bus = getVoiceBus();
@@ -170,11 +143,12 @@ function StoryPage() {
             return;
           }
         } catch {
+          if (cancelledRef.current || generation !== generationRef.current) return;
           setNote("تعذّر محرك الصوت الذكي؛ تم استخدام صوت الجهاز كبديل. قد لا يُسجَّل الصوت البديل داخل الفيديو.");
         }
       }
 
-      await speakBrowser(line);
+      if (!cancelledRef.current && generation === generationRef.current) await speakBrowser(line);
     },
     [
       getVoiceBus,
@@ -188,143 +162,136 @@ function StoryPage() {
   );
 
   const runStory = useCallback(
-    async (steps: StoryStep[]) => {
+    async (steps: StoryStep[], generation: number) => {
       for (const step of steps) {
-        if (cancelledRef.current) break;
+        if (cancelledRef.current || generation !== generationRef.current) break;
         performAction(step.action);
         setCurrentLine(step.text);
         startMouth();
         await speak(step.text);
+        if (cancelledRef.current || generation !== generationRef.current) return;
         stopMouth();
         await new Promise((r) => window.setTimeout(r, 350));
       }
+      if (generation !== generationRef.current) return;
       performAction("idle");
       setCurrentLine("");
     },
     [performAction, speak, startMouth, stopMouth],
   );
 
-  const stopRecorder = useCallback(() => {
-    recorderRef.current?.state === "recording" && recorderRef.current.stop();
-    extraTracksRef.current.forEach((t) => t.stop());
-    extraTracksRef.current = [];
-  }, []);
+  const stopRecorder = useCallback(() => recorderRef.current?.finish(), []);
 
   const handleStop = useCallback(() => {
     cancelledRef.current = true;
+    generationRef.current += 1;
+    activeSpeechRef.current?.cancel();
+    activeSpeechRef.current = null;
     window.speechSynthesis?.cancel();
     voiceBusRef.current?.stop();
     stopMouth();
     performAction("idle");
     setCurrentLine("");
     setPlaying(false);
+    // Manual stop keeps a valid partial clip; unmount/error discards it.
     stopRecorder();
   }, [performAction, stopMouth, stopRecorder]);
 
-  const handlePlay = useCallback(
-    async (withRecording: boolean) => {
-      const steps = parseStory(text);
-      if (!steps.length) return;
-      const videoMime = withRecording ? selectWebmMime("video") : null;
-      if (withRecording && !videoMime) {
-        setNote("المتصفح لا يدعم تسجيل WebM؛ جرّب متصفحًا يدعم MediaRecorder وWebM.");
-        return;
-      }
-      cancelledRef.current = false;
-      setPlaying(true);
-      setNote(null);
-
-      if (withRecording && canvasRef.current) {
-        try {
-          const stream = canvasRef.current.captureStream(30);
-
-          if (remoteVoiceConfigured) {
-            const bus = getVoiceBus();
-            const aiAudioTrack = bus.captureStream.getAudioTracks()[0];
-            if (aiAudioTrack) {
-              stream.addTrack(aiAudioTrack);
-              setNote("سيتم دمج صوت الشخصية الذكي مباشرة داخل الفيديو.");
-            }
-          } else {
-            try {
-              const display = await navigator.mediaDevices.getDisplayMedia({
-                video: true,
-                audio: true,
-              });
-              const audio = display.getAudioTracks()[0];
-              display.getVideoTracks().forEach((t) => t.stop());
-              if (audio) {
-                stream.addTrack(audio);
-                extraTracksRef.current = [audio];
-              } else {
-                setNote("تم التسجيل بدون صوت (لم تتم مشاركة صوت التبويب).");
-              }
-            } catch {
-              setNote("تم التسجيل بدون صوت (لم تتم مشاركة صوت التبويب).");
-            }
+  const handlePlay = useCallback(async (withRecording: boolean) => {
+    if (busyRef.current) return;
+    const steps = parseStory(text);
+    if (!steps.length) { setNote("اكتب نص القصة أولًا."); return; }
+    if (diagnostics?.status !== "ready") { setNote("انتظر حتى تصبح الشخصية جاهزة."); return; }
+    const videoMime = withRecording ? selectWebmMime("video") : null;
+    const canvas = canvasRef.current;
+    if (withRecording && (!videoMime || !canvas || typeof canvas.captureStream !== "function")) {
+      setNote("تسجيل الفيديو غير متاح في هذا المتصفح؛ يمكنك تشغيل القصة دون تسجيل.");
+      return;
+    }
+    busyRef.current = true;
+    const generation = ++generationRef.current;
+    const active = () => mountedRef.current && generation === generationRef.current && !cancelledRef.current;
+    cancelledRef.current = false;
+    setPlaying(true);
+    setNote(null);
+    let stream: MediaStream | null = null;
+    try {
+      if (withRecording && canvas && videoMime) {
+        stream = canvas.captureStream(30);
+        if (remoteVoiceConfigured) {
+          const audioTrack = getVoiceBus().captureStream.getAudioTracks()[0];
+          if (audioTrack) stream.addTrack(audioTrack);
+          setNote("سيتم دمج صوت الشخصية مباشرة داخل الفيديو.");
+        } else {
+          try {
+            if (!navigator.mediaDevices?.getDisplayMedia) throw new Error("unsupported");
+            const display = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+            if (!active()) { display.getTracks().forEach(track => track.stop()); return; }
+            const audio = display.getAudioTracks()[0];
+            display.getTracks().filter(track => track !== audio).forEach(track => track.stop());
+            if (audio) stream.addTrack(audio);
+            else setNote("سيكون الفيديو بدون صوت؛ لم تتم مشاركة صوت التبويب.");
+          } catch {
+            if (!active()) return;
+            setNote("سيكون الفيديو بدون صوت؛ لم تتم مشاركة صوت التبويب.");
           }
-
-          chunksRef.current = [];
-          const recorder = new MediaRecorder(stream, { mimeType: videoMime! });
-          recorder.ondataavailable = (e) => {
-            if (e.data.size) chunksRef.current.push(e.data);
-          };
-          recorder.onstop = () => {
-            const blob = new Blob(chunksRef.current, { type: "video/webm" });
+        }
+        if (!active()) return;
+        recorderRef.current = new StoryRecording(stream, videoMime,
+          blob => {
+            recorderRef.current = null;
+            if (!mountedRef.current) return;
             setRecordedVideo(blob);
             setRecording(false);
-            const bus = voiceBusRef.current;
-            voiceBusRef.current = null;
-            void bus?.close();
-            navigate({ to: "/save" });
-          };
-          recorderRef.current = recorder;
-          recorder.start();
-          setRecording(true);
-        } catch {
-          setNote("تعذّر بدء التسجيل على هذا المتصفح.");
-          const bus = voiceBusRef.current;
-          voiceBusRef.current = null;
-          void bus?.close();
-        }
+            void navigate({ to: "/save" });
+          },
+          message => {
+            recorderRef.current = null;
+            if (!mountedRef.current) return;
+            setRecording(false);
+            setNote(message);
+            handleStop();
+          });
+        stream = null; // ownership has passed to StoryRecording
+        setRecording(true);
       }
-
-      await runStory(steps);
-      setPlaying(false);
-
+      if (!active()) return;
+      await runStory(steps, generation);
+      if (!active()) return;
       if (withRecording) {
-        window.setTimeout(() => stopRecorder(), 400);
-      } else {
-        const bus = voiceBusRef.current;
-        voiceBusRef.current = null;
-        await bus?.close();
+        await new Promise(resolve => window.setTimeout(resolve, 400));
+        if (active()) stopRecorder();
       }
-    },
-    [
-      getVoiceBus,
-      navigate,
-      remoteVoiceConfigured,
-      runStory,
-      setRecordedVideo,
-      stopRecorder,
-      text,
-    ],
-  );
-
-  useEffect(
-    () => () => {
-      cancelledRef.current = true;
-      window.speechSynthesis?.cancel();
-      if (mouthTimerRef.current) window.clearInterval(mouthTimerRef.current);
-      extraTracksRef.current.forEach((t) => t.stop());
+    } catch {
+      if (active()) { setNote("تعذّر بدء التسجيل؛ حاول مرة أخرى أو شغّل القصة دون تسجيل."); handleStop(); }
+    } finally {
+      stream?.getTracks().forEach(track => track.stop());
       const bus = voiceBusRef.current;
       voiceBusRef.current = null;
       void bus?.close();
-    },
-    [],
-  );
+      busyRef.current = false;
+      if (mountedRef.current) setPlaying(false);
+    }
+  }, [diagnostics?.status, getVoiceBus, handleStop, navigate, remoteVoiceConfigured, runStory, setRecordedVideo, stopRecorder, text]);
 
-  if (!selectedCharacter) return null;
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      cancelledRef.current = true;
+      generationRef.current += 1;
+      activeSpeechRef.current?.cancel();
+      window.speechSynthesis?.cancel();
+      recorderRef.current?.discard();
+      recorderRef.current = null;
+      stopMouth();
+      const bus = voiceBusRef.current;
+      voiceBusRef.current = null;
+      void bus?.close();
+    };
+  }, [stopMouth]);
+
+  if (!selectedCharacter || !background) return null;
 
   const steps = parseStory(text);
 
@@ -336,22 +303,22 @@ function StoryPage() {
             اكتب قصة لـ {getCharacterLabel(selectedCharacter)} 📖
           </h1>
           <div className="flex flex-wrap gap-2">
-            <button
+            <Button variant="ghost"
               type="button"
               onClick={() => navigate({ to: "/customize" })}
               className="inline-flex items-center gap-2 rounded-full bg-secondary px-5 py-2.5 font-bold text-secondary-foreground"
             >
               <Palette className="size-5" />
               تعديل الشخصية
-            </button>
-            <button
+            </Button>
+            <Button variant="ghost"
               type="button"
               onClick={() => navigate({ to: "/" })}
               className="inline-flex items-center gap-2 rounded-full bg-muted px-5 py-2.5 font-bold text-foreground"
             >
               <ArrowRight className="size-5" />
               تغيير الشخصية
-            </button>
+            </Button>
           </div>
         </header>
 
@@ -363,6 +330,7 @@ function StoryPage() {
             <textarea
               id="story"
               value={text}
+              disabled={playing || recording}
               onChange={(e) => setText(e.target.value)}
               rows={5}
               className="mt-3 w-full rounded-2xl border-2 border-border bg-background p-4 text-lg font-semibold text-foreground outline-none focus:border-primary"
@@ -401,7 +369,7 @@ function StoryPage() {
 
             <div className="mt-3 flex flex-wrap gap-2">
               {BACKGROUND_FILTERS.map((filter) => (
-                <button
+                <Button variant="ghost"
                   key={filter}
                   type="button"
                   onClick={() => setBgFilter(filter)}
@@ -412,13 +380,13 @@ function StoryPage() {
                   }`}
                 >
                   {BACKGROUND_FILTER_LABELS[filter]}
-                </button>
+                </Button>
               ))}
             </div>
 
             <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
               {visibleBackgrounds.map((b) => (
-                <button
+                <Button variant="ghost"
                   key={b.id}
                   type="button"
                   onClick={() => setBgId(b.id)}
@@ -439,7 +407,7 @@ function StoryPage() {
                       className="h-full w-full object-cover"
                     />
                     {b.premium && (
-                      <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-full bg-black/60 px-2 py-1 text-[10px] font-black text-white backdrop-blur">
+                      <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-full bg-foreground/80 px-2 py-1 text-[10px] font-black text-background backdrop-blur">
                         <Sparkles className="size-3" />
                         Premium
                       </span>
@@ -448,7 +416,7 @@ function StoryPage() {
                   <span className="block truncate px-2.5 py-2 text-xs font-black text-foreground">
                     {b.label}
                   </span>
-                </button>
+                </Button>
               ))}
             </div>
 
@@ -466,36 +434,38 @@ function StoryPage() {
 
             <div className="mt-6 flex flex-wrap gap-3">
               {playing ? (
-                <button
+                <Button variant="ghost"
                   type="button"
                   onClick={handleStop}
                   className="inline-flex items-center gap-2 rounded-full bg-destructive px-7 py-4 text-xl font-black text-destructive-foreground shadow-lg"
                 >
                   <Square className="size-6" />
                   إيقاف
-                </button>
+                </Button>
               ) : (
                 <>
-                  <button
+                  <Button variant="ghost"
                     type="button"
+                    disabled={diagnostics?.status !== "ready" || !text.trim() || recording}
                     onClick={() => void handlePlay(false)}
                     className="inline-flex items-center gap-2 rounded-full bg-primary px-7 py-4 text-xl font-black text-primary-foreground shadow-lg transition hover:brightness-105"
                   >
                     <Play className="size-6" />
                     تشغيل القصة
-                  </button>
-                  <button
+                  </Button>
+                  <Button variant="ghost"
                     type="button"
+                    disabled={diagnostics?.status !== "ready" || !text.trim() || recording}
                     onClick={() => void handlePlay(true)}
                     className="inline-flex items-center gap-2 rounded-full bg-sunny px-7 py-4 text-xl font-black text-sunny-foreground shadow-lg transition hover:brightness-105"
                   >
                     <Video className="size-6" />
                     سجّل القصة
-                  </button>
+                  </Button>
                 </>
               )}
             </div>
-            {note && <p className="mt-3 text-sm font-bold text-muted-foreground">{note}</p>}
+            {note && <p role="status" className="mt-3 text-sm font-bold text-muted-foreground">{note}</p>}
           </section>
 
           <section className="relative overflow-hidden rounded-3xl border-4 border-primary bg-card shadow-xl">
@@ -505,6 +475,7 @@ function StoryPage() {
                 animation={action}
                 spin={false}
                 backgroundUrl={background.src}
+                onDiagnostics={setDiagnostics}
                 onCanvasReady={(c) => (canvasRef.current = c)}
               />
             </div>
