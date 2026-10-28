@@ -41,7 +41,7 @@ export default function StoryMultiActorCanvas({ scene, backgroundUrl, actorAnima
   return (
     <Canvas
       className="h-full w-full"
-      shadows
+      shadows="basic"
       dpr={[1, 1.5]}
       gl={{ alpha: true, antialias: true, preserveDrawingBuffer: true, powerPreference: "high-performance" }}
       onCreated={({ gl }) => onCanvasReady?.(gl.domElement)}
