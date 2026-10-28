@@ -49,16 +49,16 @@ const StudioRoute = StudioRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/projects': typeof ProjectsRoute
   '/customize': typeof CustomizeRoute
+  '/projects': typeof ProjectsRoute
   '/save': typeof SaveRoute
   '/story': typeof StoryRoute
   '/studio': typeof StudioRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/projects': typeof ProjectsRoute
   '/customize': typeof CustomizeRoute
+  '/projects': typeof ProjectsRoute
   '/save': typeof SaveRoute
   '/story': typeof StoryRoute
   '/studio': typeof StudioRoute
@@ -66,8 +66,8 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/projects': typeof ProjectsRoute
   '/customize': typeof CustomizeRoute
+  '/projects': typeof ProjectsRoute
   '/save': typeof SaveRoute
   '/story': typeof StoryRoute
   '/studio': typeof StudioRoute
@@ -77,7 +77,14 @@ export interface FileRouteTypes {
   fullPaths: '/' | '/customize' | '/projects' | '/save' | '/story' | '/studio'
   fileRoutesByTo: FileRoutesByTo
   to: '/' | '/customize' | '/projects' | '/save' | '/story' | '/studio'
-  id: '__root__' | '/' | '/customize' | '/projects' | '/save' | '/story' | '/studio'
+  id:
+    | '__root__'
+    | '/'
+    | '/customize'
+    | '/projects'
+    | '/save'
+    | '/story'
+    | '/studio'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
