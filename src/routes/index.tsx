@@ -25,6 +25,10 @@ export const Route = createFileRoute("/")({
   head: () => ({ meta: [
     { title: "مكتبة الشخصيات — Cam Cartoons Studio" },
     { name: "description", content: "استوديو مفتوح لشخصيات Premium GLB وReady Player Me مع تخصيص كل شخصية." },
+    { property: "og:title", content: "مكتبة الشخصيات — Cam Cartoons Studio" },
+    { property: "og:description", content: "اختر شخصيتك ثلاثية الأبعاد لإنشاء القصص وتحريكها." },
+    { property: "og:type", content: "website" },
+    { name: "twitter:card", content: "summary_large_image" },
   ] }),
   component: LibraryPage,
 });
@@ -651,7 +655,6 @@ function LibraryPage() {
             </div>}
             <button type="button" onClick={() => navigate({ to: "/customize" })} className="rounded-full bg-secondary px-6 py-3 font-black">تخصيص الشخصية</button>
             <button type="button" onClick={() => navigate({ to: "/story" })} className="inline-flex items-center justify-center gap-2 rounded-full bg-primary px-6 py-3 font-black text-primary-foreground"><BookOpen className="size-5" /> ابدأ القصة</button>
-            <button type="button" onClick={() => navigate({ to: "/studio" })} className="inline-flex items-center justify-center gap-2 rounded-full border-2 border-border px-6 py-3 font-black"><Camera className="size-5" /> استوديو التصوير</button>
           </div>
         </section>}
       </div>

@@ -14,7 +14,14 @@ import { appendDialogueScript } from "@/lib/storyScriptBuilder";
 import { ANIMATION_LABELS } from "@/lib/store";
 
 export const Route = createFileRoute("/projects")({
-  head: () => ({ meta: [{ title: "مشاريعي — استوديو القصص" }] }),
+  head: () => ({ meta: [
+    { title: "مشاريعي — استوديو القصص" },
+    { name: "description", content: "إنشاء وإدارة قصص متعددة المشاهد بشخصيات ثلاثية الأبعاد." },
+    { property: "og:title", content: "مشاريعي — استوديو القصص" },
+    { property: "og:description", content: "أنشئ مشاهد قصتك ورتّب حوارات الشخصيات واحفظ عملك." },
+    { property: "og:type", content: "website" },
+    { name: "twitter:card", content: "summary_large_image" },
+  ] }),
   component: ProjectsPage,
 });
 const uid = () => crypto.randomUUID();
