@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
 import { Suspense, lazy, useCallback, useEffect, useRef, useState } from "react";
 import { ArrowRight, Mic, RefreshCw, ScanFace, Sparkles } from "lucide-react";
 import CharacterStage from "@/components/characters/CharacterStage";
@@ -13,6 +13,7 @@ import { selectWebmMime } from "@/lib/mediaCapabilities";
 const Webcam = lazy(() => import("react-webcam"));
 
 export const Route = createFileRoute("/studio")({
+  beforeLoad: () => { throw redirect({ to: "/story" }); },
   head: () => ({
     meta: [
       { title: "استوديو التصوير — الشخصيات 3D" },
@@ -20,6 +21,8 @@ export const Route = createFileRoute("/studio")({
         name: "description",
         content: "صوّر فيديو مع شخصيتك الكرتونية ثلاثية الأبعاد مباشرة من الكاميرا.",
       },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
       { property: "og:title", content: "استوديو التصوير — الشخصيات 3D" },
       {
         property: "og:description",

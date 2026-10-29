@@ -14,6 +14,10 @@ export const Route = createFileRoute("/customize")({
     meta: [
       { title: "معاينة مجسم GLB الأصلي — Cam Cartoons Studio" },
       { name: "description", content: "معاينة الإضاءة والتأطير لمجسم الشخصية ثلاثي الأبعاد الأصلي دون التحويل إلى رسومات هندسية." },
+      { property: "og:title", content: "معاينة الشخصية — Cam Cartoons Studio" },
+      { property: "og:description", content: "معاينة الإضاءة والتأطير للشخصية قبل إنشاء قصتك." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
   component: CustomizePage,
