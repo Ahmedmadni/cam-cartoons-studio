@@ -67,6 +67,7 @@ function StoryPage() {
   const activeSpeechRef = useRef<ReturnType<typeof playStorySpeech> | null>(null);
   const generationRef = useRef(0);
   const busyRef = useRef(false);
+  const cancelSetupRef = useRef<(() => void) | null>(null);
   const mountedRef = useRef(true);
   const [diagnostics, setDiagnostics] = useState<AvatarDiagnostics | null>(null);
   const mouthTimerRef = useRef<number | null>(null);
@@ -185,6 +186,8 @@ function StoryPage() {
   const handleStop = useCallback(() => {
     cancelledRef.current = true;
     generationRef.current += 1;
+    cancelSetupRef.current?.();
+    cancelSetupRef.current = null;
     activeSpeechRef.current?.cancel();
     activeSpeechRef.current = null;
     window.speechSynthesis?.cancel();
@@ -225,7 +228,14 @@ function StoryPage() {
         } else {
           try {
             if (!navigator.mediaDevices?.getDisplayMedia) throw new Error("unsupported");
-            const display = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+            const requestedDisplay = navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+            const cancelledSetup = new Promise<null>(resolve => { cancelSetupRef.current = () => resolve(null); });
+            void requestedDisplay.then(display => {
+              if (!active()) display.getTracks().forEach(track => track.stop());
+            }).catch(() => {});
+            const display = await Promise.race([requestedDisplay, cancelledSetup]);
+            cancelSetupRef.current = null;
+            if (!display) return;
             if (!active()) { display.getTracks().forEach(track => track.stop()); return; }
             const audio = display.getAudioTracks()[0];
             display.getTracks().filter(track => track !== audio).forEach(track => track.stop());
@@ -280,6 +290,8 @@ function StoryPage() {
       mountedRef.current = false;
       cancelledRef.current = true;
       generationRef.current += 1;
+      cancelSetupRef.current?.();
+      cancelSetupRef.current = null;
       activeSpeechRef.current?.cancel();
       window.speechSynthesis?.cancel();
       recorderRef.current?.discard();
@@ -390,7 +402,9 @@ function StoryPage() {
                   key={b.id}
                   type="button"
                   onClick={() => setBgId(b.id)}
-                  className={`overflow-hidden rounded-2xl border-4 bg-background text-right transition hover:-translate-y-0.5 hover:shadow-md ${
+                  aria-pressed={b.id === bgId}
+                  disabled={playing || recording}
+                  className={`block h-auto min-w-0 whitespace-normal overflow-hidden rounded-lg border-4 bg-background p-0 text-right transition hover:-translate-y-0.5 hover:shadow-md ${
                     b.id === bgId
                       ? "border-primary shadow-md"
                       : "border-transparent hover:border-border"
@@ -448,7 +462,7 @@ function StoryPage() {
                     type="button"
                     disabled={diagnostics?.status !== "ready" || !text.trim() || recording}
                     onClick={() => void handlePlay(false)}
-                    className="inline-flex items-center gap-2 rounded-full bg-primary px-7 py-4 text-xl font-black text-primary-foreground shadow-lg transition hover:brightness-105"
+                    className="inline-flex h-auto whitespace-normal items-center gap-2 rounded-full bg-primary px-7 py-4 text-xl font-black text-primary-foreground shadow-lg transition hover:brightness-105"
                   >
                     <Play className="size-6" />
                     تشغيل القصة
@@ -457,7 +471,7 @@ function StoryPage() {
                     type="button"
                     disabled={diagnostics?.status !== "ready" || !text.trim() || recording}
                     onClick={() => void handlePlay(true)}
-                    className="inline-flex items-center gap-2 rounded-full bg-sunny px-7 py-4 text-xl font-black text-sunny-foreground shadow-lg transition hover:brightness-105"
+                    className="inline-flex h-auto whitespace-normal items-center gap-2 rounded-full bg-sunny px-7 py-4 text-xl font-black text-sunny-foreground shadow-lg transition hover:brightness-105"
                   >
                     <Video className="size-6" />
                     سجّل القصة
@@ -468,7 +482,7 @@ function StoryPage() {
             {note && <p role="status" className="mt-3 text-sm font-bold text-muted-foreground">{note}</p>}
           </section>
 
-          <section className="relative overflow-hidden rounded-3xl border-4 border-primary bg-card shadow-xl">
+          <section className="relative self-start overflow-hidden rounded-3xl border-4 border-primary bg-card shadow-xl">
             <div className="aspect-video w-full">
               <CharacterStage
                 type={selectedCharacter}

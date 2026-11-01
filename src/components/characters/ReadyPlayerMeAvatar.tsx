@@ -1,7 +1,8 @@
 import { useGLTF } from "@react-three/drei";
 import { useFrame, useThree } from "@react-three/fiber";
 import { useEffect, useMemo, useRef } from "react";
-import { AnimationMixer, Box3, MathUtils, Vector3 } from "three";
+import { AnimationMixer, MathUtils, Vector3 } from "three";
+import { measureAvatarBounds } from "@/lib/avatarBounds";
 import type { Bone, Euler, Group, Mesh, Object3D } from "three";
 import { clone as cloneSkeleton } from "three/examples/jsm/utils/SkeletonUtils.js";
 
@@ -255,7 +256,7 @@ export default function ReadyPlayerMeAvatar({ type, url, animation, spin, previe
 
   // Read the geometry in its bind pose, not after runtime animations change the bones.
   const presentation = useMemo(() => {
-    const bounds = new Box3().setFromObject(avatar);
+    const bounds = measureAvatarBounds(avatar);
     const size = bounds.getSize(new Vector3());
     const center = bounds.getCenter(new Vector3());
     const dimensions = { width: size.x, height: size.y, depth: size.z };
