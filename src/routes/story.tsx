@@ -4,6 +4,7 @@ import { ArrowRight, Palette, Play, Sparkles, Square, Video, Wand2 } from "lucid
 
 import { Button } from "@/components/ui/button";
 import { StoryRecording } from "@/lib/storyRecording";
+import { waitForStoryCapture } from "@/lib/storyCaptureSetup";
 import { playStorySpeech } from "@/lib/storySpeech";
 import type { AvatarDiagnostics } from "@/lib/modelPresentation";
 import CharacterStage from "@/components/characters/CharacterStage";
@@ -230,10 +231,7 @@ function StoryPage() {
             if (!navigator.mediaDevices?.getDisplayMedia) throw new Error("unsupported");
             const requestedDisplay = navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
             const cancelledSetup = new Promise<null>(resolve => { cancelSetupRef.current = () => resolve(null); });
-            void requestedDisplay.then(display => {
-              if (!active()) display.getTracks().forEach(track => track.stop());
-            }).catch(() => {});
-            const display = await Promise.race([requestedDisplay, cancelledSetup]);
+            const display = await waitForStoryCapture(requestedDisplay, cancelledSetup, active);
             cancelSetupRef.current = null;
             if (!display) return;
             if (!active()) { display.getTracks().forEach(track => track.stop()); return; }

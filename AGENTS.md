@@ -14,3 +14,5 @@
 - Use StoryRecording for single-story capture lifecycle; it owns capture tracks and rejects failed or empty exports.
 - Use playStorySpeech for single-story browser narration so cancellation settles pending speech and mouth frames are released.
 - Generate character environment lighting locally with Lightformer rather than downloading external HDR presets to avoid network-dependent blank screens.
+- Measure skinned avatar bounds only after updating world transforms and skeleton matrices so normalization works before the first render.
+- Permission setup uses waitForStoryCapture to settle cancellation immediately and release late-arriving capture streams.
