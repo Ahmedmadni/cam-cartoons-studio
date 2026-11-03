@@ -12,9 +12,10 @@ import {
 
 describe("Open Character Library", () => {
   test("starts with seventeen real 3D GLBs and no old geometric stock models", () => {
-    expect(DEFAULT_CHARACTERS).toHaveLength(17);
+    const glb = DEFAULT_CHARACTERS.filter((item) => item.provider !== "toon");
+    expect(glb).toHaveLength(17);
     expect(DEFAULT_CHARACTERS.find((item) => item.id === "curated-animal-forest-fox")?.category).toBe("animals");
-    expect(DEFAULT_CHARACTERS.every((item) => item.provider === "imported-glb" && !!item.modelUrl)).toBe(true);
+    expect(glb.every((item) => item.provider === "imported-glb" && !!item.modelUrl)).toBe(true);
     expect(DEFAULT_CHARACTERS.some((item) => ["boy", "girl", "man", "woman"].includes(item.id))).toBe(false);
   });
 
@@ -50,6 +51,12 @@ describe("Open Character Library", () => {
     expect(upgraded.filter((item) => item.id.startsWith("curated-vroid-"))).toHaveLength(4);
     expect(upgraded.filter((item) => item.category === "animals")).toHaveLength(1);
     expect(upgradeStorytellerCharacters(upgraded)).toEqual(upgraded);
+  });
+
+  test("ships six faceless cartoon figures that need no download", () => {
+    const toons = DEFAULT_CHARACTERS.filter((item) => item.provider === "toon");
+    expect(toons).toHaveLength(6);
+    expect(toons.every((item) => !!item.toon && !item.modelUrl)).toBe(true);
   });
 
   test("refuses reintroduction of the old procedural mesh provider", () => {

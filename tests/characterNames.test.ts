@@ -9,7 +9,7 @@ import {
 
 describe("Natural Arabic character names", () => {
   test("all seventeen built-in GLB characters have distinct names, no old geometry", () => {
-    const names = DEFAULT_CHARACTERS.map((character) => character.name);
+    const names = DEFAULT_CHARACTERS.filter((c) => c.provider !== "toon").map((character) => character.name);
     expect(names).toEqual(["سارة", "عمر", "ليلى", "هند", "ريم", "ياسمين", "زياد", "كوفي", "يوكي", "ليام", "نوران", "آيلا", "تالا", "كريم", "لانا", "الثعلب فلفل", "الروبوت حكيم"]);
     expect(new Set(names).size).toBe(17);
     expect(DEFAULT_CHARACTERS.every((item) => item.provider !== "procedural")).toBe(true);
