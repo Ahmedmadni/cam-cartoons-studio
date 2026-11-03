@@ -55,7 +55,7 @@ describe("Cinematic character preview", () => {
     expect(reem?.name).toBe("ريم");
     expect(reem?.preferredFraming).toBe("portrait");
     expect(reem?.modelUrl).toBe("https://three.ws/avatars/realistic-halfbody.glb");
-    const old = DEFAULT_CHARACTERS.filter((item) => item.id !== "featured-portrait-reem");
+    const old = DEFAULT_CHARACTERS.filter((item) => item.id !== "featured-portrait-reem" && item.provider !== "toon");
     const edited = old.map((item) => item.id === "featured-cinematic-female"
       ? { ...item, name: "اسمي الخاص", isFavorite: true } : item);
     const upgraded = seedPortraitForUpgrade(edited);

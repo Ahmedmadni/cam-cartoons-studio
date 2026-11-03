@@ -19,7 +19,7 @@ describe("Original GLB human and animal storyteller catalog", () => {
     expect(CURATED_CANDIDATES.filter((item) => item.faceRig === "body-only")).toHaveLength(4);
     expect(CURATED_CANDIDATES.filter((item) => item.faceRig === "inspect-on-load")).toHaveLength(6);
     expect(CURATED_CANDIDATES.find((item) => item.name === "نوران")?.modelUrl).toBe("https://raw.githubusercontent.com/met4citizen/TalkingHead/b3e277b3b46f88e557bf28a2c5612a5b04e075c3/avatars/mpfb.glb");
-    expect(DEFAULT_CHARACTERS).toHaveLength(17); // real GLB sources available immediately; binaries lazy-loaded
+    expect(DEFAULT_CHARACTERS.filter((c) => c.provider !== "toon")).toHaveLength(17); // real GLB sources available immediately; binaries lazy-loaded
   });
   test("detects an imported character by source URL despite renaming or offline caching", () => {
     const candidate = CURATED_CANDIDATES[0]!;

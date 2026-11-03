@@ -5,6 +5,10 @@ import bgRoom from "@/assets/bg-room.jpg";
 import bgClass from "@/assets/bg-class.jpg";
 import bgBeach from "@/assets/bg-beach.jpg";
 import bgForest from "@/assets/bg-forest.jpg";
+import bgCandy from "@/assets/bg-candy.jpg";
+import bgSpace from "@/assets/bg-space.jpg";
+import bgOcean from "@/assets/bg-ocean.jpg";
+import bgCastle from "@/assets/bg-castle.jpg";
 
 export type BackgroundCategory = "home" | "learning" | "nature" | "travel" | "fantasy";
 export type BackgroundFilter = "all" | "premium" | BackgroundCategory;
@@ -38,6 +42,10 @@ export const BACKGROUND_FILTERS: BackgroundFilter[] = [
 ];
 
 export const BACKGROUNDS: Background[] = [
+  { id: "vivid-space", label: "الفضاء الملوّن", src: bgSpace, category: "fantasy", premium: true },
+  { id: "vivid-candy", label: "أرض الحلوى", src: bgCandy, category: "fantasy", premium: true },
+  { id: "vivid-ocean", label: "أعماق البحر", src: bgOcean, category: "nature", premium: true },
+  { id: "vivid-castle", label: "القلعة عند الغروب", src: bgCastle, category: "fantasy", premium: true },
   {
     id: "premium-old-town",
     label: "الزقاق الدافئ",

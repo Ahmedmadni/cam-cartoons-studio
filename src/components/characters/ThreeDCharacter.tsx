@@ -14,6 +14,7 @@ import { useAvatarCustomizationStore } from "@/lib/avatarCustomization";
 import type { AnimationType, CharacterType } from "@/lib/store";
 
 import ReadyPlayerMeAvatar from "./ReadyPlayerMeAvatar";
+import ToonCharacter from "./ToonCharacter";
 
 function ResponsiveCharacterCamera({
   diagnostics,
@@ -108,6 +109,7 @@ export function Avatar({
   const customization = useAvatarCustomizationStore((state) => state.customizations[type]);
   const profile = mergeAvatarProfile(type, customization);
   const assetId = useCharacterLibrary((s) => s.characters.find((item) => item.id === type)?.assetId);
+  const toonPalette = useCharacterLibrary((s) => s.characters.find((item) => item.id === type)?.toon);
   const localAsset = useLocalGlbUrl(assetId);
   // Local geometry has priority; do not accidentally show the old remote preset while loading.
   const modelUrl = assetId ? localAsset.url : profile.modelUrl;
@@ -133,6 +135,9 @@ export function Avatar({
     </div>
   </Html>;
 
+  if (toonPalette) {
+    return <ToonCharacter id={type} palette={toonPalette} animation={animation} spin={spin} onDiagnostics={onDiagnostics} />;
+  }
   if (!modelUrl) return failed;
   return (
     <AvatarErrorBoundary
