@@ -4,7 +4,9 @@ import type { VoiceType } from "./store";
 import type { CameraFraming } from "./cameraComposition";
 import { CURATED_CANDIDATES } from "./curatedCharacters";
 
-export type CharacterProvider = "imported-glb" | "readyplayerme" | "procedural";
+export type CharacterProvider = "imported-glb" | "readyplayerme" | "procedural" | "toon";
+export type { ToonPalette } from "@/components/characters/ToonCharacter";
+import type { ToonPalette } from "@/components/characters/ToonCharacter";
 export type CharacterCategory = "children" | "youth" | "men" | "women" | "animals" | "fantasy" | "other";
 export type LegacyCharacterType = "boy" | "girl" | "man" | "woman";
 
@@ -26,6 +28,8 @@ export type CharacterDefinition = {
   yOffset?: number;
   /** The ideal 3D library preview crop; never forces a story/movie crop. */
   preferredFraming?: CameraFraming;
+  /** Faceless cartoon figure colours (provider "toon" only). */
+  toon?: ToonPalette;
 };
 
 export type CharacterDraft = Omit<CharacterDefinition, "id" | "isFavorite" | "isDefault">;
@@ -44,6 +48,7 @@ export const PROVIDER_LABELS: Record<CharacterProvider, string> = {
   "imported-glb": "Premium GLB",
   readyplayerme: "Ready Player Me",
   procedural: "قديمة — تُحوّل إلى GLB",
+  toon: "كرتون بدون ملامح",
 };
 
 /**
@@ -107,7 +112,23 @@ export const CURATED_CHARACTERS: CharacterDefinition[] = CURATED_CANDIDATES.map(
   isDefault: true,
 }));
 
+const toon = (id: string, name: string, category: CharacterCategory, voicePreset: VoiceType, palette: ToonPalette): CharacterDefinition => ({
+  id, name, category, provider: "toon", voicePreset, toon: palette, isDefault: true,
+  tags: ["كرتون", "بدون ملامح", "سريعة التحميل"], yOffset: -1.42, scale: 1,
+});
+
+/** Lightweight faceless cartoon figures; render instantly with no download. */
+export const TOON_CHARACTERS: CharacterDefinition[] = [
+  toon("toon-sunny", "شمس", "children", "child", { shape: "round", body: "#F59E0B", limbs: "#FDE68A", head: "#FFF1D6", accent: "#DC2626" }),
+  toon("toon-wave", "موج", "children", "boy", { shape: "round", body: "#14B8A6", limbs: "#0F766E", head: "#E0F2F1", accent: "#FDE047" }),
+  toon("toon-berry", "توتة", "children", "girl", { shape: "round", body: "#EC4899", limbs: "#FBCFE8", head: "#FFF0F6", accent: "#7C3AED" }),
+  toon("toon-sky", "سماء", "youth", "woman", { shape: "tall", body: "#3B82F6", limbs: "#1E3A8A", head: "#F1F5F9", accent: "#FACC15" }),
+  toon("toon-rock", "صخر", "men", "man", { shape: "tall", body: "#475569", limbs: "#1F2937", head: "#E7E5E4", accent: "#F97316" }),
+  toon("toon-bean", "فولة", "fantasy", "child", { shape: "blob", body: "#84CC16", limbs: "#3F6212", head: "#ECFCCB", accent: "#F43F5E" }),
+];
+
 export const DEFAULT_CHARACTERS: CharacterDefinition[] = [
+  ...TOON_CHARACTERS,
   ...FEATURED_CHARACTERS,
   ...CURATED_CHARACTERS,
 ];
@@ -291,7 +312,7 @@ export const useCharacterLibrary = create<CharacterLibraryState>()(
     }),
     {
       name: "cam-cartoons-character-library-v1",
-      version: 6,
+      version: 7,
       migrate: (oldState: unknown, previousVersion: number) => {
         const persisted = oldState && typeof oldState === "object"
           ? oldState as { characters?: unknown }
@@ -308,11 +329,12 @@ export const useCharacterLibrary = create<CharacterLibraryState>()(
         // of the four existing models if a user has intentionally deleted them.
         const withPortrait = previousVersion < 3 ? seedPortraitForUpgrade(named) : named;
         const realOnly = previousVersion < 4 ? upgradeToRealGlbLibrary(withPortrait) : withPortrait;
-        return {
-          characters: previousVersion < 6
-            ? upgradeRobotStoryteller(previousVersion < 5 ? upgradeStorytellerCharacters(realOnly) : realOnly)
-            : realOnly,
-        };
+        const upgraded = previousVersion < 6
+          ? upgradeRobotStoryteller(previousVersion < 5 ? upgradeStorytellerCharacters(realOnly) : realOnly)
+          : realOnly;
+        if (previousVersion >= 7) return { characters: upgraded };
+        const ids = new Set(upgraded.map((c) => c.id));
+        return { characters: [...TOON_CHARACTERS.filter((c) => !ids.has(c.id)), ...upgraded] };
       },
       partialize: (state) => ({ characters: state.characters }),
     },
