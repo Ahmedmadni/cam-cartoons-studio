@@ -366,13 +366,13 @@ function StoryPage() {
               <div>
                 <p className="text-sm font-black text-foreground">الخلفية</p>
                 <p className="mt-0.5 text-xs font-semibold text-muted-foreground">
-                  اختر مشهدًا سينمائيًا مناسبًا للقصة.
+                  اختر مشهدًا مناسبًا للقصة ويبرز الشخصية.
                 </p>
               </div>
-              {background.premium && (
+              {(background.premium || background.category === "illustrated") && (
                 <span className="inline-flex items-center gap-1 rounded-full bg-primary/15 px-3 py-1 text-xs font-black text-primary">
                   <Sparkles className="size-3.5" />
-                  احترافية
+                  {background.category === "illustrated" ? "رسمة 2D" : "احترافية"}
                 </span>
               )}
             </div>
@@ -418,10 +418,10 @@ function StoryPage() {
                       height={540}
                       className="h-full w-full object-cover"
                     />
-                    {b.premium && (
+                    {(b.premium || b.category === "illustrated") && (
                       <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-full bg-foreground/80 px-2 py-1 text-[10px] font-black text-background backdrop-blur">
                         <Sparkles className="size-3" />
-                        Premium
+                        {b.category === "illustrated" ? "2D" : "Premium"}
                       </span>
                     )}
                   </div>
