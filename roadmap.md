@@ -1,5 +1,5 @@
 # Current work
-- [ ] Add flat illustrated backgrounds and a dedicated 2D category, then verify selection and scene display.
+- [x] Add four flat illustrated backgrounds and a dedicated 2D category; verify all scenes and full toon framing in Chromium.
 - [x] Fix character shadow warnings without external lighting downloads.
 - [x] Make story speech and recording cancellation safe; release media resources.
 - [x] Correct video sharing and remove navigation back to the retired camera workflow.
