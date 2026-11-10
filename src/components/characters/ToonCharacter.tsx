@@ -2,6 +2,7 @@ import { useFrame } from "@react-three/fiber";
 import { useEffect, useRef } from "react";
 import type { Group } from "three";
 
+import { getAvatarProfile } from "@/lib/avatarCatalog";
 import { faceState } from "@/lib/faceState";
 import type { AvatarDiagnostics } from "@/lib/modelPresentation";
 import type { AnimationType } from "@/lib/store";
@@ -93,9 +94,11 @@ export default function ToonCharacter({
     <meshPhysicalMaterial color={color} roughness={rough} clearcoat={0.6} clearcoatRoughness={0.25} />
   );
   const armLen = s === "tall" ? 0.62 : 0.5;
+  const groundOffset = getAvatarProfile(id).rpmYOffset;
 
   return (
-    <group ref={root}>
+    <group position={[0, groundOffset, 0]}>
+      <group ref={root}>
       {/* legs */}
       {[-1, 1].map((side) => (
         <mesh key={side} castShadow position={[side * bodyW * 0.45, legH / 2 + 0.06, 0]}>
@@ -147,6 +150,7 @@ export default function ToonCharacter({
           )}
         </group>
       </group>
+    </group>
     </group>
   );
 }
