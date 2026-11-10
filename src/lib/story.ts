@@ -9,8 +9,12 @@ import bgCandy from "@/assets/bg-candy.jpg";
 import bgSpace from "@/assets/bg-space.jpg";
 import bgOcean from "@/assets/bg-ocean.jpg";
 import bgCastle from "@/assets/bg-castle.jpg";
+import bg2dMeadow from "@/assets/bg-2d-meadow.jpg";
+import bg2dCity from "@/assets/bg-2d-city.jpg";
+import bg2dSpace from "@/assets/bg-2d-space.jpg";
+import bg2dLagoon from "@/assets/bg-2d-lagoon.jpg";
 
-export type BackgroundCategory = "home" | "learning" | "nature" | "travel" | "fantasy";
+export type BackgroundCategory = "illustrated" | "home" | "learning" | "nature" | "travel" | "fantasy";
 export type BackgroundFilter = "all" | "premium" | BackgroundCategory;
 
 export type Background = {
@@ -23,6 +27,7 @@ export type Background = {
 
 export const BACKGROUND_FILTER_LABELS: Record<BackgroundFilter, string> = {
   all: "الكل",
+  illustrated: "رسومات 2D",
   premium: "احترافية",
   home: "المنزل",
   learning: "التعليم",
@@ -33,6 +38,7 @@ export const BACKGROUND_FILTER_LABELS: Record<BackgroundFilter, string> = {
 
 export const BACKGROUND_FILTERS: BackgroundFilter[] = [
   "all",
+  "illustrated",
   "premium",
   "home",
   "learning",
@@ -42,6 +48,10 @@ export const BACKGROUND_FILTERS: BackgroundFilter[] = [
 ];
 
 export const BACKGROUNDS: Background[] = [
+  { id: "illustrated-meadow", label: "المرج المشمس", src: bg2dMeadow, category: "illustrated" },
+  { id: "illustrated-city", label: "ساحة المدينة", src: bg2dCity, category: "illustrated" },
+  { id: "illustrated-space", label: "كوكب النجوم", src: bg2dSpace, category: "illustrated" },
+  { id: "illustrated-lagoon", label: "بحيرة المرجان", src: bg2dLagoon, category: "illustrated" },
   { id: "vivid-space", label: "الفضاء الملوّن", src: bgSpace, category: "fantasy", premium: true },
   { id: "vivid-candy", label: "أرض الحلوى", src: bgCandy, category: "fantasy", premium: true },
   { id: "vivid-ocean", label: "أعماق البحر", src: bgOcean, category: "nature", premium: true },

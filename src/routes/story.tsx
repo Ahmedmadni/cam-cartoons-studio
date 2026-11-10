@@ -56,7 +56,7 @@ function StoryPage() {
 
   const [text, setText] = useState(EXAMPLE);
   const [bgId, setBgId] = useState(BACKGROUNDS[0]?.id ?? "");
-  const [bgFilter, setBgFilter] = useState<BackgroundFilter>("premium");
+  const [bgFilter, setBgFilter] = useState<BackgroundFilter>("illustrated");
   const [action, setAction] = useState<AnimationType>("idle");
   const [playing, setPlaying] = useState(false);
   const [recording, setRecording] = useState(false);
