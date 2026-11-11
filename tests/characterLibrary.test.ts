@@ -55,8 +55,13 @@ describe("Open Character Library", () => {
 
   test("ships six faceless cartoon figures that need no download", () => {
     const toons = DEFAULT_CHARACTERS.filter((item) => item.provider === "toon");
-    expect(toons).toHaveLength(6);
+    expect(toons.filter((item) => !item.toon?.flat)).toHaveLength(6);
     expect(toons.every((item) => !!item.toon && !item.modelUrl)).toBe(true);
+  });
+
+  test("ships five flat 2D characters", () => {
+    const flat = DEFAULT_CHARACTERS.filter((item) => item.toon?.flat);
+    expect(flat.map((item) => item.name)).toEqual(["نور", "زين", "لولو", "كريم", "بوبو"]);
   });
 
   test("refuses reintroduction of the old procedural mesh provider", () => {
