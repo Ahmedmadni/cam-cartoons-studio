@@ -125,7 +125,23 @@ export const TOON_CHARACTERS: CharacterDefinition[] = [
   toon("toon-sky", "سماء", "youth", "woman", { shape: "tall", body: "#3B82F6", limbs: "#1E3A8A", head: "#F1F5F9", accent: "#FACC15" }),
   toon("toon-rock", "صخر", "men", "man", { shape: "tall", body: "#475569", limbs: "#1F2937", head: "#E7E5E4", accent: "#F97316" }),
   toon("toon-bean", "فولة", "fantasy", "child", { shape: "blob", body: "#84CC16", limbs: "#3F6212", head: "#ECFCCB", accent: "#F43F5E" }),
+  ...FLAT_CHARACTERS(),
 ];
+
+/** Flat 2D cut-out figures that match the illustrated backgrounds. */
+function FLAT_CHARACTERS(): CharacterDefinition[] {
+  const flat = (id: string, name: string, category: CharacterCategory, voice: VoiceType, p: Omit<ToonPalette, "flat">) => ({
+    ...toon(id, name, category, voice, { ...p, flat: true }),
+    tags: ["رسمة 2D", "بدون ملامح", "سريعة التحميل"],
+  });
+  return [
+    flat("flat-nour", "نور", "children", "girl", { shape: "round", body: "#FF6B6B", limbs: "#FFD93D", head: "#FFE8D6", accent: "#4D96FF" }),
+    flat("flat-zain", "زين", "children", "boy", { shape: "round", body: "#4D96FF", limbs: "#1B3B6F", head: "#FFE8D6", accent: "#FFD93D" }),
+    flat("flat-lulu", "لولو", "youth", "woman", { shape: "tall", body: "#A66CFF", limbs: "#FFB4E6", head: "#FFF3E6", accent: "#2EC4B6" }),
+    flat("flat-karim", "كريم", "men", "man", { shape: "tall", body: "#2EC4B6", limbs: "#264653", head: "#F4D9C6", accent: "#FF9F1C" }),
+    flat("flat-boo", "بوبو", "fantasy", "child", { shape: "blob", body: "#FF9F1C", limbs: "#9C4A00", head: "#FFF1D0", accent: "#6BCB77" }),
+  ];
+}
 
 export const DEFAULT_CHARACTERS: CharacterDefinition[] = [
   ...TOON_CHARACTERS,
@@ -312,7 +328,7 @@ export const useCharacterLibrary = create<CharacterLibraryState>()(
     }),
     {
       name: "cam-cartoons-character-library-v1",
-      version: 7,
+      version: 8,
       migrate: (oldState: unknown, previousVersion: number) => {
         const persisted = oldState && typeof oldState === "object"
           ? oldState as { characters?: unknown }

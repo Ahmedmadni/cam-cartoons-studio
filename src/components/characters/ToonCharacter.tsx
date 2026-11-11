@@ -1,5 +1,6 @@
 import { useFrame } from "@react-three/fiber";
 import { useEffect, useRef } from "react";
+import { Outlines } from "@react-three/drei";
 import type { Group } from "three";
 
 import { getAvatarProfile } from "@/lib/avatarCatalog";
@@ -14,6 +15,8 @@ export type ToonPalette = {
   accent: string;
   /** "round" chunky kid, "tall" slim figure, "blob" bean shape. */
   shape: "round" | "tall" | "blob";
+  /** Flat 2D cut-out look: unlit solid colours, thin depth and a dark outline. */
+  flat?: boolean;
 };
 
 export const TOON_HEIGHT = 1.9;
@@ -90,15 +93,22 @@ export default function ToonCharacter({
     rr.rotation.x = damp(rr.rotation.x, aRx);
   });
 
-  const mat = (color: string, rough = 0.45) => (
-    <meshPhysicalMaterial color={color} roughness={rough} clearcoat={0.6} clearcoatRoughness={0.25} />
-  );
+  const flat = !!palette.flat;
+  const mat = (color: string, rough = 0.45) =>
+    flat ? (
+      <>
+        <meshBasicMaterial color={color} toneMapped={false} />
+        <Outlines thickness={0.035} color="#1F1630" />
+      </>
+    ) : (
+      <meshPhysicalMaterial color={color} roughness={rough} clearcoat={0.6} clearcoatRoughness={0.25} />
+    );
   const armLen = s === "tall" ? 0.62 : 0.5;
   const groundOffset = getAvatarProfile(id).rpmYOffset;
 
   return (
     <group position={[0, groundOffset, 0]}>
-      <group ref={root}>
+      <group ref={root} scale={flat ? [1, 1, 0.12] : 1}>
       {/* legs */}
       {[-1, 1].map((side) => (
         <mesh key={side} castShadow position={[side * bodyW * 0.45, legH / 2 + 0.06, 0]}>
