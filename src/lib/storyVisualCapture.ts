@@ -1,12 +1,14 @@
 import type { StoryProject } from "./storyProject";
 import { previewDurationMs, previewFrameAt, PREVIEW_FPS, PREVIEW_WIDTH, PREVIEW_HEIGHT } from "./storyExportPlan";
 import { selectWebmMime } from "./mediaCapabilities";
+import { prepareStoryAudioSession } from "./storyAudioMix";
 
 export type VisualCaptureOptions = {
   project: StoryProject;
   backgrounds: ReadonlyMap<string, string>;
   getWebglCanvas: () => HTMLCanvasElement | null;
   onPosition: (ms: number) => void;
+  voiceClips?: ReadonlyMap<string, Blob> | undefined;
   signal?: AbortSignal | undefined;
 };
 
@@ -63,8 +65,8 @@ async function loadBackground(url: string, signal?: AbortSignal): Promise<HTMLIm
 }
 
 /**
- * A capped, silent, visually composited WebM sample of the authored scenes.
- * Canvas overlays are baked into frames; Web Speech is intentionally NOT captured.
+ * A capped, visually composited WebM sample of the authored scenes.
+ * Uploaded/recorded voice clips can be mixed via Web Audio; Web Speech is NOT captured.
  */
 export async function recordVisualStoryPreview(options: VisualCaptureOptions): Promise<Blob> {
   const { project, signal } = options;
@@ -84,17 +86,25 @@ export async function recordVisualStoryPreview(options: VisualCaptureOptions): P
   }));
   if (signal?.aborted) throw new Error("أُلغى التسجيل");
 
+  const audioSession = await prepareStoryAudioSession(project, options.voiceClips ?? new Map(), durationMs, signal);
+  if (signal?.aborted) { await audioSession?.close(); throw new Error("أُلغى التسجيل"); }
+
   const canvas = document.createElement("canvas");
   canvas.width = PREVIEW_WIDTH;
   canvas.height = PREVIEW_HEIGHT;
   const context = canvas.getContext("2d", { alpha: false });
-  if (!context || typeof canvas.captureStream !== "function") throw new Error("هذا المتصفح لا يدعم تصدير المعاينة");
+  if (!context || typeof canvas.captureStream !== "function") {
+    await audioSession?.close();
+    throw new Error("هذا المتصفح لا يدعم تصدير المعاينة");
+  }
   const stream = canvas.captureStream(PREVIEW_FPS);
+  if (audioSession) stream.addTrack(audioSession.track);
   let recorder: MediaRecorder;
   try {
     recorder = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 1_800_000 });
   } catch (error) {
     stream.getTracks().forEach(track => track.stop());
+    await audioSession?.close();
     throw error;
   }
   return await new Promise<Blob>((resolve, reject) => {
@@ -106,6 +116,7 @@ export async function recordVisualStoryPreview(options: VisualCaptureOptions): P
       cancelAnimationFrame(raf);
       signal?.removeEventListener("abort", abort);
       stream.getTracks().forEach(track => track.stop());
+      void audioSession?.close().catch(() => undefined);
     };
     const fail = (reason: Error) => {
       error = reason;
@@ -144,6 +155,7 @@ export async function recordVisualStoryPreview(options: VisualCaptureOptions): P
       options.onPosition(0);
       paint(0);
       recorder.start(500);
+      audioSession?.start();
       const start = performance.now();
       const tick = (now: number) => {
         if (finished) return;
