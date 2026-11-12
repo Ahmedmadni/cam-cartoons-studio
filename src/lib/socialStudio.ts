@@ -83,37 +83,37 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 
 /** Strictly bounded import; arbitrary JSON is never executed or trusted. */
 export function parseSocialProject(value: unknown): SocialProject {
-  if (!isRecord(value) || value.version !== 1 || !Array.isArray(value.scenes) ||
-      value.scenes.length < 1 || value.scenes.length > MAX_SCENES) {
+  if (!isRecord(value) || value["version"] !== 1 || !Array.isArray(value["scenes"]) ||
+      value["scenes"].length < 1 || value["scenes"].length > MAX_SCENES) {
     throw new Error("ملف المشروع غير صالح أو بإصدار غير مدعوم.");
   }
   const used = new Set<string>();
-  const scenes = value.scenes.map((v: unknown, index: number): SocialScene => {
+  const scenes = value["scenes"].map((v: unknown, index: number): SocialScene => {
     if (!isRecord(v)) throw new Error("المشهد رقم " + (index + 1) + " غير صالح.");
-    const id = safeText(v.id, 80, "scene-" + index);
+    const id = safeText(v["id"], 80, "scene-" + index);
     if (used.has(id) || !id) throw new Error("معرّفات المشاهد مكررة أو غير صالحة.");
     used.add(id);
-    const duration = v.duration;
+    const duration = v["duration"];
     if (typeof duration !== "number" || !Number.isInteger(duration) || duration < 2 || duration > 30) {
       throw new Error("مدة كل مشهد يجب أن تكون بين ثانيتين و30 ثانية.");
     }
     return {
       id,
-      caption: safeText(v.caption, 140),
-      headline: safeText(v.headline, 80),
-      character: ids.has(v.character as CartoonId) ? v.character as CartoonId : "sami",
-      theme: themeIds.has(v.theme as SceneTheme) ? v.theme as SceneTheme : "sky",
-      motion: motions.has(v.motion as string) ? v.motion as SceneMotion : "talk",
-      transition: transitions.has(v.transition as string) ? v.transition as SceneTransition : "cut",
+      caption: safeText(v["caption"], 140),
+      headline: safeText(v["headline"], 80),
+      character: ids.has(v["character"] as CartoonId) ? v["character"] as CartoonId : "sami",
+      theme: themeIds.has(v["theme"] as SceneTheme) ? v["theme"] as SceneTheme : "sky",
+      motion: motions.has(v["motion"] as string) ? v["motion"] as SceneMotion : "talk",
+      transition: transitions.has(v["transition"] as string) ? v["transition"] as SceneTransition : "cut",
       duration,
     };
   });
   const project: SocialProject = {
     version: 1,
-    title: safeText(value.title, 100, "مشروع جديد"),
-    watermark: safeText(value.watermark, 60),
-    captionColor: value.captionColor === "yellow" ? "yellow" : "white",
-    showCaptions: value.showCaptions !== false,
+    title: safeText(value["title"], 100, "مشروع جديد"),
+    watermark: safeText(value["watermark"], 60),
+    captionColor: value["captionColor"] === "yellow" ? "yellow" : "white",
+    showCaptions: value["showCaptions"] !== false,
     scenes,
   };
   if (projectSeconds(project) > MAX_DURATION_SECONDS) throw new Error("مدة الفيديو تتجاوز دقيقتين.");
