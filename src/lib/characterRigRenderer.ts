@@ -49,9 +49,10 @@ export function paintCutoutRig(
   ctx.save();
   ctx.imageSmoothingEnabled=true;
   ctx.imageSmoothingQuality="high";
-  // Correct hierarchical order: rear arm -> torso -> gesturing arm -> head.
-  arm(ctx,art,rig,pose,"left");
+  // Both sleeves sit over the tailored shirt so the anatomical shoulder
+  // contours stay visible. Each sleeve still follows its own pivot hierarchy.
   draw(ctx,art.torso);
+  arm(ctx,art,rig,pose,"left");
   arm(ctx,art,rig,pose,"right");
   ctx.save();
   rotate(ctx,rig.pivots.neck,pose.head);
