@@ -53,3 +53,12 @@ These are **calibration defaults, not the actual joint coordinates of any upload
 - Mouth currently switches between artist-supplied open/closed drawings. Additional A/E/O/M-B-P viseme assets and speech-to-viseme alignment are a separate planned step.
 - Export is WebM 720×1280 or 1080×1920 depending on the browser. MP4, automated voice synthesis and remote collaboration are not provided here.
 - Actual illustration quality requires **manual visual review** of pose extremes and movement across frames. Passing TypeScript and browser tests verifies operation only.
+
+
+## Built-in first illustrated master
+
+Sami ships with a complete, original, **15-layer** upper-body vector pack. Eight parts are torso/head and both upper arms, forearms, and hands; seven additional layers cover mouth (2), eyes (3), eyebrows (2). The browser rasterizes the bundled vectors at 976×1288 px. The low-resolution user reference is only used as a fallback on unsupported devices. The other three characters still require dedicated layered artwork.
+
+The first-party vectors are bundled and trusted; SVG uploads from the public remain disabled. Your own uploaded raster art overrides the built-in package without replacing saved scenes and narration.
+
+Preview and export must remain visually identical. Mouth animation follows voice energy (not phoneme-level speech analysis). Large extreme joint angles may still benefit from extra artist-authored sleeve overlap variants.
