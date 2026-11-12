@@ -11,7 +11,7 @@
 import type { CartoonId, SceneExpression, SceneMotion } from "./socialStudio";
 import { SAMI_REFERENCE_WEBP } from "./socialReferenceArt";
 import { defaultRigSettings, evaluateRigPose, type RigSettings } from "./characterRig";
-import { isFullCutoutRig, paintCutoutRig } from "./characterRigRenderer";
+import { isFullCutoutRig, paintCutoutRig, RIG_REQUIRED_LAYERS } from "./characterRigRenderer";
 
 export type CharacterArtLayer = "base" | "mouthClosed" | "mouthOpen" | "eyesClosed" |
   "torso" | "head" | "leftUpperArm" | "leftForearm" | "leftHand" |
@@ -100,7 +100,7 @@ export function getCharacterArt(character:CartoonId):CharacterArt | null {
 }
 export function artStatus(character:CartoonId) {
   const a=cache.get(character);
-  return { hasBase:!!a?.base, hasMouth:!!(a?.mouthClosed && a?.mouthOpen), hasBlink:!!a?.eyesClosed, hasRig:isFullCutoutRig(a??null) };
+  return { hasBase:!!a?.base, hasMouth:!!(a?.mouthClosed && a?.mouthOpen), hasBlink:!!a?.eyesClosed, hasRig:isFullCutoutRig(a??null), rigLayerCount:RIG_REQUIRED_LAYERS.filter(layer=>!!a?.[layer]).length };
 }
 export async function saveCharacterArt(
   character:CartoonId,layer:CharacterArtLayer,blob:Blob|null
