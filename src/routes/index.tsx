@@ -65,6 +65,7 @@ function SocialCreator() {
   const [exporting, setExporting] = useState(false);
   const [exportPercent, setExportPercent] = useState(0);
   const [video, setVideo] = useState<Blob | null>(null);
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const previewCanvas = useRef<HTMLCanvasElement | null>(null);
@@ -109,6 +110,12 @@ function SocialCreator() {
     audioPlayer.current = element;
     return () => { element.pause(); URL.revokeObjectURL(url); if (audioPlayer.current === element) audioPlayer.current = null; };
   }, [audio]);
+  useEffect(() => {
+    if (!video) { setVideoUrl(null); return; }
+    const url = URL.createObjectURL(video);
+    setVideoUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [video]);
   useEffect(() => () => {
     try { if (mic.current && mic.current.state !== "inactive") mic.current.stop(); } catch { /* noop */ }
     micStream.current?.getTracks().forEach(track => track.stop());
@@ -445,9 +452,9 @@ function SocialCreator() {
                 <button type="button" className={secondary} onClick={() => exportAbort.current?.abort()}>إلغاء التصدير</button>
               </div>}
               {!exportSupported && <p className="mt-3 text-sm font-bold text-rose-600">المتصفح الحالي لا يدعم تسجيل WebM.</p>}
-              {video && <div className="mt-5 rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+              {video && videoUrl && <div className="mt-5 rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
                 <strong className="text-sm text-emerald-900">الفيديو جاهز للمعاينة والتحميل</strong>
-                <video key={video.size} className="mx-auto mt-3 max-h-95 rounded-xl bg-black" controls playsInline src={URL.createObjectURL(video)} />
+                <video key={video.size} className="mx-auto mt-3 max-h-95 rounded-xl bg-black" controls playsInline src={videoUrl} />
                 <button type="button" className={primary + " mt-4 w-full"} onClick={() => saveFile(video, "cartoon-content-" + Date.now() + ".webm")}><Download className="size-4" /> تنزيل الفيديو</button>
               </div>}
             </div>}
