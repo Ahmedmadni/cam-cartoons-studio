@@ -2,6 +2,8 @@
  * Social-content-specific project model. Deliberately independent from the legacy
  * camera, GLB and face-tracking app. No remote service or user account required.
  */
+import { readRigSettings, type RigSettings } from "./characterRig";
+
 export type CartoonId = "sami" | "layla" | "omar" | "nour";
 export type SceneTheme = "sky" | "studio" | "classroom" | "warm" | "night" | "mint";
 export type SceneMotion = "talk" | "explain" | "wave" | "idle";
@@ -22,6 +24,8 @@ export type SocialScene = {
   audioDelayMs: number;
   transition: SceneTransition;
   duration: number;
+  /** Optional cut-out rig settings; earlier JSON projects remain valid. */
+  rig?: RigSettings;
 };
 
 export type SocialProject = {
@@ -123,6 +127,7 @@ export function parseSocialProject(value: unknown): SocialProject {
       audioDelayMs: Number.isInteger(v["audioDelayMs"]) && typeof v["audioDelayMs"] === "number" && v["audioDelayMs"] >= 0 && v["audioDelayMs"] <= (duration * 1000 - 250) ? v["audioDelayMs"] as number : 0,
       transition: transitions.has(v["transition"] as string) ? v["transition"] as SceneTransition : "cut",
       duration,
+      ...(v["rig"] === undefined ? {} : {rig:readRigSettings(v["rig"],duration*1000)}),
     };
   });
   const project: SocialProject = {
