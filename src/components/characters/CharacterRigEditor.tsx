@@ -11,7 +11,7 @@ import type { CartoonId } from "@/lib/socialStudio";
 type Props = {
   character:CartoonId;
   durationSeconds:number;
-  rig?:RigSettings;
+  rig?:RigSettings|undefined;
   onChange:(settings:RigSettings)=>void;
   revision:number;
 };
