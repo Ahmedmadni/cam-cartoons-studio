@@ -63,3 +63,13 @@ The still-open [3D audio PR #33](https://github.com/Ahmedmadni/cam-cartoons-stud
 6. Once old data is migrated: remove GLB, camera, Ready Player Me and legacy UI/dependencies, with test-driven cleanup.
 
 Lovable sync: keep main history intact. Review changes in a feature branch PR.
+
+
+### First working illustrated character art pack (Sami)
+
+- Sami now has an original **15-layer cut-out illustration**: naturally drawn face, dimensional hair and golden shirt, independent upper/lower arms and hands, open/closed mouth, eyes (open/half/blink) and eyebrow variants.
+- The source resides in `src/lib/builtinSamiRig.ts` as compressed first-party SVG vector artwork; the browser rasterizes it at 976×1288. There are no online AI calls, database dependencies or ongoing generation charges.
+- The **same character layers and joint settings** render in preview and WebM export. The default joint pivots line up with this pack.
+- Existing user-uploaded PNG/WebP art always takes priority. If compressed-source decoding is unsupported, Sami falls back to the previous flattened portrait.
+- Layla, Omar and Nour do not yet have equivalent illustration packs; their older vector renderers remain as fallbacks.
+- This is an original hand-designed vector interpretation of the owner's style reference, not a claim of pixel-perfect likeness or professionally approved character quality.
