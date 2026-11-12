@@ -170,6 +170,12 @@ function drawClothing(c:C,id:Person,ink:Ink,pose:SceneMotion,time:number){
       x.moveTo(handX-12,handY+48);x.bezierCurveTo(handX-18,handY+5,handX,handY-7,handX+12,handY+9);
       x.bezierCurveTo(handX+29,handY+18,handX+24,handY+44,handX+13,handY+51);
     }));
+    // Fine finger crease strokes make the raised hand look illustrated, not a mitten.
+    soft(c,.78,()=>stroke(c,ink.skinShade,2.1,x=>{
+      x.moveTo(handX+4,handY-30);x.quadraticCurveTo(handX+7,handY-8,handX+8,handY+1);
+      x.moveTo(handX+18,handY-37);x.quadraticCurveTo(handX+20,handY-13,handX+20,handY-2);
+      x.moveTo(handX+31,handY-25);x.quadraticCurveTo(handX+32,handY-10,handX+30,handY+4);
+    }));
   }
 }
 function drawNeck(c:C,ink:Ink) {
@@ -400,6 +406,18 @@ function drawPerson(c:C,id:Person,time:number,energy:number,motion:SceneMotion,e
 function drawRobot(c:C,time:number,energy:number,motion:SceneMotion,expression:SceneExpression) {
   // Robots are designed as one seamless capsule body rather than floating circles.
   c.save();c.translate(360,711+Math.sin(time*2.5)*3);
+  // Integrated neck column bridges the face housing to the shoulder capsule.
+  // Drawn first so both head and body overlap it without any floating gap.
+  fill(c,"#356c9e",q=>{
+    q.moveTo(-70,62);q.bezierCurveTo(-68,-4,-68,-68,-67,-101);
+    q.quadraticCurveTo(0,-116,67,-101);
+    q.bezierCurveTo(67,-68,69,-5,70,62);
+  });
+  fill(c,gradient(c,-105,65,["#8ad9ee","#64a8d2","#397bad"]),q=>{
+    q.moveTo(-54,65);q.bezierCurveTo(-54,1,-51,-65,-52,-89);
+    q.quadraticCurveTo(0,-96,52,-89);
+    q.bezierCurveTo(52,-64,55,4,54,65);
+  });
   const shell=gradient(c,-200,360,["#c7f4ff","#5bb4e7","#3375b7"]);
   fill(c,"#295986",q=>{
     q.moveTo(-75,32);q.bezierCurveTo(-156,45,-188,123,-188,206);
