@@ -1,4 +1,4 @@
-name: Character Studio CI
+name: 2D Social Content Studio CI
 
 on:
   pull_request:
@@ -8,76 +8,45 @@ on:
 permissions:
   contents: read
 
-# New commits cancel superseded runs, preventing parallel large GLB downloads
-# from overloading source hosting and exhausting GitHub Actions minutes.
 concurrency:
-  group: character-studio-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: cartoon-content-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
   validate:
-    runs-on: ubuntu-latest
-    timeout-minutes: 25
-
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
-
       - name: Install dependencies
         run: bun install --frozen-lockfile
-
       - name: TypeScript
         run: bun x tsc --noEmit
-
-      - name: Character catalog tests
+      - name: All unit tests (new 2D and retained legacy data contracts)
         run: bun test tests/
-
       - name: Production build
         run: bun run build
-
-      - name: Premium background assets
-        run: |
-          test "$(find public/backgrounds/premium -type f -name '*.avif' | wc -l)" -eq 8
-          test "$(find public/backgrounds/premium -type f -name '*.avif' -size +1k | wc -l)" -eq 8
-
       - name: Python syntax
-        run: python -m py_compile services/voice-api/app.py
-
-
-      - name: Set up Python browser tooling
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - name: Install headless Chromium for WebGL QA
+        run: |
+          python -m py_compile scripts/browser_social_smoke.py
+          python -m py_compile services/voice-api/app.py
+      - name: Install Playwright Chromium
         run: |
           python -m pip install playwright==1.56.0
           python -m playwright install --with-deps chromium
-
-      - name: Chromium storyboard creation and autosave smoke
+      - name: Chromium 2D editor, audio mux and mobile layout
+        run: python scripts/browser_social_smoke.py
+      - name: Retained legacy storyboard data/recovery regression
         run: python scripts/browser_storyboard_smoke.py
-
-      - name: Generate deterministic GLB browser fixture
-        run: python scripts/generate_qa_glb.py
-
-      - name: Deterministic glTF 2.0 audit parser tests
-        run: python -m unittest discover -s scripts -p 'test_featured_glb_audit.py'
-
-      - name: Audit actual hosted featured GLBs
-        run: python scripts/audit_featured_glbs.py --live --download-tests
-
-      - name: Chromium 3D character smoke
-        run: python scripts/browser_model_smoke.py
-
-      - name: Upload browser QA evidence
+      - name: Upload UI evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: model-review-screenshots
-          path: artifacts/model-review/
+          name: social-2d-review-screenshots
+          path: artifacts/social-review/
           if-no-files-found: ignore
