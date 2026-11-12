@@ -35,3 +35,12 @@
 - Display honest capability state: do not claim arms animate if only the base image exists.
 - QA in tests/characterRig.test.ts and scripts/browser_social_smoke.py (uploads 8 fixture layers, records two keyframes and checks audio export).
 - Format, pivots, design requirements: docs/CHARACTER_RIG_PACK.md.
+
+
+## Built-in Sami art
+
+- First-party original cut-out art in src/lib/builtinSamiRig.ts (15 aligned layers).
+- Its source data is compressed vector SVG only for first-party artwork, decompressed locally with browser APIs, then rasterized to ImageBitmap. Do not accept user-supplied SVG.
+- Never replace or delete user-uploaded local IndexedDB art automatically.
+- Sami has real arm/head articulation; Layla, Omar and Nour remain fallback art until they get separate packs.
+- Regression check: scripts/browser_social_smoke.py checks full illustrated master rig and facial layer availability.
