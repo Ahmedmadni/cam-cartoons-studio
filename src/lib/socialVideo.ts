@@ -45,8 +45,8 @@ export async function loadSocialAudio(): Promise<Blob | null> {
 
 /** Each scene is keyed by its stable ID, independent of ordering. */
 const sceneAudioKey = (id: string) => {
-  if (!/^[a-zA-Z0-9_-]{1,100}$/.test(id)) throw new Error("معرّف المشهد غير صالح لحفظ الصوت.");
-  return "scene-voice:" + id;
+  if (!id || id.length > 80) throw new Error("معرّف المشهد غير صالح لحفظ الصوت.");
+  return "scene-voice:" + encodeURIComponent(id);
 };
 export async function saveSceneVoice(id: string, blob: Blob | null): Promise<void> {
   if (blob && (blob.size === 0 || blob.size > MAX_AUDIO_BYTES)) throw new Error("حجم الصوت غير صالح (30MB كحد أقصى).");
