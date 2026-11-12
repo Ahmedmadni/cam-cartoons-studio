@@ -23,6 +23,8 @@ import {
 } from "@/lib/socialVideo";
 import { sceneVoiceEnergyAt, voiceBarHeights } from "@/lib/socialAudioTimeline";
 import { selectWebmMime } from "@/lib/mediaCapabilities";
+import { CharacterRigEditor } from "@/components/characters/CharacterRigEditor";
+import { RIG_REQUIRED_LAYERS } from "@/lib/characterRigRenderer";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -36,7 +38,7 @@ export const Route = createFileRoute("/")({
   component: SocialCreator,
 });
 
-type Panel = "scenes" | "characters" | "audio" | "export";
+type Panel = "scenes" | "characters" | "rig" | "audio" | "export";
 const input = "w-full rounded-2xl border border-slate-200 bg-white px-3 py-3 text-sm text-slate-800 outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100";
 const primary = "inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-900 px-4 py-3 text-sm font-extrabold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50";
 const secondary = "inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-800 transition hover:bg-slate-50 disabled:opacity-50";
@@ -441,10 +443,10 @@ function SocialCreator() {
               </div>
               <label className="block text-xs font-extrabold text-slate-600" htmlFor="social-title">عنوان المشروع</label>
               <input id="social-title" className={input + " mt-2"} maxLength={100} value={project.title} onChange={e => patchProject({ title: e.target.value })} />
-              <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+              <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-5">
                 {([
                   ["scenes", "المشاهد", Film], ["characters", "الشخصيات", WandSparkles],
-                  ["audio", "الصوت", Mic], ["export", "التصدير", Download],
+                  ["rig", "المفاصل", Settings2], ["audio", "الصوت", Mic], ["export", "التصدير", Download],
                 ] as const).map(([key, label, Icon]) => (
                   <button type="button" key={key} onClick={() => setPanel(key)} aria-pressed={panel === key}
                     className={"flex flex-col items-center gap-2 rounded-2xl px-2 py-4 text-xs font-extrabold transition " + (panel === key ? "bg-cyan-500 text-white shadow-lg shadow-cyan-100" : "bg-slate-50 text-slate-600 hover:bg-cyan-50")}>
@@ -500,6 +502,8 @@ function SocialCreator() {
               </div>
             </>}
 
+            {panel === "rig" && <CharacterRigEditor character={selected.character} durationSeconds={selected.duration}
+              revision={artRevision} rig={selected.rig} onChange={value=>patchScene({rig:value})} />}
             {panel === "characters" && <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
               <h2 className="text-lg font-black">شخصيات كرتونية مرسومة 2D</h2>
               <p className="mt-2 text-sm leading-6 text-slate-500">الشخصيات أصلية مرسومة بأشكال قابلة للتحريك، لا تعتمد على صور أشخاص حقيقيين ولا على الكاميرا.</p>
@@ -533,6 +537,7 @@ function SocialCreator() {
                     ? "الشخصية لها رسم مصور"
                     : "لم يضاف رسم مصور لهذه الشخصية — يظهر الرسم الاحتياطي"}
                   {artStatus(selected.character).hasMouth ? " · الشفاه قابلة للتحريك" : " · الشفاه ثابتة حتى تضاف طبقات الفم"}
+                  {artStatus(selected.character).hasRig ? " · المفاصل جاهزة للتحريك" : " · المفاصل تحتاج طبقات مستقلة"}
                 </p>
                 <div className="mt-3 space-y-2">
                   {(["base","mouthClosed","mouthOpen","eyesClosed"] as CharacterArtLayer[]).map(layer=>(
