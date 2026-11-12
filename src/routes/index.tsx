@@ -6,15 +6,17 @@ import {
   Trash2, Upload, Video, Volume2, WandSparkles,
 } from "lucide-react";
 import {
-  CARTOONS, MAX_AUDIO_BYTES, MAX_DURATION_SECONDS, MAX_SCENES, STARTER, THEMES,
+  CARTOONS, EXPRESSIONS, MAX_AUDIO_BYTES, MAX_DURATION_SECONDS, MAX_SCENES, STARTER, THEMES,
   parseSocialProject, projectSeconds, sceneAt, srtForProject,
-  type CartoonId, type SceneMotion, type SceneTheme, type SceneTransition,
+  type CartoonId, type SceneMotion, type SceneExpression, type SceneTheme, type SceneTransition,
   type SocialProject, type SocialScene,
 } from "@/lib/socialStudio";
 import { renderSocialFrame } from "@/lib/socialCanvas";
 import {
   amplitudeAt, analyzeSocialAudio, exportSocialVideo, loadSocialAudio, saveSocialAudio,
+  loadSceneVoices, saveSceneVoice,
 } from "@/lib/socialVideo";
+import { sceneVoiceEnergyAt, voiceBarHeights } from "@/lib/socialAudioTimeline";
 import { selectWebmMime } from "@/lib/mediaCapabilities";
 
 export const Route = createFileRoute("/")({
@@ -61,6 +63,9 @@ function SocialCreator() {
   const [audioName, setAudioName] = useState("");
   const [audioDuration, setAudioDuration] = useState(0);
   const [envelope, setEnvelope] = useState<Float32Array | null>(null);
+  const [sceneAudio, setSceneAudio] = useState<Map<string, Blob>>(() => new Map());
+  const [sceneAnalyses, setSceneAnalyses] = useState<Map<string, {duration:number; envelope:Float32Array}>>(() => new Map());
+  const [quality, setQuality] = useState<"standard"|"high">("standard");
   const [recordingMic, setRecordingMic] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [exportPercent, setExportPercent] = useState(0);
@@ -72,22 +77,43 @@ function SocialCreator() {
   const mic = useRef<MediaRecorder | null>(null);
   const micStream = useRef<MediaStream | null>(null);
   const audioPlayer = useRef<HTMLAudioElement | null>(null);
+  const activeSceneVoice = useRef<{id:string; player: HTMLAudioElement; url:string}|null>(null);
   const exportAbort = useRef<AbortController | null>(null);
   const projectRef = useRef(project);
   projectRef.current = project;
   const duration = projectSeconds(project);
   const selected = project.scenes[Math.min(active, project.scenes.length - 1)]!;
   const setNotice = (text: string) => { setMessage(text); setError(""); };
+  const activeSceneAudio = sceneAudio.get(selected.id) ?? null;
+  const currentAnalysis = sceneAnalyses.get(selected.id);
+  const hasNarration = project.narrationMode === "scenes" ? sceneAudio.size > 0 : audio !== null;
+  function stopSceneVoice() {
+    const current = activeSceneVoice.current;
+    if (!current) return;
+    current.player.pause(); URL.revokeObjectURL(current.url);
+    activeSceneVoice.current = null;
+  }
+  async function hydrateSceneClips(ids: string[]) {
+    const voices = await loadSceneVoices(ids);
+    const analyses = new Map<string, {duration:number; envelope:Float32Array}>();
+    for (const [id,clip] of voices) {
+      try { analyses.set(id, await analyzeSocialAudio(clip)); } catch { /* corrupted legacy audio is skipped */ }
+    }
+    setSceneAudio(voices); setSceneAnalyses(analyses);
+  }
 
   useEffect(() => {
+    let initial = STARTER;
     try {
       const saved = localStorage.getItem("cam-social-project-v1");
-      if (saved) setProject(parseSocialProject(JSON.parse(saved) as unknown));
+      if (saved) initial = parseSocialProject(JSON.parse(saved) as unknown);
+      setProject(initial);
     } catch {
       setError("تعذر استعادة المشروع المحفوظ؛ لم يتم حذف بياناتك القديمة.");
     }
     setHydrated(true);
     let live = true;
+    void hydrateSceneClips(initial.scenes.map(s=>s.id)).catch(() => { if(live) setMessage("تعذر استعادة بعض ملفات صوت المشاهد."); });
     loadSocialAudio().then(async blob => {
       if (!blob || !live) return;
       const analysis = await analyzeSocialAudio(blob);
@@ -117,6 +143,7 @@ function SocialCreator() {
     return () => URL.revokeObjectURL(url);
   }, [video]);
   useEffect(() => () => {
+    stopSceneVoice();
     try { if (mic.current && mic.current.state !== "inactive") mic.current.stop(); } catch { /* noop */ }
     micStream.current?.getTracks().forEach(track => track.stop());
     exportAbort.current?.abort();
@@ -131,12 +158,26 @@ function SocialCreator() {
     let lastUi = 0;
     const startClock = performance.now();
     const initial = playing ? 0 : timelineStart(project, Math.min(active, project.scenes.length - 1)) + .6;
+    const sceneCurves = new Map([...sceneAnalyses].map(([id,a])=>[id,a.envelope] as const));
     const tick = (now: number) => {
       const t = playing ? Math.min(duration, (now - startClock) / 1000) : initial;
-      renderSocialFrame(ctx, project, t, amplitudeAt(envelope, t));
+      const energy = project.narrationMode==="scenes" ? sceneVoiceEnergyAt(project,t,sceneCurves) : amplitudeAt(envelope,t);
+      renderSocialFrame(ctx, project, t, energy);
+      if (playing && project.narrationMode==="scenes") {
+        const {scene,elapsed} = sceneAt(project,t);
+        const voice = sceneAudio.get(scene.id);
+        if (voice && elapsed >= scene.audioDelayMs/1000 && elapsed < scene.duration && activeSceneVoice.current?.id!==scene.id) {
+          stopSceneVoice();
+          const url=URL.createObjectURL(voice);
+          const player=new Audio(url); player.preload="auto";
+          player.currentTime=Math.max(0,elapsed-scene.audioDelayMs/1000);
+          activeSceneVoice.current={id:scene.id,player,url};
+          void player.play().catch(()=>setError("تعذر تشغيل صوت المشهد؛ تحقق من إعدادات المتصفح."));
+        } else if (!voice || elapsed < scene.audioDelayMs/1000 || elapsed >= scene.duration) stopSceneVoice();
+      }
       if (playing && now - lastUi > 120) { lastUi = now; setPosition(t); }
       if (playing && t >= duration) {
-        audioPlayer.current?.pause();
+        stopSceneVoice(); audioPlayer.current?.pause();
         setPlaying(false); setPosition(0);
         return;
       }
@@ -144,17 +185,17 @@ function SocialCreator() {
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [project, playing, active, envelope, duration]);
+  }, [project, playing, active, envelope, duration, sceneAudio, sceneAnalyses]);
 
   function patchProject(change: Partial<SocialProject>) {
     setPlaying(false);
-    audioPlayer.current?.pause();
+    audioPlayer.current?.pause(); stopSceneVoice();
     setVideo(null);
     setProject(previous => ({ ...previous, ...change }));
   }
   function patchScene(change: Partial<SocialScene>) {
     setPlaying(false);
-    audioPlayer.current?.pause();
+    audioPlayer.current?.pause(); stopSceneVoice();
     setVideo(null);
     setProject(previous => ({
       ...previous,
@@ -167,7 +208,7 @@ function SocialCreator() {
     }
     const next: SocialScene = {
       id: createId(), headline: "عنوان المشهد", caption: "اكتب هنا الجملة التي ستظهر على الشاشة.",
-      character: selected.character, theme: selected.theme, motion: "talk", transition: "fade", duration: 5,
+      character: selected.character, theme: selected.theme, motion: "talk", expression:"happy", audioDelayMs:0, transition: "fade", duration: 5,
     };
     setProject(previous => ({ ...previous, scenes: [...previous.scenes, next] }));
     setActive(project.scenes.length); setPlaying(false); setVideo(null); setNotice("تمت إضافة مشهد جديد.");
@@ -186,17 +227,21 @@ function SocialCreator() {
     if (project.scenes.length === 1) { setError("يجب الاحتفاظ بمشهد واحد على الأقل."); return; }
     setProject(previous => ({ ...previous, scenes: previous.scenes.filter((_, i) => i !== index) }));
     setActive(Math.max(0, Math.min(index, project.scenes.length - 2)));
+    stopSceneVoice(); setSceneAudio(prev=>{const next=new Map(prev);next.delete(project.scenes[index]!.id);return next;});
+    setSceneAnalyses(prev=>{const next=new Map(prev);next.delete(project.scenes[index]!.id);return next;});
+    void saveSceneVoice(project.scenes[index]!.id,null).catch(()=>setError("تعذر حذف صوت المشهد من التخزين."));
     setPlaying(false); setVideo(null);
   }
   function togglePreview() {
-    if (playing) { audioPlayer.current?.pause(); setPlaying(false); setPosition(0); return; }
+    if (playing) { stopSceneVoice(); audioPlayer.current?.pause(); setPlaying(false); setPosition(0); return; }
     setError("");
     const element = audioPlayer.current;
-    if (element) {
+    if (element && project.narrationMode==="global") {
       element.pause();
       element.currentTime = 0;
       void element.play().catch(() => { setError("تعذر تشغيل الصوت؛ يرجى التحقق من إعدادات المتصفح."); });
-    }
+    } else element?.pause();
+    stopSceneVoice();
     setPosition(0);
     setPlaying(true);
   }
@@ -212,6 +257,26 @@ function SocialCreator() {
       setNotice("تم تجهيز التعليق الصوتي وتخزينه محلياً في هذا المتصفح.");
     } catch (caught) { setError(caught instanceof Error ? caught.message : "تعذر قراءة الملف الصوتي."); }
   }
+  async function useSceneAudio(blob: Blob, sceneId: string) {
+    setError("");
+    try {
+      const analysis = await analyzeSocialAudio(blob);
+      await saveSceneVoice(sceneId,blob);
+      setSceneAudio(prev=>new Map(prev).set(sceneId,blob));
+      setSceneAnalyses(prev=>new Map(prev).set(sceneId,analysis));
+      stopSceneVoice(); setPlaying(false); setVideo(null);
+      setNotice("تم حفظ التعليق الصوتي للمشهد الحالي، ويمكن استخدامه بعد إعادة ترتيب المشاهد.");
+    } catch(caught) { setError(caught instanceof Error?caught.message:"تعذر حفظ صوت المشهد."); }
+  }
+  async function removeSceneAudio(id:string) {
+    try {
+      await saveSceneVoice(id,null);
+      stopSceneVoice(); setPlaying(false);
+      setSceneAudio(prev=>{const next=new Map(prev);next.delete(id);return next;});
+      setSceneAnalyses(prev=>{const next=new Map(prev);next.delete(id);return next;});
+      setVideo(null);setNotice("تم حذف صوت المشهد.");
+    } catch {setError("تعذر حذف صوت المشهد.");}
+  }
   async function removeAudio() {
     try {
       await saveSocialAudio(null);
@@ -226,6 +291,7 @@ function SocialCreator() {
       if (!navigator.mediaDevices?.getUserMedia) throw new Error("الميكروفون غير متاح. استخدم اتصال HTTPS أو ارفع ملف صوتي.");
       const mimeType = selectWebmMime("audio");
       if (!mimeType) throw new Error("المتصفح لا يدعم تسجيل الصوت. ارفع ملف MP3 أو WAV.");
+      const targetScene = project.narrationMode==="scenes" ? selected.id : null;
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       micStream.current = stream;
       const parts: Blob[] = [];
@@ -236,7 +302,11 @@ function SocialCreator() {
       recorder.onstop = () => {
         stream.getTracks().forEach(track => track.stop());
         micStream.current = null; mic.current = null; setRecordingMic(false);
-        if (parts.length) void useAudio(new Blob(parts, { type: mimeType }), "تسجيل الميكروفون");
+        if (parts.length) {
+          const recording=new Blob(parts, { type: mimeType });
+          if(targetScene) void useSceneAudio(recording,targetScene);
+          else void useAudio(recording, "تسجيل الميكروفون");
+        }
       };
       recorder.start();
       setRecordingMic(true);
@@ -251,9 +321,10 @@ function SocialCreator() {
     const controller = new AbortController();
     exportAbort.current = controller;
     try {
-      setPlaying(false); audioPlayer.current?.pause();
+      setPlaying(false); audioPlayer.current?.pause(); stopSceneVoice();
       const result = await exportSocialVideo({
-        project, narration: audio, signal: controller.signal, onProgress: value => setExportPercent(Math.round(value * 100)),
+        project, narration: audio, sceneNarrations:sceneAudio, quality,
+        signal: controller.signal, onProgress: value => setExportPercent(Math.round(value * 100)),
       });
       setVideo(result);
       setNotice("تم إنتاج الفيديو. يمكنك تحميله ومراجعته قبل النشر.");
@@ -265,13 +336,15 @@ function SocialCreator() {
     if (file.size > 150_000) { setError("ملف JSON كبير جداً."); return; }
     try {
       const parsed = parseSocialProject(JSON.parse(await file.text()) as unknown);
-      setProject(parsed); setActive(0); setPlaying(false); setVideo(null);
+      stopSceneVoice(); setProject(parsed); setActive(0); setPlaying(false); setVideo(null);
+      void hydrateSceneClips(parsed.scenes.map(s=>s.id)).catch(()=>setError("تعذر استعادة أصوات بعض المشاهد."));
       setNotice("تم استيراد المشاهد. الصوت يُخزن بصورة منفصلة على الجهاز، فراجع التعليق الصوتي قبل التصدير.");
     } catch (caught) { setError(caught instanceof Error ? caught.message : "تعذر استيراد الملف."); }
   }
   function resetProject() {
     if (!window.confirm("إنشاء مشروع جديد؟ سيُستبدل المشروع الحالي. حمّل نسخة JSON أولاً إذا أردت الاحتفاظ به.")) return;
-    setProject(STARTER); setActive(0); setPlaying(false); setVideo(null); setNotice("تم فتح قالب جديد.");
+    stopSceneVoice();setProject(STARTER); setActive(0); setPlaying(false); setVideo(null); setNotice("تم فتح قالب جديد. ملفات الصوت القديمة لم تُحذف من التخزين المحلي.");
+    void hydrateSceneClips(STARTER.scenes.map(s=>s.id)).catch(()=>{});
   }
   const exportSupported = typeof window === "undefined" || Boolean(selectWebmMime("video"));
 
