@@ -1,213 +1,453 @@
 /**
- * Deterministic, layered 2D vector character rigs.
- * No generated human image, webcam or network request is involved.
- * The mouth poses are animation shapes driven by audio energy, NOT phoneme recognition.
+ * Illustration-first, organic 2D characters for the social video editor.
+ *
+ * Every human uses a continuous, hand-contoured silhouette. Arms overlap at their
+ * actual shoulders, hands grow out of sleeves, and the neck is hidden behind
+ * the chin/collar. Curved cubic paths and clipped colour washes replace the
+ * previous pile of detached ellipses/rectangles.
+ *
+ * Canvas preview and exported frames use this exact same renderer.
+ * Facial animation is still voice-envelope based, not phoneme recognition.
  */
 import type { CartoonId, SceneExpression, SceneMotion } from "./socialStudio";
 
-type Ctx = CanvasRenderingContext2D;
-type Human = Exclude<CartoonId, "nour">;
-type Palette = { skin: string; shade: string; light: string; hair: string; hairLight: string; shirt: string; shirtShade: string; eye: string; eyebrow: string; blush: string };
-const palettes: Record<Human, Palette> = {
-  sami: { skin: "#f6b78f", shade: "#d9866f", light: "#ffd6af", hair: "#2e2539", hairLight: "#604353", shirt: "#efac35", shirtShade: "#d9832d", eye: "#2b2432", eyebrow: "#332535", blush: "#e68b86" },
-  layla: { skin: "#f4c3a9", shade: "#d89284", light: "#ffddbf", hair: "#5c367c", hairLight: "#9167b4", shirt: "#9567d0", shirtShade: "#6e47b2", eye: "#362d41", eyebrow: "#5e3a59", blush: "#e9a1a0" },
-  omar: { skin: "#dca47d", shade: "#b57b62", light: "#f1bd95", hair: "#302c35", hairLight: "#61515b", shirt: "#329f8c", shirtShade: "#247b7a", eye: "#252936", eyebrow: "#3b3134", blush: "#c9887a" },
+type C = CanvasRenderingContext2D;
+type Person = Exclude<CartoonId, "nour">;
+type Ink = {
+  skin: string; skinLight: string; skinShade: string; blush: string;
+  hair: string; hairLight: string; clothes: string; clothesShade: string;
+  clothesLight: string; outline: string; scarf?: string; scarfLight?: string;
 };
-const circle = (c: Ctx, x: number, y: number, rx: number, ry: number, fill: string) => {
-  c.beginPath(); c.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2); c.fillStyle = fill; c.fill();
+const palette: Record<Person, Ink> = {
+  sami: {
+    skin:"#f6b18e",skinLight:"#ffd7b4",skinShade:"#da8872",blush:"#ea9b91",
+    hair:"#292030",hairLight:"#5e3c40",clothes:"#f7b638",clothesShade:"#d88a2e",
+    clothesLight:"#ffd36e",outline:"#633a3c",
+  },
+  layla: {
+    skin:"#efbc9f",skinLight:"#ffe0c2",skinShade:"#cc8d80",blush:"#e9a49d",
+    hair:"#5f457a",hairLight:"#9672ad",clothes:"#aa78cb",clothesShade:"#76559f",
+    clothesLight:"#cba8e7",outline:"#674b68",scarf:"#dac7e7",scarfLight:"#f2e3f0",
+  },
+  omar: {
+    skin:"#d89f78",skinLight:"#efc29a",skinShade:"#ae755e",blush:"#bf8a76",
+    hair:"#332b35",hairLight:"#65505b",clothes:"#348e82",clothesShade:"#23746a",
+    clothesLight:"#72beb0",outline:"#543f45",
+  },
 };
-const path = (c: Ctx, fill: string, draw: (c: Ctx) => void) => {
-  c.beginPath(); draw(c); c.closePath(); c.fillStyle = fill; c.fill();
+type Brush = string | CanvasGradient;
+const fill = (c:C, brush:Brush, draw:(ctx:C)=>void) => {
+  c.beginPath();draw(c);c.closePath();c.fillStyle=brush;c.fill();
 };
-const line = (c: Ctx, color: string, width: number, draw: (c: Ctx) => void) => {
-  c.beginPath(); draw(c); c.strokeStyle = color; c.lineWidth = width;
-  c.lineCap = "round"; c.lineJoin = "round"; c.stroke();
+const stroke = (c:C,color:string,width:number,draw:(ctx:C)=>void) => {
+  c.beginPath();draw(c);c.lineWidth=width;c.lineCap="round";c.lineJoin="round";c.strokeStyle=color;c.stroke();
 };
-const rounded = (c: Ctx, x: number, y: number, w: number, h: number, r: number, fill: string) => {
-  c.beginPath(); c.roundRect(x,y,w,h,r); c.fillStyle = fill; c.fill();
+const oval = (c:C,x:number,y:number,rx:number,ry:number,color:Brush) => {
+  c.beginPath();c.ellipse(x,y,rx,ry,0,0,Math.PI*2);c.fillStyle=color;c.fill();
 };
-const mix = (a: number, b: number, t: number) => a + (b-a)*t;
-const clamp = (x:number,min=0,max=1)=>Math.max(min,Math.min(max,x));
-
-type Pose = { expression: SceneExpression; motion: SceneMotion; time: number; energy: number };
-function blinkAt(t:number) {
-  const phase = (t + 1.3) % 4.6;
-  const short = phase < .08 ? phase / .08 : phase < .17 ? ( .17-phase)/.09 : 0;
-  return 1 - .96 * clamp(short);
+const gradient = (c:C,y1:number,y2:number,colors:string[]):CanvasGradient => {
+  const g=c.createLinearGradient(-125,y1,145,y2);
+  colors.forEach((v,i)=>g.addColorStop(i/(colors.length-1),v));
+  return g;
+};
+const soft = (c:C,opacity:number,fn:()=>void)=>{
+  c.save();c.globalAlpha=opacity;fn();c.restore();
+};
+function blink(time:number) {
+  // smooth, occasional blink that doesn't get stuck closed at specific frames
+  const phase=(time+1.6)%4.15;
+  if(phase>.19)return 1;
+  return .12+.88*Math.abs(phase-.095)/.095;
 }
-function drawTorso(c:Ctx,p:Palette,motion:SceneMotion,t:number,veil:boolean) {
-  // Back arm and articulated near-hand: separate layers from body silhouette.
-  c.save(); c.translate(-134,125); c.rotate(-.03 + (motion==="explain" ? Math.sin(t*2.9)*.09 : 0));
-  path(c,p.shirtShade,x=>{x.moveTo(-40,0);x.bezierCurveTo(-78,55,-64,172,-38,239);x.lineTo(26,241);x.bezierCurveTo(20,150,45,75,25,4);});
-  circle(c,-10,235,31,37,p.skin); circle(c,1,224,22,19,p.light);
-  c.restore();
-  c.save(); c.translate(133,120);
-  const waving = motion==="wave";
-  const explaining = motion==="explain";
-  c.rotate(waving ? -.98+Math.sin(t*6)*.20 : explaining ? -.64+Math.sin(t*3)*.12 : -.04);
-  path(c,p.shirtShade,x=>{x.moveTo(-20,10);x.bezierCurveTo(-2,-9,45,-6,55,17);x.lineTo(61,187);x.bezierCurveTo(37,227,-8,202,-16,170);});
-  circle(c,35,185,32,37,p.skin);
-  for(let n=0;n<4;n++) {
-    const dx=n*13-3;
-    line(c,p.shade,3,x=>{x.moveTo(dx,188);x.lineTo(dx+2,203);});
-  }
-  circle(c,24,175,20,13,p.light);
-  c.restore();
-  // Torso: hem, collar and inner T-shirt
-  path(c,p.shirt,x=>{
-    x.moveTo(-75,38);x.bezierCurveTo(-128,48,-158,65,-176,120);
-    x.lineTo(-197,316);x.lineTo(194,316);x.lineTo(176,116);
-    x.bezierCurveTo(163,65,130,49,73,38);x.quadraticCurveTo(0,88,-75,38);
+function drawClothing(c:C,id:Person,ink:Ink,pose:SceneMotion,time:number){
+  const sleeve=gradient(c,60,370,[ink.clothesLight,ink.clothes,ink.clothesShade]);
+  // One continuous coat + both hanging arms: the seams are cosmetic, not gaps.
+  fill(c,ink.outline,x=>{
+    x.moveTo(-87,55);
+    x.bezierCurveTo(-133,62,-161,86,-178,131);
+    x.bezierCurveTo(-197,184,-198,264,-213,357);
+    x.lineTo(212,357);
+    x.bezierCurveTo(197,265,199,183,178,129);
+    x.bezierCurveTo(158,80,133,62,87,55);
+    x.bezierCurveTo(24,67,-20,66,-87,55);
   });
-  path(c,p.shirtShade,x=>{x.moveTo(143,67);x.quadraticCurveTo(166,96,174,156);x.lineTo(189,316);x.lineTo(147,316);x.closePath();});
-  path(c,"#fff9ee",x=>{x.moveTo(-49,49);x.quadraticCurveTo(0,133,49,49);x.lineTo(33,154);x.lineTo(-34,154);});
-  line(c,p.shirtShade,5,x=>{x.moveTo(-108,90);x.lineTo(-120,290);x.moveTo(110,88);x.lineTo(121,290);});
-  if(veil) {
-    // Scarf drapes over shoulders, without covering garment completely.
-    path(c,p.hair,x=>{x.moveTo(-113,-92);x.bezierCurveTo(-150,-12,-138,95,-144,215);x.lineTo(-103,305);x.quadraticCurveTo(-79,100,-63,35);x.lineTo(76,28);x.quadraticCurveTo(112,122,123,306);x.lineTo(165,243);x.quadraticCurveTo(157,-30,117,-131);});
-    path(c,p.hairLight,x=>{x.moveTo(93,-35);x.quadraticCurveTo(142,91,136,233);x.lineTo(121,281);x.quadraticCurveTo(112,103,66,0);});
+  fill(c,sleeve,x=>{
+    x.moveTo(-85,61);
+    x.bezierCurveTo(-131,68,-156,96,-171,141);
+    x.bezierCurveTo(-188,192,-190,260,-205,352);
+    x.lineTo(204,352);
+    x.bezierCurveTo(187,262,190,194,171,141);
+    x.bezierCurveTo(157,94,132,69,86,61);
+    x.bezierCurveTo(21,70,-26,71,-85,61);
+  });
+  // Rounded shoulder creases and soft fabric shading.
+  soft(c,.28,()=>fill(c,ink.clothesLight,x=>{
+    x.moveTo(-145,99);x.bezierCurveTo(-183,156,-167,253,-155,296);
+    x.bezierCurveTo(-151,207,-131,144,-101,99);
+  }));
+  soft(c,.30,()=>fill(c,ink.clothesShade,x=>{
+    x.moveTo(144,96);x.bezierCurveTo(177,140,169,258,172,324);
+    x.bezierCurveTo(147,279,150,175,120,115);
+  }));
+  // Inner white shirt joins the neckline. Collar is drawn over neck later.
+  fill(c,"#fff7ee",x=>{
+    x.moveTo(-45,66);x.quadraticCurveTo(0,118,45,66);
+    x.lineTo(55,164);x.quadraticCurveTo(0,179,-55,164);
+  });
+  soft(c,.52,()=>fill(c,"#d6dcea",x=>{
+    x.moveTo(27,104);x.quadraticCurveTo(37,140,54,160);
+    x.lineTo(25,168);x.quadraticCurveTo(32,142,27,104);
+  }));
+  // Jacket lapels/collar flow from neck onto torso.
+  fill(c,ink.clothesLight,x=>{
+    x.moveTo(-80,67);x.lineTo(-44,70);x.quadraticCurveTo(-24,113,0,128);
+    x.quadraticCurveTo(-61,130,-80,67);
+  });
+  fill(c,ink.clothesShade,x=>{
+    x.moveTo(80,67);x.lineTo(43,71);x.quadraticCurveTo(22,115,0,128);
+    x.quadraticCurveTo(62,131,80,67);
+  });
+  stroke(c,ink.clothesShade,3,x=>{
+    x.moveTo(-104,148);x.bezierCurveTo(-112,201,-113,248,-113,327);
+    x.moveTo(107,149);x.bezierCurveTo(112,201,113,251,114,329);
+  });
+  soft(c,.70,()=>stroke(c,ink.clothesLight,2,x=>{
+    x.moveTo(-94,148);x.bezierCurveTo(-97,203,-99,252,-101,322);
+  }));
+  // Shirt chest button/pocket, drawn on fabric not as separate components.
+  stroke(c,ink.clothesShade,3,x=>{
+    x.moveTo(40,215);x.lineTo(90,215);x.lineTo(90,264);
+    x.quadraticCurveTo(66,274,40,264);x.closePath();
+  });
+  for(let n=0;n<3;n++)oval(c,17,182+n*64,3,4,"#ffe7ac");
+  if(id==="omar"){
+    // Presenter glasses character wears a tie; still below the actual neck.
+    fill(c,"#2d6270",x=>{x.moveTo(-12,127);x.lineTo(13,127);x.lineTo(19,164);
+      x.lineTo(0,247);x.lineTo(-20,164);});
+    fill(c,"#c9e3e1",x=>{x.moveTo(-47,80);x.lineTo(-13,129);x.lineTo(-22,146);
+      x.quadraticCurveTo(-62,110,-47,80);});
   }
-  // Neck is deliberately behind jaw and above shirt collar.
-  rounded(c,-35,4,70,88,22,p.shade);
-  rounded(c,-29,6,58,74,18,p.skin);
+  // If gesturing, a connected sleeve is painted over the shoulder.
+  if(pose==="explain"||pose==="wave"){
+    const wave=pose==="wave";
+    const sway=Math.sin(time*(wave?5:2.7))*10;
+    const handX=wave?188+sway:210+sway;
+    const handY=wave?-87:43;
+    // Curved forearm bent from shoulder -> elbow -> wrist in a single sleeve.
+    fill(c,ink.outline,x=>{
+      x.moveTo(103,83);
+      x.bezierCurveTo(152,78,182,96,193,129);
+      x.bezierCurveTo(203,101,194,49,handX-10,handY+42);
+      x.lineTo(handX+22,handY+56);
+      x.bezierCurveTo(244,119,229,183,202,194);
+      x.bezierCurveTo(163,213,127,145,102,122);
+    });
+    fill(c,gradient(c,50,230,[ink.clothesLight,ink.clothes,ink.clothesShade]),x=>{
+      x.moveTo(103,88);
+      x.bezierCurveTo(145,83,178,100,187,136);
+      x.bezierCurveTo(200,114,194,50,handX-6,handY+46);
+      x.lineTo(handX+18,handY+60);
+      x.bezierCurveTo(230,122,222,177,198,187);
+      x.bezierCurveTo(169,204,127,140,103,115);
+    });
+    // Visible wrist directly touches sleeve; five fingers curve organically.
+    fill(c,ink.skinShade,x=>{
+      x.moveTo(handX-10,handY+56);
+      x.quadraticCurveTo(handX-27,handY+31,handX-28,handY+5);
+      x.bezierCurveTo(handX-27,handY-15,handX-15,handY-15,handX-9,handY-3);
+      x.lineTo(handX-9,handY-40);
+      x.quadraticCurveTo(handX-5,handY-55,handX+3,handY-43);
+      x.lineTo(handX+6,handY-54);
+      x.quadraticCurveTo(handX+14,handY-66,handX+19,handY-48);
+      x.lineTo(handX+20,handY-50);
+      x.quadraticCurveTo(handX+30,handY-61,handX+32,handY-39);
+      x.lineTo(handX+31,handY-29);
+      x.quadraticCurveTo(handX+45,handY-46,handX+48,handY-28);
+      x.bezierCurveTo(handX+58,handY+14,handX+30,handY+47,handX+22,handY+60);
+      x.closePath();
+    });
+    soft(c,.65,()=>fill(c,ink.skinLight,x=>{
+      x.moveTo(handX-12,handY+48);x.bezierCurveTo(handX-18,handY+5,handX,handY-7,handX+12,handY+9);
+      x.bezierCurveTo(handX+29,handY+18,handX+24,handY+44,handX+13,handY+51);
+    }));
+  }
 }
-function mouthShape(c:Ctx,energy:number,t:number,expression:SceneExpression,p:Palette) {
-  const speaking=clamp(energy);
-  const pose = speaking < .10 ? 0 : speaking<.28 ? 1 : speaking<.52 ? 2 : speaking<.77 ? 3 : 4;
-  c.save();c.translate(0,-73);
-  if(expression==="happy" && pose===0) {
-    line(c,"#963f4d",5,x=>{x.moveTo(-22,-5);x.quadraticCurveTo(0,18,24,-5);});
-    circle(c,-21,-5,3,3,"#963f4d");circle(c,24,-5,3,3,"#963f4d");
-  } else if(expression==="serious" && pose===0) {
-    line(c,"#813f46",5,x=>{x.moveTo(-20,1);x.quadraticCurveTo(0,-3,20,2);});
-  } else if(pose===0) {
-    path(c,"#8c414c",x=>{x.moveTo(-20,0);x.quadraticCurveTo(0,11,20,0);x.quadraticCurveTo(0,5,-20,0);});
+function drawNeck(c:C,ink:Ink) {
+  // Entire neck is rooted in collar and covered by facial chin.
+  fill(c,ink.skinShade,x=>{
+    x.moveTo(-43,-76);x.bezierCurveTo(-38,-29,-40,50,-22,70);
+    x.quadraticCurveTo(0,86,24,70);
+    x.bezierCurveTo(41,46,37,-33,45,-76);
+  });
+  fill(c,gradient(c,-58,70,[ink.skinLight,ink.skin,ink.skinShade]),x=>{
+    x.moveTo(-34,-61);x.bezierCurveTo(-33,-19,-35,47,-17,65);
+    x.quadraticCurveTo(0,76,17,65);
+    x.bezierCurveTo(34,44,32,-17,34,-61);
+  });
+  soft(c,.4,()=>stroke(c,"#a56760",3,x=>{x.moveTo(-24,63);x.quadraticCurveTo(0,83,24,63);}));
+}
+function drawHairBehind(c:C,id:Person,ink:Ink) {
+  if(id==="layla"){
+    fill(c,gradient(c,-335,185,["#aa8fbd",ink.hair,"#483257"]),x=>{
+      x.moveTo(-126,-182);x.bezierCurveTo(-147,-256,-96,-321,-6,-328);
+      x.bezierCurveTo(103,-337,151,-250,139,-170);
+      x.bezierCurveTo(154,-80,147,94,165,254);
+      x.quadraticCurveTo(113,288,72,244);
+      x.lineTo(-71,245);x.quadraticCurveTo(-131,278,-168,242);
+      x.bezierCurveTo(-147,89,-154,-97,-126,-182);
+    });
   } else {
-    const w=pose===1?20:pose===2?16:pose===3?27:33;
-    const h=pose===1?10:pose===2?24:pose===3?25:36;
-    circle(c,0,2,w,h,"#782c43");
-    if(pose!==2) {
-      path(c,"#fff5ee",x=>{x.moveTo(-w+4,-h/2);x.quadraticCurveTo(0,-h/2+7,w-4,-h/2);x.lineTo(w-7,-h/2+6);x.quadraticCurveTo(0,-h/2+12,-w+7,-h/2+6);});
-    }
-    circle(c,1,h/2+1,w*.57,h*.22,"#eb8092");
-  }
-  c.restore();
-  if(expression==="surprised" && speaking<.10) {
-    circle(c,0,-73,13,19,"#813f48");
-  }
-  // Small breathing motion below lower lip.
-  if(speaking>.52) line(c,p.shade,2,x=>{x.moveTo(-5,-32);x.quadraticCurveTo(0,-30+Math.sin(t*4)*2,6,-32);});
-}
-function eyes(c:Ctx,t:number,p:Palette,expression:SceneExpression,glasses:boolean) {
-  const openness = blinkAt(t);
-  const raised = expression==="surprised" ? -14 : expression==="curious" ? -7 : expression==="serious" ? 7 : -1;
-  const gaze = Math.sin(t*.83)*3;
-  // eyebrows move independently of eye frames
-  line(c,p.eyebrow,7,x=>{x.moveTo(-81,-204+raised);x.quadraticCurveTo(-53,-220+raised,-23,-208+raised);});
-  line(c,p.eyebrow,7,x=>{x.moveTo(24,-208+raised);x.quadraticCurveTo(56,-220+(expression==="curious"? -14 : raised),83,-204+raised);});
-  for(const sign of [-1,1]) {
-    const ex=sign*53;
-    circle(c,ex,-167,26,30*openness,"#fffdfb");
-    if(openness>.32){
-      circle(c,ex+gaze*sign,-167,13,18,p.eye);
-      circle(c,ex+gaze*sign+4,-175,4.5,6,"#ffffff");
-      circle(c,ex+gaze*sign-3,-162,2,3,"#dbc9ba");
-    } else {
-      line(c,p.eyebrow,4,x=>{x.moveTo(ex-20,-167);x.quadraticCurveTo(ex,-164,ex+20,-167);});
-    }
-  }
-  if(glasses) {
-    c.lineWidth=6;c.strokeStyle="#2c3945";
-    c.beginPath();c.roundRect(-90,-200,78,68,18);c.roundRect(13,-200,78,68,18);c.stroke();
-    line(c,"#2c3945",5,x=>{x.moveTo(-12,-177);x.quadraticCurveTo(0,-184,13,-177);});
-    line(c,"#2c3945",5,x=>{x.moveTo(-90,-181);x.lineTo(-109,-189);x.moveTo(91,-181);x.lineTo(109,-189);});
-    circle(c,-78,-193,4,3,"#ffffff");
-  }
-}
-function hairBack(c:Ctx,id:Human,p:Palette) {
-  if(id==="layla") {
-    path(c,p.hair,x=>{x.moveTo(-133,-144);x.bezierCurveTo(-159,-232,-106,-299,7,-304);x.bezierCurveTo(110,-300,143,-227,129,-140);x.lineTo(117,9);x.lineTo(-122,9);});
-    path(c,p.hairLight,x=>{x.moveTo(-80,-268);x.quadraticCurveTo(14,-327,94,-267);x.quadraticCurveTo(122,-244,125,-198);x.quadraticCurveTo(70,-296,-80,-268);});
-  } else {
-    path(c,p.hair,x=>{
-      x.moveTo(-119,-148);x.bezierCurveTo(-149,-219,-129,-291,-65,-307);
-      x.bezierCurveTo(11,-348,112,-303,125,-239);
-      x.quadraticCurveTo(147,-174,113,-128);x.lineTo(-108,-124);
+    fill(c,ink.hair,x=>{
+      x.moveTo(-117,-180);x.bezierCurveTo(-158,-241,-125,-310,-61,-320);
+      x.bezierCurveTo(7,-357,104,-331,132,-272);
+      x.bezierCurveTo(154,-225,128,-166,110,-153);
+      x.lineTo(-105,-138);
     });
   }
 }
-function hairFront(c:Ctx,id:Human,p:Palette) {
-  if(id==="layla") {
-    line(c,p.hair,23,x=>{x.moveTo(-102,-205);x.bezierCurveTo(-94,-293,40,-317,110,-227);});
-    line(c,p.hairLight,8,x=>{x.moveTo(-81,-229);x.quadraticCurveTo(-29,-290,39,-275);});
-  } else if(id==="sami") {
-    path(c,p.hair,x=>{x.moveTo(-122,-218);x.quadraticCurveTo(-148,-303,-58,-313);x.quadraticCurveTo(15,-350,82,-305);x.quadraticCurveTo(126,-274,120,-213);x.quadraticCurveTo(88,-248,61,-270);x.quadraticCurveTo(13,-206,-34,-210);x.quadraticCurveTo(-78,-186,-122,-218);});
-    path(c,p.hair,x=>{x.moveTo(-80,-250);x.quadraticCurveTo(-55,-306,-18,-326);x.quadraticCurveTo(-82,-321,-113,-273);});
-    line(c,p.hairLight,8,x=>{x.moveTo(-99,-279);x.quadraticCurveTo(-53,-317,-19,-302);});
+function drawFace(c:C,id:Person,ink:Ink) {
+  const faceGradient=gradient(c,-310,-11,[ink.skinLight,ink.skin,ink.skinShade]);
+  // Unified facial outline including the ears, jawline and chin.
+  const face=(x:C)=>{
+    x.moveTo(0,-292);
+    x.bezierCurveTo(-74,-300,-108,-267,-116,-206);
+    x.bezierCurveTo(-126,-184,-128,-170,-127,-158);
+    x.bezierCurveTo(-152,-168,-167,-149,-156,-126);
+    x.bezierCurveTo(-145,-103,-121,-104,-114,-114);
+    x.bezierCurveTo(-110,-70,-88,-35,-54,-19);
+    x.quadraticCurveTo(0,18,54,-19);
+    x.bezierCurveTo(88,-36,109,-74,115,-115);
+    x.bezierCurveTo(132,-103,150,-105,158,-129);
+    x.bezierCurveTo(166,-149,148,-167,127,-158);
+    x.bezierCurveTo(129,-192,121,-241,91,-266);
+    x.quadraticCurveTo(58,-294,0,-292);
+  };
+  fill(c,ink.outline,face);
+  c.save();c.translate(0,3);c.scale(.977,.977);fill(c,faceGradient,face);c.restore();
+  // Realistic ear inner contours and curved cheek planes.
+  stroke(c,ink.skinShade,4,x=>{
+    x.moveTo(-134,-151);x.bezierCurveTo(-153,-149,-148,-127,-133,-130);
+    x.moveTo(134,-151);x.bezierCurveTo(155,-150,147,-125,134,-128);
+  });
+  soft(c,.35,()=>fill(c,ink.skinLight,x=>{
+    x.moveTo(-70,-263);x.bezierCurveTo(-109,-225,-101,-164,-86,-138);
+    x.bezierCurveTo(-113,-199,-76,-254,-45,-269);
+  }));
+  soft(c,.55,()=>oval(c,-84,-100,25,13,ink.blush));
+  soft(c,.55,()=>oval(c,84,-100,25,13,ink.blush));
+  if(id==="omar") {
+    // Connected beard around jaw; leaves mouth uncovered for speech shapes.
+    soft(c,.45,()=>fill(c,ink.hair,x=>{
+      x.moveTo(-103,-87);x.bezierCurveTo(-88,-37,-48,-12,0,0);
+      x.bezierCurveTo(44,-10,82,-39,104,-87);
+      x.bezierCurveTo(77,-45,47,-20,0,-13);
+      x.bezierCurveTo(-43,-23,-83,-52,-103,-87);
+    }));
+  }
+}
+function drawEyes(c:C,ink:Ink,expression:SceneExpression,t:number,glasses:boolean) {
+  const lift = expression==="surprised"?-13:expression==="curious"?-8:expression==="serious"?5:0;
+  const opening=blink(t);
+  const pupilMotion=Math.sin(t*.71)*2.2;
+  for(const sign of [-1,1]){
+    const x=sign*51;
+    stroke(c,ink.hair,8,q=>{
+      q.moveTo(x-23,-212+lift);
+      q.quadraticCurveTo(x,-222+lift,x+24,-209+lift);
+    });
+    // Upper eyelid follows round eyeball, never looks detached.
+    fill(c,"#ffffff",q=>{
+      q.moveTo(x-29,-181);
+      q.bezierCurveTo(x-23,-208*0.96,x+15,-207,x+29,-178);
+      q.bezierCurveTo(x+30,-144,x-25,-140,x-29,-181);
+    });
+    if(opening>.28){
+      oval(c,x+pupilMotion,-172,15,19*opening,"#4d332f");
+      oval(c,x+pupilMotion+1,-173,9,14*opening,"#211e2b");
+      oval(c,x+pupilMotion+4,-181,5,7,"#ffffff");
+      oval(c,x+pupilMotion-5,-166,2.4,3.1,"#d9c9be");
+    } else stroke(c,ink.outline,4,q=>{q.moveTo(x-24,-171);q.quadraticCurveTo(x,-163,x+23,-170);});
+    stroke(c,ink.outline,5,q=>{
+      q.moveTo(x-29,-182);
+      q.bezierCurveTo(x-22,-211,x+20,-210,x+29,-182);
+    });
+    soft(c,.5,()=>stroke(c,ink.skinShade,2,q=>{q.moveTo(x-21,-142);q.quadraticCurveTo(x,-137,x+20,-143);}));
+  }
+  if(glasses){
+    stroke(c,"#344355",6,q=>{
+      q.roundRect(-88,-210,79,73,20);
+      q.roundRect(10,-210,79,73,20);
+      q.moveTo(-9,-180);q.quadraticCurveTo(0,-187,10,-180);
+      q.moveTo(-87,-177);q.lineTo(-111,-192);
+      q.moveTo(88,-177);q.lineTo(113,-192);
+    });
+    soft(c,.6,()=>stroke(c,"#ffffff",3,q=>{
+      q.moveTo(-73,-198);q.lineTo(-61,-204);
+      q.moveTo(23,-198);q.lineTo(34,-204);
+    }));
+  }
+}
+function drawNose(c:C,ink:Ink){
+  soft(c,.95,()=>stroke(c,ink.skinShade,3,q=>{
+    q.moveTo(2,-166);q.bezierCurveTo(-7,-148,-1,-132,8,-134);
+  }));
+  soft(c,.8,()=>oval(c,4,-136,8,3,ink.skinLight));
+}
+function drawMouth(c:C,ink:Ink,expression:SceneExpression,energy:number){
+  // Five stable natural mouth shapes. Blends into face; no floating face disc.
+  const level=energy<.11?0:energy<.26?1:energy<.47?2:energy<.74?3:4;
+  const smiling=expression==="happy"||expression==="surprised";
+  if(!level){
+    if(expression==="surprised"){
+      oval(c,0,-91,13,19,"#804250");
+      soft(c,.7,()=>oval(c,0,-99,7,4,"#e7a4a7"));
+    } else {
+      stroke(c,"#9e4d59",4,q=>{
+        q.moveTo(-22,-91);
+        q.quadraticCurveTo(0,smiling?-67:-88,22,-91);
+      });
+      soft(c,.4,()=>stroke(c,ink.skinShade,2,q=>{q.moveTo(-11,-78);q.quadraticCurveTo(0,-74,11,-78);}));
+    }
+    return;
+  }
+  const width=level===1?18:level===2?13:level===3?25:31;
+  const height=level===1?12:level===2?22:level===3?24:32;
+  fill(c,"#8a3e50",q=>{
+    q.moveTo(-width,-93);
+    q.bezierCurveTo(-width,-101,0,-103,width,-93);
+    q.bezierCurveTo(width+3,-93+height,0,-93+height*1.75,-width-3,-93+height);
+  });
+  if(level!==2){
+    fill(c,"#fff9f1",q=>{
+      q.moveTo(-width+4,-94);q.quadraticCurveTo(0,-90,width-4,-94);
+      q.quadraticCurveTo(width-1,-90,width-4,-86);
+      q.quadraticCurveTo(0,-80,-width+4,-86);
+    });
+  }
+  soft(c,.85,()=>oval(c,0,-93+height*1.28,width*.57,height*.19,"#f28894"));
+  stroke(c,ink.skinShade,2,q=>{q.moveTo(-13,-72+height*.28);q.quadraticCurveTo(0,-66+height*.28,13,-72+height*.28);});
+}
+function drawTopHair(c:C,id:Person,ink:Ink) {
+  if(id==="layla"){
+    fill(c,gradient(c,-310,-152,[ink.scarfLight??"#eee1f0",ink.scarf??"#ccb0d7",ink.hairLight]),q=>{
+      q.moveTo(-108,-220);
+      q.bezierCurveTo(-113,-289,-59,-322,12,-322);
+      q.bezierCurveTo(90,-319,121,-284,116,-220);
+      q.bezierCurveTo(94,-263,59,-291,6,-283);
+      q.bezierCurveTo(-44,-293,-78,-268,-108,-220);
+    });
+    stroke(c,ink.hairLight,7,q=>{q.moveTo(-98,-216);q.bezierCurveTo(-53,-290,45,-300,101,-232);});
+    fill(c,ink.scarf??"#d2c0dd",q=>{
+      q.moveTo(110,-236);q.bezierCurveTo(141,-196,132,-99,120,-29);
+      q.bezierCurveTo(106,42,118,127,131,178);
+      q.bezierCurveTo(82,149,66,72,77,10);
+      q.bezierCurveTo(91,-61,103,-167,110,-236);
+    });
+    soft(c,.75,()=>stroke(c,ink.scarfLight??"#eee1f0",9,q=>{
+      q.moveTo(119,-167);q.bezierCurveTo(104,-97,103,-17,111,54);
+    }));
+    return;
+  }
+  if(id==="sami"){
+    // Broad sculpted forelock, tapered silhouette and three fine hair strands.
+    fill(c,gradient(c,-345,-200,[ink.hairLight,ink.hair,ink.hair]),q=>{
+      q.moveTo(-117,-208);
+      q.bezierCurveTo(-161,-292,-105,-328,-43,-324);
+      q.bezierCurveTo(19,-367,104,-328,126,-276);
+      q.bezierCurveTo(140,-250,140,-213,117,-190);
+      q.bezierCurveTo(108,-235,83,-266,50,-264);
+      q.bezierCurveTo(58,-224,31,-209,17,-201);
+      q.bezierCurveTo(22,-245,1,-263,-16,-263);
+      q.bezierCurveTo(-49,-230,-83,-195,-117,-208);
+    });
+    fill(c,ink.hair,q=>{
+      q.moveTo(-85,-291);q.bezierCurveTo(-133,-308,-141,-266,-131,-235);
+      q.bezierCurveTo(-157,-258,-157,-310,-111,-321);
+    });
+    stroke(c,ink.hairLight,6,q=>{
+      q.moveTo(-103,-291);q.bezierCurveTo(-66,-332,-13,-340,20,-318);
+      q.moveTo(54,-312);q.bezierCurveTo(87,-302,109,-273,111,-244);
+    });
   } else {
-    path(c,p.hair,x=>{x.moveTo(-113,-218);x.quadraticCurveTo(-124,-296,-61,-304);x.quadraticCurveTo(2,-317,60,-295);x.quadraticCurveTo(104,-305,120,-252);x.quadraticCurveTo(71,-261,34,-247);x.quadraticCurveTo(-7,-232,-42,-254);x.quadraticCurveTo(-81,-222,-113,-218);});
-    line(c,p.hairLight,7,x=>{x.moveTo(-70,-281);x.quadraticCurveTo(-24,-305,20,-279);});
+    fill(c,gradient(c,-333,-185,[ink.hairLight,ink.hair,ink.hair]),q=>{
+      q.moveTo(-113,-211);q.bezierCurveTo(-137,-284,-95,-323,-34,-326);
+      q.bezierCurveTo(41,-347,123,-314,126,-247);
+      q.bezierCurveTo(88,-261,69,-266,35,-255);
+      q.bezierCurveTo(-7,-248,-34,-266,-54,-256);
+      q.bezierCurveTo(-76,-232,-98,-222,-113,-211);
+    });
+    soft(c,.8,()=>stroke(c,ink.hairLight,6,q=>{
+      q.moveTo(-88,-287);q.bezierCurveTo(-32,-315,23,-305,54,-290);
+    }));
   }
 }
-function drawHuman(c:Ctx,id:Human,pose:Pose){
-  const p=palettes[id];const veil=id==="layla", glasses=id==="omar";
-  const t=pose.time, motion=pose.motion, expr=pose.expression;
-  const bob=(motion==="idle"?2:5)*Math.sin(t*2.9), lean=(motion==="explain"? .035*Math.sin(t*2.2):0);
-  c.save();c.translate(360,684+bob);c.rotate(lean);
-  hairBack(c,id,p);
-  drawTorso(c,p,motion,t,veil);
-  // Rear ears and cheek surfaces
-  if(!veil){circle(c,-110,-122,24,36,p.shade);circle(c,110,-122,24,36,p.shade);
-    circle(c,-112,-125,15,24,p.skin);circle(c,112,-125,15,24,p.skin);}
-  // Real tapered jaw, cheeks, forehead + soft under-jaw shading
-  path(c,p.shade,x=>{x.moveTo(-106,-204);x.bezierCurveTo(-126,-139,-99,-42,-37,-19);x.quadraticCurveTo(0,1,37,-19);x.bezierCurveTo(100,-51,121,-137,106,-204);x.quadraticCurveTo(11,-306,-106,-204);});
-  path(c,p.skin,x=>{x.moveTo(-105,-209);x.bezierCurveTo(-121,-157,-96,-52,-28,-27);x.quadraticCurveTo(0,-15,27,-27);x.bezierCurveTo(100,-52,119,-144,105,-211);x.quadraticCurveTo(0,-305,-105,-209);});
-  // Cheek glow; restrained so that rendered art remains legible at phone size.
-  circle(c,-78,-97,27,14,p.blush);circle(c,79,-97,27,14,p.blush);
-  c.globalAlpha=.33;circle(c,-70,-110,29,10,p.light);circle(c,73,-110,29,10,p.light);c.globalAlpha=1;
-  line(c,p.shade,4,x=>{x.moveTo(-5,-144);x.quadraticCurveTo(7,-122,-2,-121);});
-  eyes(c,t,p,expr,glasses);
-  mouthShape(c,pose.energy,t,expr,p);
-  hairFront(c,id,p);
-  // Collar seam on top of neckline
-  line(c,"#ffffff",6,x=>{x.moveTo(-48,50);x.quadraticCurveTo(0,99,48,50);});
+function drawPerson(c:C,id:Person,time:number,energy:number,motion:SceneMotion,expression:SceneExpression) {
+  const ink=palette[id];
+  c.save();
+  c.translate(360,711+Math.sin(time*2.6)*3);
+  c.rotate(motion==="explain"?Math.sin(time*1.9)*.015:0);
+  // All body regions intentionally overlap, so there are no jigsaw-like joints.
+  drawHairBehind(c,id,ink);
+  drawClothing(c,id,ink,motion,time);
+  drawNeck(c,ink);
+  drawFace(c,id,ink);
+  drawEyes(c,ink,expression,time,id==="omar");
+  drawNose(c,ink);
+  drawMouth(c,ink,expression,motion==="idle"?0:energy);
+  drawTopHair(c,id,ink);
   c.restore();
 }
-function drawRobot(c:Ctx,pose:Pose){
-  const t=pose.time,energy=pose.energy,expr=pose.expression;
-  c.save();c.translate(360,684+Math.sin(t*3)*5);
-  const wave=pose.motion==="wave"?Math.sin(t*6)*34:0;
-  path(c,"#3979bd",x=>{x.moveTo(-142,68);x.quadraticCurveTo(-173,105,-160,240);x.lineTo(-117,308);x.lineTo(126,308);x.quadraticCurveTo(165,252,157,130);x.quadraticCurveTo(151,79,116,65);});
-  rounded(c,-127,92,254,210,49,"#8ad9f0");
-  c.save();c.translate(-146,132);c.rotate(wave*.012);rounded(c,-24,-8,51,159,25,"#315f9d");circle(c,1,150,24,28,"#8dd2ed");c.restore();
-  c.save();c.translate(146,132);c.rotate(-wave*.012);rounded(c,-26,-8,51,159,25,"#315f9d");circle(c,-1,150,24,28,"#8dd2ed");c.restore();
-  rounded(c,-139,-275,278,259,65,"#326fae");
-  rounded(c,-117,-252,234,209,45,"#e7f9ff");
-  c.globalAlpha=.46;rounded(c,-96,-232,194,22,12,"#ffffff");c.globalAlpha=1;
-  const blink=blinkAt(t);
-  for(const sign of [-1,1]) {
-    circle(c,sign*59,-161,26,30*blink,"#213755");
-    if(blink>.28)circle(c,sign*59+6,-171,7,9,"#ffffff");
+function drawRobot(c:C,time:number,energy:number,motion:SceneMotion,expression:SceneExpression) {
+  // Robots are designed as one seamless capsule body rather than floating circles.
+  c.save();c.translate(360,711+Math.sin(time*2.5)*3);
+  const shell=gradient(c,-200,360,["#c7f4ff","#5bb4e7","#3375b7"]);
+  fill(c,"#295986",q=>{
+    q.moveTo(-75,32);q.bezierCurveTo(-156,45,-188,123,-188,206);
+    q.bezierCurveTo(-195,273,-167,335,0,344);
+    q.bezierCurveTo(158,332,193,274,189,207);
+    q.bezierCurveTo(185,124,155,48,75,32);
+  });
+  c.save();c.translate(0,-3);c.scale(.97,.97);
+  fill(c,shell,q=>{
+    q.moveTo(-75,32);q.bezierCurveTo(-156,45,-188,123,-188,206);
+    q.bezierCurveTo(-195,273,-167,335,0,344);
+    q.bezierCurveTo(158,332,193,274,189,207);
+    q.bezierCurveTo(185,124,155,48,75,32);
+  });c.restore();
+  fill(c,"#295986",q=>{
+    q.moveTo(-115,-204);q.bezierCurveTo(-123,-277,-64,-315,0,-315);
+    q.bezierCurveTo(66,-316,123,-277,116,-205);
+    q.lineTo(107,-57);q.quadraticCurveTo(0,2,-107,-57);
+  });
+  fill(c,gradient(c,-290,-54,["#f7fdff","#c9f6ff","#7abce5"]),q=>{
+    q.moveTo(-104,-199);q.bezierCurveTo(-113,-263,-50,-292,0,-292);
+    q.bezierCurveTo(55,-293,110,-263,103,-199);
+    q.lineTo(93,-76);q.quadraticCurveTo(0,-28,-93,-76);
+  });
+  const openness=blink(time);
+  for(const s of [-1,1]){
+    oval(c,s*53,-181,24,26*openness,"#263b61");
+    if(openness>.3)oval(c,s*53+7,-190,6,7,"#ffffff");
   }
-  const open=clamp(energy);
-  if(expr==="happy"&&open<.10)line(c,"#325271",6,x=>{x.moveTo(-33,-97);x.quadraticCurveTo(0,-64,33,-97);});
-  else rounded(c,-38,-106,76,mix(9,44,open),14,"#243b5b");
-  line(c,"#3a6f9f",13,x=>{x.moveTo(0,-275);x.lineTo(0,-310);});
-  circle(c,0,-323,19,19,"#ffcb54");
-  rounded(c,-86,149,172,80,26,"#376ea3");
-  circle(c,-38,189,15,15,"#80f4cf");circle(c,16,189,15,15,"#fdd66e");
+  if(energy>.12){
+    oval(c,0,-108,24,7+Math.min(1,energy)*23,"#28476a");
+  } else stroke(c,"#2c4f76",5,q=>{
+    q.moveTo(-22,-111);q.quadraticCurveTo(0,expression==="happy"?-91:-106,22,-111);
+  });
+  stroke(c,"#43749d",12,q=>{q.moveTo(0,-315);q.lineTo(0,-341);});
+  oval(c,0,-353,15,15,"#ffc55a");
+  oval(c,-31,178,18,18,"#b3ffde");
+  oval(c,32,178,18,18,"#ffdf83");
+  soft(c,.65,()=>stroke(c,"#d8fbff",6,q=>{
+    q.moveTo(-142,126);q.bezierCurveTo(-152,158,-153,205,-146,238);
+  }));
   c.restore();
 }
-
 export function renderCartoonCharacter(
-  ctx: Ctx,
-  character: CartoonId,
-  time: number,
-  energy: number,
-  motion: SceneMotion,
-  expression: SceneExpression = "happy",
-) {
-  const pose:Pose = { time, energy:clamp(energy), motion, expression };
-  if(character==="nour") drawRobot(ctx,pose);
-  else drawHuman(ctx,character,pose);
+  ctx:C, character:CartoonId, time:number, energy:number,
+  motion:SceneMotion, expression:SceneExpression="happy",
+){
+  const value=Number.isFinite(energy)?Math.max(0,Math.min(1,energy)):0;
+  if(character==="nour")drawRobot(ctx,time,value,motion,expression);
+  else drawPerson(ctx,character,time,value,motion,expression);
 }
