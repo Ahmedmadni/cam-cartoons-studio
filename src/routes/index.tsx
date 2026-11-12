@@ -12,6 +12,7 @@ import {
   type SocialProject, type SocialScene,
 } from "@/lib/socialStudio";
 import { renderSocialFrame } from "@/lib/socialCanvas";
+import { renderCartoonCharacter } from "@/lib/socialCharacterRig";
 import {
   amplitudeAt, analyzeSocialAudio, exportSocialVideo, loadSocialAudio, saveSocialAudio,
   loadSceneVoices, saveSceneVoice,
@@ -50,6 +51,23 @@ function formatSeconds(seconds: number) {
 }
 function timelineStart(project: SocialProject, index: number) {
   return project.scenes.slice(0, index).reduce((a, scene) => a + scene.duration, 0);
+}
+
+/** Actual miniature rig preview, rather than misleading stock emoji for each actor. */
+function CartoonThumbnail({character}:{character:CartoonId}) {
+  const ref=useRef<HTMLCanvasElement|null>(null);
+  useEffect(()=>{
+    const canvas=ref.current,ctx=canvas?.getContext("2d");
+    if(!canvas||!ctx)return;
+    const colors:Record<CartoonId,string>={sami:"#fff0cf",layla:"#f0defc",omar:"#ddf4e9",nour:"#d7e9fe"};
+    ctx.fillStyle=colors[character];ctx.fillRect(0,0,160,160);
+    ctx.save();
+    ctx.translate(80-360*.38,80-500*.38);
+    ctx.scale(.38,.38);
+    renderCartoonCharacter(ctx,character,.7,0,"idle","happy");
+    ctx.restore();
+  },[character]);
+  return <canvas ref={ref} width={160} height={160} role="img" aria-label={"رسم شخصية "+character} className="mx-auto mb-2 h-17 w-17 rounded-2xl border border-white/60 shadow-sm" />;
 }
 
 function SocialCreator() {
@@ -455,7 +473,7 @@ function SocialCreator() {
                 {CARTOONS.map(character => (
                   <button type="button" key={character.id} aria-pressed={selected.character === character.id}
                     onClick={() => patchScene({ character: character.id as CartoonId })} className={"rounded-2xl border p-4 text-center transition " + (selected.character === character.id ? "border-cyan-500 bg-cyan-50" : "border-slate-200 bg-slate-50 hover:bg-slate-100")}>
-                    <span className="mx-auto mb-2 grid h-14 w-14 place-items-center rounded-2xl text-2xl shadow-sm" style={{ background: character.color }}>{character.id === "nour" ? "🤖" : character.id === "layla" ? "👩🏻" : character.id === "omar" ? "👨🏻‍🏫" : "🧑🏻"}</span>
+                    <CartoonThumbnail character={character.id} />
                     <strong className="block text-sm">{character.name}</strong><span className="text-xs text-slate-500">{character.description}</span>
                   </button>
                 ))}
@@ -493,7 +511,15 @@ function SocialCreator() {
               </div>
               {project.narrationMode==="scenes" && <div className="mt-4 rounded-xl bg-cyan-50 p-3 text-sm font-bold text-cyan-950">
                 الصوت الجاري تعديله: المشهد {active+1} — {selected.headline || "مشهد بلا عنوان"}
-                <p className="mt-1 text-xs font-normal">اختَر المشهد من تبويب المشاهد أولًا، ثم ارفع تسجيله هنا. سيظل الصوت مرتبطًا بالمشهد عند تغيير ترتيبه.</p>
+                <p className="mt-1 text-xs font-normal">يمكن اختيار أي مشهد من الأزرار التالية وإرفاق صوت مختلف له. يظل الصوت مرتبطًا بالمشهد عند تغيير الترتيب.</p>
+                <div aria-label="اختيار مشهد الصوت" className="mt-3 flex flex-wrap gap-2">
+                  {project.scenes.map((s,i)=><button type="button" key={s.id}
+                    onClick={()=>{stopSceneVoice();audioPlayer.current?.pause();setPlaying(false);setActive(i);}}
+                    aria-pressed={active===i}
+                    className={"rounded-lg border px-3 py-2 text-xs font-bold "+(active===i?"border-cyan-500 bg-cyan-600 text-white":"border-cyan-200 bg-white text-cyan-900")}>
+                    المشهد {i+1} {sceneAudio.has(s.id)?"●":""}
+                  </button>)}
+                </div>
               </div>}
               <div className="mt-5 flex flex-wrap gap-2">
                 <label className={secondary + " cursor-pointer"}><Upload className="size-4" /> رفع MP3 / WAV / WebM
