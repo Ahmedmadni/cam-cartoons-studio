@@ -14,7 +14,7 @@ import {
 import { renderSocialFrame } from "@/lib/socialCanvas";
 import { renderCartoonCharacter } from "@/lib/socialCharacterRig";
 import {
-  ART_LAYER_LABELS, artStatus, hydrateCharacterArt, paintIllustratedCharacter, saveCharacterArt, restoreSamiReferenceArt,
+  ART_LAYER_LABELS, artStatus, getCharacterArt, hydrateCharacterArt, paintIllustratedCharacter, saveCharacterArt, restoreSamiReferenceArt,
   type CharacterArtLayer,
 } from "@/lib/socialCharacterArt";
 import {
@@ -560,7 +560,10 @@ function SocialCreator() {
                   </p>
                   <div className="mt-3 space-y-2">
                     {RIG_REQUIRED_LAYERS.map(layer=><div key={layer} className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-slate-50 p-2">
-                      <strong className="text-xs">{ART_LAYER_LABELS[layer]}</strong>
+                      <strong className="text-xs">{ART_LAYER_LABELS[layer]} {getCharacterArt(selected.character)?.[layer]?"✓":""}</strong>
+                      {getCharacterArt(selected.character)?.[layer] && <button type="button" disabled={artUploading}
+                        className="rounded-lg border border-rose-200 px-2 py-1 text-xs text-rose-700"
+                        onClick={()=>void deleteArtwork(layer)}>حذف</button>}
                       <label className={secondary+" cursor-pointer !px-3 !py-2 !text-xs"}>
                         رفع طبقة
                         <input type="file" accept="image/png,image/webp" disabled={artUploading} className="sr-only"
