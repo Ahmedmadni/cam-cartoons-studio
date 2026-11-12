@@ -9,6 +9,7 @@
  * Only raster formats are accepted: never render uploaded SVG/HTML documents.
  */
 import type { CartoonId, SceneExpression, SceneMotion } from "./socialStudio";
+import { SAMI_REFERENCE_WEBP } from "./socialReferenceArt";
 
 export type CharacterArtLayer = "base" | "mouthClosed" | "mouthOpen" | "eyesClosed";
 export type CharacterArt = Partial<Record<CharacterArtLayer, ImageBitmap>>;
@@ -134,6 +135,14 @@ export async function hydrateCharacterArt():Promise<void> {
       for(const layer of layers)updateCache(character,layer,images[layer]);
     }
   }
+  // One built-in owner-provided illustrated reference; all other actors keep the
+  // existing vector fallback until the artist supplies their respective art.
+  if(!getCharacterArt("sami"))await restoreSamiReferenceArt();
+}
+export async function restoreSamiReferenceArt():Promise<void> {
+  if(getCharacterArt("sami"))return;
+  const blob=await fetch(SAMI_REFERENCE_WEBP).then(res=>res.blob());
+  await restoreBuiltinCharacterArt("sami",blob);
 }
 export async function restoreBuiltinCharacterArt(character: CartoonId, blob: Blob) {
   if(getCharacterArt(character))return;
