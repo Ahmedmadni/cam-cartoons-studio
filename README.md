@@ -7,16 +7,16 @@ Arabic-first **2D narrated short-video editor** for TikTok, Reels and Shorts. Us
 1. Up to 20 editable scenes totaling 120 seconds.
 2. The illustrated reference-style Sami character is bundled from the owner-supplied visual. All four actors can now use imported cohesive raster character art (base + optional mouth and eye patches) stored locally; the three other built-ins continue using the original vector fallback until artwork is imported.
 3. Microphone recording or uploaded audio. Choose whole-film narration or an independent clip for each scene with waveform and per-scene delay; IndexedDB keeps real audio files keyed to stable scene IDs.
-4. Full vertical story preview and baked Arabic captions; selectable static or approximate word-reveal animation.
+4. Full vertical story preview and baked Arabic captions; static or approximate word-reveal animation. An interactive **rig editor** can set head, shoulder, elbow, wrist, eyebrow and eyelid values, configure rotation pivots, apply pose presets and interpolate per-scene keyframes.
 5. Real-time **720×1280 or 1080×1920, 24 fps WebM** export. Web Audio muxes each clip at its scene start plus optional delay and trims audio exactly to scene boundaries. Supports silent output when no audio exists.
 6. Download editable JSON scene backup or separate SRT subtitles.
 
 ## Accurate limitations
 
-- Approximate volume-driven mouth movement is **not** phoneme-level automatic lip sync.
+- Approximate volume-driven mouth movement is **not** phoneme-level lip sync. A single flattened picture cannot move the elbow or wrist independently; the editor shows an explicit readiness warning until proper layers exist.
 - No hosted generative AI, automatic voice synthesis, voice cloning, transcription, MP4 or music library is implemented.
 - Mic access requires HTTPS/localhost and browser permission. Some uploaded files may not decode despite their extension.
-- The WebM export occurs in real time; the browser tab must stay visible and the device must support MediaRecorder. Current preview/export is capped at two minutes and 720×1280.
+- The WebM export occurs in real time; the browser tab must stay visible and the device must support MediaRecorder. Current preview/export is capped at two minutes and offers 720×1280 or optional 1080×1920.
 - Whole-video audio starts at zero; per-scene audio begins at the selected scene plus its user-defined delay. Clips longer than the available scene are truncated. There is no automatic voice-to-word alignment.
 - The reveal of Arabic words is **estimated uniformly from scene duration**, not derived from speech timestamps. Mouth poses are driven by PCM amplitude, not viseme / phoneme inference.
 - 1080p export demands more browser memory and can drop frames on slower devices. Validate it on intended phones.
