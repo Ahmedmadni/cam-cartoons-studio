@@ -10,6 +10,7 @@
  */
 import type { CartoonId, SceneExpression, SceneMotion } from "./socialStudio";
 import { SAMI_REFERENCE_WEBP } from "./socialReferenceArt";
+import { createBuiltinSamiArt } from "./builtinSamiRig";
 import { defaultRigSettings, evaluateRigPose, type RigSettings } from "./characterRig";
 import { isFullCutoutRig, paintCutoutRig, RIG_REQUIRED_LAYERS } from "./characterRigRenderer";
 
@@ -147,16 +148,37 @@ export async function hydrateCharacterArt():Promise<void> {
     }
     if(images.base){
       for(const layer of layers)updateCache(character,layer,images[layer]);
+    } else if(character==="sami") {
+      // First-party art is bundled with the app. A user's uploaded base always
+      // takes precedence. Locally saved facial overlays can customize that art.
+      await restoreSamiReferenceArt();
+      const base=getCharacterArt("sami")?.base;
+      for(const layer of layers){
+        if(layer==="base")continue;
+        const image=images[layer];
+        if(image && base && image.width===base.width && image.height===base.height)
+          updateCache("sami",layer,image);
+        else image?.close();
+      }
     }
   }
-  // One built-in owner-provided illustrated reference; all other actors keep the
-  // existing vector fallback until the artist supplies their respective art.
-  if(!getCharacterArt("sami"))await restoreSamiReferenceArt();
 }
 export async function restoreSamiReferenceArt():Promise<void> {
   if(getCharacterArt("sami"))return;
-  const blob=await fetch(SAMI_REFERENCE_WEBP).then(res=>res.blob());
-  await restoreBuiltinCharacterArt("sami",blob);
+  try {
+    const pack=await createBuiltinSamiArt();
+    if(getCharacterArt("sami")) {
+      for(const image of Object.values(pack))image?.close();
+      return;
+    }
+    for(const [key,image] of Object.entries(pack)){
+      if(image)updateCache("sami",key as CharacterArtLayer,image);
+    }
+  } catch {
+    // Last-resort safety path for browsers lacking gzip stream support.
+    const blob=await fetch(SAMI_REFERENCE_WEBP).then(res=>res.blob());
+    await restoreBuiltinCharacterArt("sami",blob);
+  }
 }
 export async function restoreBuiltinCharacterArt(character: CartoonId, blob: Blob) {
   if(getCharacterArt(character))return;

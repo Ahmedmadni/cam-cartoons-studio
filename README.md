@@ -5,7 +5,7 @@ Arabic-first **2D narrated short-video editor** for TikTok, Reels and Shorts. Us
 ## Real features
 
 1. Up to 20 editable scenes totaling 120 seconds.
-2. The illustrated reference-style Sami character is bundled from the owner-supplied visual. All four actors can now use imported cohesive raster character art (base + optional mouth and eye patches) stored locally; the three other built-ins continue using the original vector fallback until artwork is imported.
+2. Sami ships with an **original illustrated 15-layer upper-body character rig** using detailed face, hair, golden shirt, separate moving limbs, eye/brow overlays and mouth drawings. Other characters can import layered PNG/WebP artwork; their built-in fallback remains simplified until individually illustrated.
 3. Microphone recording or uploaded audio. Choose whole-film narration or an independent clip for each scene with waveform and per-scene delay; IndexedDB keeps real audio files keyed to stable scene IDs.
 4. Full vertical story preview and baked Arabic captions; static or approximate word-reveal animation. An interactive **rig editor** can set head, shoulder, elbow, wrist, eyebrow and eyelid values, configure rotation pivots, apply pose presets and interpolate per-scene keyframes.
 5. Real-time **720×1280 or 1080×1920, 24 fps WebM** export. Web Audio muxes each clip at its scene start plus optional delay and trims audio exactly to scene boundaries. Supports silent output when no audio exists.
@@ -22,8 +22,8 @@ Arabic-first **2D narrated short-video editor** for TikTok, Reels and Shorts. Us
 - 1080p export demands more browser memory and can drop frames on slower devices. Validate it on intended phones.
 - Local project metadata is saved in localStorage; audio in IndexedDB. Clearing browser storage destroys local work.
 - **JSON backups omit audio**. Keep your source audio separately.
-- The user-provided cartoon reference is now included as a **small low-resolution cutout** for Sami. It is not a production-ready HD character pack or a lip-synced puppet; the bundled other characters remain vector fallback. Artist-provided PNG/WebP layers are necessary for production quality and optional mouth/eye changes.
-- Imported illustrations can be **static**. The editor only applies subtle overall movement to an unlayered image. It never claims hand gestures or lip sync from a single image.
+- The uploaded reference remains a small low-resolution fallback. Sami's NEW master art pack is a separate original vector illustration with its own 15 cut-out layers; artistic fidelity should still be inspected before production. The other built-in characters need their own layered illustrations.
+- A user's imported illustration may be **static** if only a flattened base is provided. Only a complete, individually segmented art pack permits moving shoulder, elbow and wrist joints, and mouth/eye overlays require actual corresponding artwork.
 
 ## Relevant source files
 
@@ -63,3 +63,13 @@ The still-open [3D audio PR #33](https://github.com/Ahmedmadni/cam-cartoons-stud
 6. Once old data is migrated: remove GLB, camera, Ready Player Me and legacy UI/dependencies, with test-driven cleanup.
 
 Lovable sync: keep main history intact. Review changes in a feature branch PR.
+
+
+### First working illustrated character art pack (Sami)
+
+- Sami now has an original **15-layer cut-out illustration**: naturally drawn face, dimensional hair and golden shirt, independent upper/lower arms and hands, open/closed mouth, eyes (open/half/blink) and eyebrow variants.
+- The source resides in `src/lib/builtinSamiRig.ts` as compressed first-party SVG vector artwork; the browser rasterizes it at 976×1288. There are no online AI calls, database dependencies or ongoing generation charges.
+- The **same character layers and joint settings** render in preview and WebM export. The default joint pivots line up with this pack.
+- Existing user-uploaded PNG/WebP art always takes priority. If compressed-source decoding is unsupported, Sami falls back to the previous flattened portrait.
+- Layla, Omar and Nour do not yet have equivalent illustration packs; their older vector renderers remain as fallbacks.
+- This is an original hand-designed vector interpretation of the owner's style reference, not a claim of pixel-perfect likeness or professionally approved character quality.
