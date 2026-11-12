@@ -100,6 +100,8 @@ def main():
             expect(page.get_by_text("التعليق الصوتي للمشهد 1", exact=False)).to_be_visible(timeout=12000)
             page.get_by_label("تأخير بداية الصوت").select_option("250")
             page.get_by_role("button", name="الشخصيات", exact=True).click()
+            expect(page.locator('canvas[aria-label^="رسم شخصية"]')).to_have_count(4)
+            page.screenshot(path=str(out / "character-rigs.png"), full_page=False)
             page.get_by_label("تعبير الوجه").select_option("curious")
             page.get_by_role("button", name="التصدير", exact=True).click()
             page.get_by_label("أسلوب ظهور الكلمات").select_option("reveal")
