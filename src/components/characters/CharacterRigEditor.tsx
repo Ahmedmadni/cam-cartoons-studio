@@ -49,13 +49,12 @@ export function CharacterRigEditor({character,durationSeconds,rig,onChange,revis
     ["base","الوضع الأساسي"],["start","أول المشهد"],["end","آخر المشهد"],
   ];
   const requiredTotal=RIG_REQUIRED_LAYERS.length;
-  const acquired=RIG_REQUIRED_LAYERS.filter(part=>status.hasRig || false).length;
-  void acquired;void revision;
+  void revision;
   return <section aria-label="محرر مفاصل الشخصية" className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
     <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
       <h2 className="text-lg font-black">محرر العظام والمفاصل 2D</h2>
       <span className={"rounded-full px-3 py-1.5 text-xs font-bold "+(status.hasRig?"bg-emerald-100 text-emerald-800":"bg-amber-100 text-amber-900")}>
-        {status.hasRig?"طبقات الحركة مكتملة":"تنتظر طبقات الحركة"}
+        {status.hasRig?"طبقات الحركة مكتملة":status.rigLayerCount+" / "+requiredTotal+" طبقات"}
       </span>
     </div>
     <p className="text-sm leading-7 text-slate-600">
@@ -101,7 +100,7 @@ export function CharacterRigEditor({character,durationSeconds,rig,onChange,revis
       <label className="mt-3 block text-xs font-bold">اختيار المفصل
         <select aria-label="اختيار المفصل" className="mt-2 w-full rounded-xl border border-slate-200 bg-white p-3"
           value={activePivot} onChange={e=>setActivePivot(e.target.value as PivotId)}>
-          {PIVOT_IDS.map(id=><option key={id} value={id}>{id==="neck"?"الرقبة":JOINT_META[id]?.name??id}</option>)}
+          {PIVOT_IDS.map(id=><option key={id} value={id}>{id==="neck"?"الرقبة":JOINT_META[id].name}</option>)}
         </select>
       </label>
       <div className="mt-3 grid gap-2 sm:grid-cols-2">
