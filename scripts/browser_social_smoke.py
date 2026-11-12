@@ -102,6 +102,17 @@ def main():
             page.get_by_role("button", name="الشخصيات", exact=True).click()
             expect(page.locator('canvas[aria-label^="رسم شخصية"]')).to_have_count(4)
             page.screenshot(path=str(out / "character-rigs.png"), full_page=False)
+            # Review all four full-size figures, not just tiny selection thumbnails.
+            for label, slug in [
+                ("سامي مقدم شاب", "sami"),
+                ("ليلى شخصية محجبة", "layla"),
+                ("عمر مدرس بنظارة", "omar"),
+                ("نور روبوت لطيف", "nour"),
+            ]:
+                page.get_by_role("button", name=label).click()
+                page.wait_for_timeout(170)
+                page.screenshot(path=str(out / ("portrait-" + slug + ".png")), full_page=False)
+            page.get_by_role("button", name="عمر مدرس بنظارة").click()
             page.get_by_label("تعبير الوجه").select_option("curious")
             page.get_by_role("button", name="التصدير", exact=True).click()
             page.get_by_label("أسلوب ظهور الكلمات").select_option("reveal")
