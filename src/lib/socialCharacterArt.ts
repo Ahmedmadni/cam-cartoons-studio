@@ -10,14 +10,24 @@
  */
 import type { CartoonId, SceneExpression, SceneMotion } from "./socialStudio";
 import { SAMI_REFERENCE_WEBP } from "./socialReferenceArt";
+import { defaultRigSettings, evaluateRigPose, type RigSettings } from "./characterRig";
+import { isFullCutoutRig, paintCutoutRig } from "./characterRigRenderer";
 
-export type CharacterArtLayer = "base" | "mouthClosed" | "mouthOpen" | "eyesClosed";
+export type CharacterArtLayer = "base" | "mouthClosed" | "mouthOpen" | "eyesClosed" |
+  "torso" | "head" | "leftUpperArm" | "leftForearm" | "leftHand" |
+  "rightUpperArm" | "rightForearm" | "rightHand" |
+  "eyesOpen" | "eyesHalf" | "browsNeutral" | "browsRaised";
 export type CharacterArt = Partial<Record<CharacterArtLayer, ImageBitmap>>;
 export const ART_LAYER_LABELS: Record<CharacterArtLayer, string> = {
   base: "الرسم الأساسي المتكامل",
   mouthClosed: "طبقة الفم المغلق",
   mouthOpen: "طبقة الفم المفتوح",
   eyesClosed: "طبقة العينين المغلقتين",
+  torso:"الجذع والملابس (شفاف)",head:"الرأس والشعر (شفاف)",
+  leftUpperArm:"العضد الأيسر",leftForearm:"الساعد الأيسر",leftHand:"اليد اليسرى",
+  rightUpperArm:"العضد الأيمن",rightForearm:"الساعد الأيمن",rightHand:"اليد اليمنى",
+  eyesOpen:"العينان مفتوحتان",eyesHalf:"العينان نصف مفتوحتين",
+  browsNeutral:"الحاجبان الطبيعيان",browsRaised:"الحاجبان مرفوعان",
 };
 const DB = "cam-social-content-v1";
 const STORE = "assets";
@@ -25,7 +35,11 @@ const MAX_BYTES = 8 * 1024 * 1024;
 const MAX_PIXELS = 4096 * 4096;
 const cache = new Map<CartoonId, CharacterArt>();
 const IDS: CartoonId[] = ["sami","layla","omar","nour"];
-const layers: CharacterArtLayer[] = ["base","mouthClosed","mouthOpen","eyesClosed"];
+const layers: CharacterArtLayer[] = [
+  "base","mouthClosed","mouthOpen","eyesClosed",
+  "torso","head","leftUpperArm","leftForearm","leftHand",
+  "rightUpperArm","rightForearm","rightHand","eyesOpen","eyesHalf","browsNeutral","browsRaised",
+];
 
 function assetKey(character: CartoonId, layer: CharacterArtLayer) {
   return "illustrated-character-v1:" + character + ":" + layer;
@@ -86,7 +100,7 @@ export function getCharacterArt(character:CartoonId):CharacterArt | null {
 }
 export function artStatus(character:CartoonId) {
   const a=cache.get(character);
-  return { hasBase:!!a?.base, hasMouth:!!(a?.mouthClosed && a?.mouthOpen), hasBlink:!!a?.eyesClosed };
+  return { hasBase:!!a?.base, hasMouth:!!(a?.mouthClosed && a?.mouthOpen), hasBlink:!!a?.eyesClosed, hasRig:isFullCutoutRig(a??null) };
 }
 export async function saveCharacterArt(
   character:CartoonId,layer:CharacterArtLayer,blob:Blob|null
@@ -165,9 +179,14 @@ export function paintIllustratedCharacter(
   ctx:CanvasRenderingContext2D,
   character:CartoonId,time:number,voiceAmplitude:number,
   motion:SceneMotion,expression:SceneExpression,
+  rigSettings?:RigSettings, elapsedMs=0,
 ):boolean {
   const art=getCharacterArt(character);
   if(!art?.base)return false;
+  if (isFullCutoutRig(art)) {
+    const pose=evaluateRigPose(rigSettings??defaultRigSettings(),elapsedMs,voiceAmplitude);
+    return paintCutoutRig(ctx,art,rigSettings??defaultRigSettings(),pose,time);
+  }
   const w=488,h=644;
   const x=360-w/2,y=249+4*Math.sin(time*2.3);
   ctx.save();ctx.translate(360,644);
