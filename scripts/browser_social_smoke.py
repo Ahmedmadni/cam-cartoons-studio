@@ -95,7 +95,7 @@ def main():
             page.get_by_role("button", name="الصوت", exact=True).click()
             expect(page.get_by_text("تعليق صوتي محفوظ")).to_be_visible(timeout=15000)
             # Real per-scene audio export: no external service, no fallback to global narration.
-            page.get_by_role("button", name="صوت مستقل لكل مشهد").click()
+            page.get_by_role("radio", name="صوت مستقل لكل مشهد").click()
             page.locator('input[type="file"][accept^="audio/"]').set_input_files(str(fixture))
             expect(page.get_by_text("التعليق الصوتي للمشهد 1", exact=False)).to_be_visible(timeout=12000)
             page.get_by_label("تأخير بداية الصوت").select_option("250")
