@@ -99,7 +99,7 @@ export function parseSocialProject(value: unknown): SocialProject {
     }
     return {
       id,
-      caption: safeText(v.caption, 400),
+      caption: safeText(v.caption, 140),
       headline: safeText(v.headline, 80),
       character: ids.has(v.character as CartoonId) ? v.character as CartoonId : "sami",
       theme: themeIds.has(v.theme as SceneTheme) ? v.theme as SceneTheme : "sky",
