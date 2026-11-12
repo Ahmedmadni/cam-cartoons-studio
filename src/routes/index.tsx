@@ -553,6 +553,32 @@ function SocialCreator() {
                     </div>
                   ))}
                 </div>
+                <details className="mt-4 rounded-2xl border border-cyan-200 bg-white p-3">
+                  <summary className="cursor-pointer text-sm font-black text-cyan-900">طبقات المفاصل — الرأس والجذع والذراعان</summary>
+                  <p className="mt-2 text-xs leading-6 text-slate-600">
+                    يجب تجهيز كل عضو كملف PNG أو WebP شفاف بأبعاد متطابقة مع الرسم الأساسي. بعد رفع ثماني طبقات، يصبح الرأس والذراعان والمفاصل قابلين للتحريك المستقل في الفيديو.
+                  </p>
+                  <div className="mt-3 space-y-2">
+                    {RIG_REQUIRED_LAYERS.map(layer=><div key={layer} className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-slate-50 p-2">
+                      <strong className="text-xs">{ART_LAYER_LABELS[layer]}</strong>
+                      <label className={secondary+" cursor-pointer !px-3 !py-2 !text-xs"}>
+                        رفع طبقة
+                        <input type="file" accept="image/png,image/webp" disabled={artUploading} className="sr-only"
+                          aria-label={"رفع "+ART_LAYER_LABELS[layer]}
+                          onChange={e=>{void uploadArtwork(e.target.files?.[0],layer);e.currentTarget.value="";}} />
+                      </label>
+                    </div>)}
+                  </div>
+                  <div className="mt-3 grid grid-cols-2 gap-2">
+                    {(["eyesOpen","eyesHalf","browsNeutral","browsRaised"] as CharacterArtLayer[]).map(layer=><label key={layer}
+                      className="cursor-pointer rounded-lg border border-cyan-200 bg-white p-2 text-xs font-bold text-cyan-900">
+                      {ART_LAYER_LABELS[layer]}
+                      <input type="file" accept="image/png,image/webp" disabled={artUploading} className="sr-only"
+                        aria-label={"رفع "+ART_LAYER_LABELS[layer]} onChange={e=>{void uploadArtwork(e.target.files?.[0],layer);e.currentTarget.value="";}}/>
+                    </label>)}
+                  </div>
+                  <button type="button" onClick={()=>setPanel("rig")} className={primary+" mt-4 w-full"}>فتح محرر المفاصل</button>
+                </details>
                 <p className="mt-3 text-xs leading-6 text-cyan-900">
                   طبقات الفم والعينين اختيارية، ويجب أن تكون صور PNG أو WebP شفافة بأبعاد مطابقة للرسم الأساسي.
                   الرسم المفرد لا يملك مزامنة شفاه أو حركة يد حقيقية. لا تُستبدل التسجيلات الصوتية عند تغيير الرسم.
