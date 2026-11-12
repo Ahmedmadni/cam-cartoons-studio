@@ -143,9 +143,43 @@ def main():
             page.get_by_label("رفع طبقة الفم المفتوح").set_input_files(str(mouth))
             expect(page.get_by_text("الشفاه قابلة للتحريك", exact=False)).to_be_visible(timeout=12000)
             page.screenshot(path=str(out / "custom-layered-illustration.png"), full_page=False)
+            # Load a genuine 8-layer transparent art fixture. This activates the
+            # skeletal compositor and ensures all joints can be transformed.
+            page.get_by_text("طبقات المفاصل — الرأس والجذع والذراعان").click()
+            for arabic in [
+                "الجذع والملابس (شفاف)", "الرأس والشعر (شفاف)",
+                "العضد الأيسر", "الساعد الأيسر", "اليد اليسرى",
+                "العضد الأيمن", "الساعد الأيمن", "اليد اليمنى",
+            ]:
+                page.get_by_label("رفع " + arabic).set_input_files(str(mouth))
+                expect(page.get_by_text("تم حفظ طبقة التعبير",exact=False)).to_be_visible(timeout=12000)
+            expect(page.get_by_text("المفاصل جاهزة للتحريك",exact=False)).to_be_visible()
+            page.get_by_role("button",name="فتح محرر المفاصل").click()
+            expect(page.get_by_text("محرر العظام والمفاصل 2D")).to_be_visible()
+            expect(page.get_by_role("slider",name="الكتف الأيمن")).to_be_visible()
+            page.get_by_role("button",name="أول المشهد").click()
+            page.get_by_role("button",name="وضع طبيعي").click()
+            page.get_by_role("button",name="آخر المشهد").click()
+            page.get_by_role("button",name="ترحيب باليد").click()
+            expect(page.get_by_text("عدد إطارات الحركة المحفوظة: 2",exact=False)).to_be_visible()
+            page.screenshot(path=str(out / "articulated-joint-editor.png"), full_page=False)
+            # The per-scene animation survives JSON export, reload, and re-import.
+            page.get_by_role("button",name="التصدير",exact=True).click()
+            with page.expect_download() as rig_json:
+                page.get_by_role("button",name="نسخة JSON").click()
+            import json
+            rig_path=rig_json.value.path()
+            assert rig_path is not None
+            saved=json.loads(rig_path.read_text())
+            assert len(saved["scenes"][0]["rig"]["keyframes"])==2, "Expected 2 animation keyframes"
+            assert saved["scenes"][0]["rig"]["keyframes"][1]["pose"]["head"]==6
             page.reload(wait_until="networkidle")
             page.get_by_role("button", name="الشخصيات", exact=True).click()
             expect(page.get_by_text("الشفاه قابلة للتحريك", exact=False)).to_be_visible(timeout=16000)
+            expect(page.get_by_text("المفاصل جاهزة للتحريك",exact=False)).to_be_visible()
+            page.get_by_role("button",name="المفاصل",exact=True).click()
+            expect(page.get_by_text("عدد إطارات الحركة المحفوظة: 2",exact=False)).to_be_visible()
+            page.get_by_role("button",name="الشخصيات",exact=True).click()
             page.get_by_role("button", name="عمر مدرس بنظارة").click()
             page.get_by_label("تعبير الوجه").select_option("curious")
             page.get_by_role("button", name="التصدير", exact=True).click()

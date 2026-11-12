@@ -14,7 +14,7 @@ import {
 import { renderSocialFrame } from "@/lib/socialCanvas";
 import { renderCartoonCharacter } from "@/lib/socialCharacterRig";
 import {
-  ART_LAYER_LABELS, artStatus, hydrateCharacterArt, paintIllustratedCharacter, saveCharacterArt, restoreSamiReferenceArt,
+  ART_LAYER_LABELS, artStatus, getCharacterArt, hydrateCharacterArt, paintIllustratedCharacter, saveCharacterArt, restoreSamiReferenceArt,
   type CharacterArtLayer,
 } from "@/lib/socialCharacterArt";
 import {
@@ -23,6 +23,8 @@ import {
 } from "@/lib/socialVideo";
 import { sceneVoiceEnergyAt, voiceBarHeights } from "@/lib/socialAudioTimeline";
 import { selectWebmMime } from "@/lib/mediaCapabilities";
+import { CharacterRigEditor } from "@/components/characters/CharacterRigEditor";
+import { RIG_REQUIRED_LAYERS } from "@/lib/characterRigRenderer";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -36,7 +38,7 @@ export const Route = createFileRoute("/")({
   component: SocialCreator,
 });
 
-type Panel = "scenes" | "characters" | "audio" | "export";
+type Panel = "scenes" | "characters" | "rig" | "audio" | "export";
 const input = "w-full rounded-2xl border border-slate-200 bg-white px-3 py-3 text-sm text-slate-800 outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100";
 const primary = "inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-900 px-4 py-3 text-sm font-extrabold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50";
 const secondary = "inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-800 transition hover:bg-slate-50 disabled:opacity-50";
@@ -441,10 +443,10 @@ function SocialCreator() {
               </div>
               <label className="block text-xs font-extrabold text-slate-600" htmlFor="social-title">عنوان المشروع</label>
               <input id="social-title" className={input + " mt-2"} maxLength={100} value={project.title} onChange={e => patchProject({ title: e.target.value })} />
-              <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+              <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-5">
                 {([
                   ["scenes", "المشاهد", Film], ["characters", "الشخصيات", WandSparkles],
-                  ["audio", "الصوت", Mic], ["export", "التصدير", Download],
+                  ["rig", "المفاصل", Settings2], ["audio", "الصوت", Mic], ["export", "التصدير", Download],
                 ] as const).map(([key, label, Icon]) => (
                   <button type="button" key={key} onClick={() => setPanel(key)} aria-pressed={panel === key}
                     className={"flex flex-col items-center gap-2 rounded-2xl px-2 py-4 text-xs font-extrabold transition " + (panel === key ? "bg-cyan-500 text-white shadow-lg shadow-cyan-100" : "bg-slate-50 text-slate-600 hover:bg-cyan-50")}>
@@ -500,6 +502,8 @@ function SocialCreator() {
               </div>
             </>}
 
+            {panel === "rig" && <CharacterRigEditor character={selected.character} durationSeconds={selected.duration}
+              revision={artRevision} rig={selected.rig} onChange={value=>patchScene({rig:value})} />}
             {panel === "characters" && <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
               <h2 className="text-lg font-black">شخصيات كرتونية مرسومة 2D</h2>
               <p className="mt-2 text-sm leading-6 text-slate-500">الشخصيات أصلية مرسومة بأشكال قابلة للتحريك، لا تعتمد على صور أشخاص حقيقيين ولا على الكاميرا.</p>
@@ -533,6 +537,7 @@ function SocialCreator() {
                     ? "الشخصية لها رسم مصور"
                     : "لم يضاف رسم مصور لهذه الشخصية — يظهر الرسم الاحتياطي"}
                   {artStatus(selected.character).hasMouth ? " · الشفاه قابلة للتحريك" : " · الشفاه ثابتة حتى تضاف طبقات الفم"}
+                  {artStatus(selected.character).hasRig ? " · المفاصل جاهزة للتحريك" : " · المفاصل تحتاج طبقات مستقلة"}
                 </p>
                 <div className="mt-3 space-y-2">
                   {(["base","mouthClosed","mouthOpen","eyesClosed"] as CharacterArtLayer[]).map(layer=>(
@@ -548,6 +553,35 @@ function SocialCreator() {
                     </div>
                   ))}
                 </div>
+                <details className="mt-4 rounded-2xl border border-cyan-200 bg-white p-3">
+                  <summary className="cursor-pointer text-sm font-black text-cyan-900">طبقات المفاصل — الرأس والجذع والذراعان</summary>
+                  <p className="mt-2 text-xs leading-6 text-slate-600">
+                    يجب تجهيز كل عضو كملف PNG أو WebP شفاف بأبعاد متطابقة مع الرسم الأساسي. بعد رفع ثماني طبقات، يصبح الرأس والذراعان والمفاصل قابلين للتحريك المستقل في الفيديو.
+                  </p>
+                  <div className="mt-3 space-y-2">
+                    {RIG_REQUIRED_LAYERS.map(layer=><div key={layer} className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-slate-50 p-2">
+                      <strong className="text-xs">{ART_LAYER_LABELS[layer]} {getCharacterArt(selected.character)?.[layer]?"✓":""}</strong>
+                      {getCharacterArt(selected.character)?.[layer] && <button type="button" disabled={artUploading}
+                        className="rounded-lg border border-rose-200 px-2 py-1 text-xs text-rose-700"
+                        onClick={()=>void deleteArtwork(layer)}>حذف</button>}
+                      <label className={secondary+" cursor-pointer !px-3 !py-2 !text-xs"}>
+                        رفع طبقة
+                        <input type="file" accept="image/png,image/webp" disabled={artUploading} className="sr-only"
+                          aria-label={"رفع "+ART_LAYER_LABELS[layer]}
+                          onChange={e=>{void uploadArtwork(e.target.files?.[0],layer);e.currentTarget.value="";}} />
+                      </label>
+                    </div>)}
+                  </div>
+                  <div className="mt-3 grid grid-cols-2 gap-2">
+                    {(["eyesOpen","eyesHalf","browsNeutral","browsRaised"] as CharacterArtLayer[]).map(layer=><label key={layer}
+                      className="cursor-pointer rounded-lg border border-cyan-200 bg-white p-2 text-xs font-bold text-cyan-900">
+                      {ART_LAYER_LABELS[layer]}
+                      <input type="file" accept="image/png,image/webp" disabled={artUploading} className="sr-only"
+                        aria-label={"رفع "+ART_LAYER_LABELS[layer]} onChange={e=>{void uploadArtwork(e.target.files?.[0],layer);e.currentTarget.value="";}}/>
+                    </label>)}
+                  </div>
+                  <button type="button" onClick={()=>setPanel("rig")} className={primary+" mt-4 w-full"}>فتح محرر المفاصل</button>
+                </details>
                 <p className="mt-3 text-xs leading-6 text-cyan-900">
                   طبقات الفم والعينين اختيارية، ويجب أن تكون صور PNG أو WebP شفافة بأبعاد مطابقة للرسم الأساسي.
                   الرسم المفرد لا يملك مزامنة شفاه أو حركة يد حقيقية. لا تُستبدل التسجيلات الصوتية عند تغيير الرسم.

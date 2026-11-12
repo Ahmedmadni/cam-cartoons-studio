@@ -25,3 +25,13 @@
   Do not destroy or migrate user browser storage without a safe backup.
 - The routes /studio, /story, /save, /customize redirect to the new editor.
 - Before removing old 3D packages/assets, update tests and migration plan.
+
+## Character cut-out animation (Phase 4)
+- Rig types and pose interpolation: src/lib/characterRig.ts (bounded, JSON-safe).
+- Canvas transform renderer: src/lib/characterRigRenderer.ts. Head + 2× shoulder/elbow/wrist hierarchies.
+- The eight separate full-frame transparent PNG/WebP body-part images are mandatory for REAL articulation; a flattened portrait is not a skeletal rig.
+- Artwork stored locally under existing IndexedDB image keys, not included in scene JSON backups.
+- Scene RigSettings are optional so previous projects remain compatible; when present they MUST be honored in the shared preview/export compositor.
+- Display honest capability state: do not claim arms animate if only the base image exists.
+- QA in tests/characterRig.test.ts and scripts/browser_social_smoke.py (uploads 8 fixture layers, records two keyframes and checks audio export).
+- Format, pivots, design requirements: docs/CHARACTER_RIG_PACK.md.

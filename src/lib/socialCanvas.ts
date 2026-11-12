@@ -103,7 +103,7 @@ export function renderSocialFrame(
   const { scene, elapsed } = sceneAt(project, Math.max(0, seconds));
   drawBackground(ctx, scene.theme, seconds);
   const mouth = scene.motion === "idle" ? .06 : Math.min(1, voiceAmplitude * 2.7);
-  if (!paintIllustratedCharacter(ctx, scene.character, seconds, mouth, scene.motion, scene.expression)) {
+  if (!paintIllustratedCharacter(ctx, scene.character, seconds, mouth, scene.motion, scene.expression, scene.rig, elapsed*1000)) {
     renderCartoonCharacter(ctx, scene.character, seconds, mouth, scene.motion, scene.expression);
   }
   // A gentle transition that never obscures captions for the entire first frame.
