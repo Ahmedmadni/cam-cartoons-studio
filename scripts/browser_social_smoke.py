@@ -9,6 +9,7 @@ import time
 import urllib.error
 import urllib.request
 import wave
+import zlib
 from pathlib import Path
 
 from playwright.sync_api import expect, sync_playwright
@@ -41,6 +42,22 @@ def make_fixture(path):
             pcm.extend(struct.pack("<h", amplitude))
         output.writeframes(bytes(pcm))
 
+def make_rgba_png(path, width=64, height=96, transparent=False):
+    """A real PNG fixture with no dependency beyond Python stdlib."""
+    def chunk(kind, body):
+        return struct.pack(">I", len(body)) + kind + body + struct.pack(">I", zlib.crc32(kind + body))
+    rows = bytearray()
+    for y in range(height):
+        rows.append(0)
+        for x in range(width):
+            active = not transparent or (28 <= x <= 38 and 25 <= y <= 38)
+            rows.extend((244, 176, 111, 255 if active else 0))
+    data = (b"\x89PNG\r\n\x1a\n" +
+            chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 6, 0, 0, 0)) +
+            chunk(b"IDAT", zlib.compress(bytes(rows), level=9)) +
+            chunk(b"IEND", b""))
+    path.write_bytes(data)
+
 def main():
     out = Path("artifacts/social-review")
     out.mkdir(parents=True, exist_ok=True)
@@ -51,6 +68,10 @@ def main():
         with tempfile.TemporaryDirectory() as temp, sync_playwright() as playwright:
             fixture = Path(temp) / "narration.wav"
             make_fixture(fixture)
+            portrait = Path(temp) / "layered-portrait.png"
+            mouth = Path(temp) / "layered-mouth.png"
+            make_rgba_png(portrait)
+            make_rgba_png(mouth, transparent=True)
             browser = playwright.chromium.launch(headless=True, args=["--no-sandbox"])
             page = browser.new_page(viewport={"width": 1400, "height": 900}, accept_downloads=True)
             errors = []
@@ -112,6 +133,19 @@ def main():
                 page.get_by_role("button", name=label).click()
                 page.wait_for_timeout(170)
                 page.screenshot(path=str(out / ("portrait-" + slug + ".png")), full_page=False)
+            page.get_by_role("button", name="سامي مقدم شاب").click()
+            expect(page.get_by_text("الشخصية لها رسم مصور", exact=False)).to_be_visible(timeout=15000)
+            page.screenshot(path=str(out / "owner-reference-illustration.png"), full_page=False)
+            page.get_by_role("button", name="ليلى شخصية محجبة").click()
+            page.get_by_label("رفع الرسم الأساسي المتكامل").set_input_files(str(portrait))
+            expect(page.get_by_text("الشخصية لها رسم مصور", exact=False)).to_be_visible(timeout=12000)
+            page.get_by_label("رفع طبقة الفم المغلق").set_input_files(str(mouth))
+            page.get_by_label("رفع طبقة الفم المفتوح").set_input_files(str(mouth))
+            expect(page.get_by_text("الشفاه قابلة للتحريك", exact=False)).to_be_visible(timeout=12000)
+            page.screenshot(path=str(out / "custom-layered-illustration.png"), full_page=False)
+            page.reload(wait_until="networkidle")
+            page.get_by_role("button", name="الشخصيات", exact=True).click()
+            expect(page.get_by_text("الشفاه قابلة للتحريك", exact=False)).to_be_visible(timeout=16000)
             page.get_by_role("button", name="عمر مدرس بنظارة").click()
             page.get_by_label("تعبير الوجه").select_option("curious")
             page.get_by_role("button", name="التصدير", exact=True).click()
