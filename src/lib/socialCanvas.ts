@@ -173,12 +173,12 @@ function drawCopy(ctx: Ctx, project: SocialProject, headline: string, caption: s
   ctx.fillText(headline || project.title, W / 2, 137, 490);
   if (project.showCaptions && caption.trim()) {
     const captionBg = theme === "night" ? "rgba(5,12,29,.92)" : "rgba(23,38,58,.88)";
-    round(ctx, 42, 937, 636, 196, 32, captionBg);
-    ctx.font = "900 37px Cairo, sans-serif";
-    const lines = splitLines(ctx, caption, 565, 3);
+    round(ctx, 42, 900, 636, 246, 32, captionBg);
+    ctx.font = "900 34px Cairo, sans-serif";
+    const lines = splitLines(ctx, caption, 565, 4);
     ctx.fillStyle = project.captionColor === "yellow" ? "#ffdf6a" : "#ffffff";
-    const top = 1035 - (lines.length - 1) * 30;
-    lines.forEach((line, i) => ctx.fillText(line, W / 2, top + i * 59, 575));
+    const top = 1022 - (lines.length - 1) * 26;
+    lines.forEach((line, i) => ctx.fillText(line, W / 2, top + i * 52, 575));
   }
   if (project.watermark.trim()) {
     ctx.fillStyle = theme === "night" ? "#ffffff" : "#26374e";
