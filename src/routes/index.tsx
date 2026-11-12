@@ -481,7 +481,7 @@ function SocialCreator() {
             </div>
           </aside>
         </div>
-        <footer className="mt-8 text-center text-xs leading-7 text-slate-500">يعمل المحرر بدون حساب أو قاعدة بيانات سحابية. احتفظ بنسخة احتياطية من المشروع والصوت قبل تنظيف بيانات المتصفح.</footer>
+        <footer className="mt-8 text-center text-xs leading-7 text-slate-500">يعمل المحرر بدون حساب أو قاعدة بيانات سحابية. احتفظ بنسخة احتياطية من المشروع والصوت قبل تنظيف بيانات المتصفح. <a href="/projects" className="mr-2 font-bold text-cyan-700 underline">استرجاع مشاريع الإصدار القديم</a></footer>
       </div>
     </main>
   );
