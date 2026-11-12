@@ -354,7 +354,7 @@ function SocialCreator() {
                 <h3 className="mb-5 text-lg font-black">تحرير المشهد {active + 1}</h3>
                 <div className="space-y-4">
                   <label className="block text-sm font-bold">عنوان المشهد<input className={input + " mt-2"} maxLength={80} value={selected.headline} onChange={e => patchScene({ headline: e.target.value })} /></label>
-                  <label className="block text-sm font-bold">النص الظاهر على الفيديو<textarea className={input + " mt-2 min-h-30 resize-y"} maxLength={400} value={selected.caption} onChange={e => patchScene({ caption: e.target.value })} placeholder="جملة قصيرة وواضحة تناسب سرعة القراءة" /></label>
+                  <label className="block text-sm font-bold">النص الظاهر على الفيديو<textarea className={input + " mt-2 min-h-30 resize-y"} maxLength={140} value={selected.caption} onChange={e => patchScene({ caption: e.target.value })} placeholder="جملة قصيرة وواضحة تناسب سرعة القراءة" /></label>
                   <div className="grid grid-cols-2 gap-4">
                     <label className="block text-sm font-bold">مدة المشهد
                       <select className={input + " mt-2"} value={selected.duration} onChange={e => {
