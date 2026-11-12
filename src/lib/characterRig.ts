@@ -77,25 +77,25 @@ export function readRigPose(input:unknown):RigPose {
 export function readRigSettings(input:unknown, durationMs:number):RigSettings {
   const result=defaultRigSettings();
   if(!record(input))return result;
-  result.pose=readRigPose(input.pose);
-  result.mouthSource=input.mouthSource==="manual"?"manual":"audio";
-  if(record(input.pivots)){
+  result.pose=readRigPose(input["pose"]);
+  result.mouthSource=input["mouthSource"]==="manual"?"manual":"audio";
+  if(record(input["pivots"])){
     for(const id of PIVOT_IDS){
-      const p=input.pivots[id];
+      const p=input["pivots"][id];
       if(record(p))result.pivots[id]={
-        x:bounded(p.x,DEFAULT_PIVOTS[id].x,0,1),
-        y:bounded(p.y,DEFAULT_PIVOTS[id].y,0,1),
+        x:bounded(p["x"],DEFAULT_PIVOTS[id].x,0,1),
+        y:bounded(p["y"],DEFAULT_PIVOTS[id].y,0,1),
       };
     }
   }
-  if(Array.isArray(input.keyframes)){
+  if(Array.isArray(input["keyframes"])){
     const max=Math.max(0,Math.floor(durationMs));
     const seen=new Set<number>();
-    for(const item of input.keyframes.slice(0,20)){
-      if(!record(item)||typeof item.atMs!=="number"||!Number.isInteger(item.atMs)||
-        item.atMs<0||item.atMs>max||seen.has(item.atMs))continue;
-      seen.add(item.atMs);
-      result.keyframes.push({atMs:item.atMs,pose:readRigPose(item.pose)});
+    for(const item of input["keyframes"].slice(0,20)){
+      if(!record(item)||typeof item["atMs"]!=="number"||!Number.isInteger(item["atMs"])||
+        item["atMs"]<0||item["atMs"]>max||seen.has(item["atMs"]))continue;
+      seen.add(item["atMs"]);
+      result.keyframes.push({atMs:item["atMs"],pose:readRigPose(item["pose"])});
     }
     result.keyframes.sort((a,b)=>a.atMs-b.atMs);
   }
