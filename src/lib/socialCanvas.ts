@@ -1,5 +1,6 @@
 import { sceneAt, visibleCaptionAt, type SceneTheme, type SocialProject } from "./socialStudio";
 import { renderCartoonCharacter } from "./socialCharacterRig";
+import { paintIllustratedCharacter } from "./socialCharacterArt";
 
 /** Offline 2D vector renderer. Export and live preview use exactly the same pixels. */
 const W = 720;
@@ -102,7 +103,9 @@ export function renderSocialFrame(
   const { scene, elapsed } = sceneAt(project, Math.max(0, seconds));
   drawBackground(ctx, scene.theme, seconds);
   const mouth = scene.motion === "idle" ? .06 : Math.min(1, voiceAmplitude * 2.7);
-  renderCartoonCharacter(ctx, scene.character, seconds, mouth, scene.motion, scene.expression);
+  if (!paintIllustratedCharacter(ctx, scene.character, seconds, mouth, scene.motion, scene.expression)) {
+    renderCartoonCharacter(ctx, scene.character, seconds, mouth, scene.motion, scene.expression);
+  }
   // A gentle transition that never obscures captions for the entire first frame.
   if (scene.transition === "fade" && elapsed < .32) {
     ctx.fillStyle = "rgba(255,255,255," + (0.7 * (1 - elapsed / .32)) + ")";

@@ -14,6 +14,10 @@ import {
 import { renderSocialFrame } from "@/lib/socialCanvas";
 import { renderCartoonCharacter } from "@/lib/socialCharacterRig";
 import {
+  ART_LAYER_LABELS, artStatus, hydrateCharacterArt, paintIllustratedCharacter, saveCharacterArt, restoreSamiReferenceArt,
+  type CharacterArtLayer,
+} from "@/lib/socialCharacterArt";
+import {
   amplitudeAt, analyzeSocialAudio, exportSocialVideo, loadSocialAudio, saveSocialAudio,
   loadSceneVoices, saveSceneVoice,
 } from "@/lib/socialVideo";
@@ -54,7 +58,7 @@ function timelineStart(project: SocialProject, index: number) {
 }
 
 /** Actual miniature rig preview, rather than misleading stock emoji for each actor. */
-function CartoonThumbnail({character}:{character:CartoonId}) {
+function CartoonThumbnail({character,revision}:{character:CartoonId;revision:number}) {
   const ref=useRef<HTMLCanvasElement|null>(null);
   useEffect(()=>{
     const canvas=ref.current,ctx=canvas?.getContext("2d");
@@ -62,16 +66,19 @@ function CartoonThumbnail({character}:{character:CartoonId}) {
     const colors:Record<CartoonId,string>={sami:"#fff0cf",layla:"#f0defc",omar:"#ddf4e9",nour:"#d7e9fe"};
     ctx.fillStyle=colors[character];ctx.fillRect(0,0,160,160);
     ctx.save();
-    ctx.translate(80-360*.38,80-500*.38);
-    ctx.scale(.38,.38);
-    renderCartoonCharacter(ctx,character,.7,0,"idle","happy");
+    ctx.translate(80-360*.23,80-510*.23);
+    ctx.scale(.23,.23);
+    if(!paintIllustratedCharacter(ctx,character,.7,0,"idle","happy"))
+      renderCartoonCharacter(ctx,character,.7,0,"idle","happy");
     ctx.restore();
-  },[character]);
+  },[character,revision]);
   return <canvas ref={ref} width={160} height={160} role="img" aria-label={"رسم شخصية "+character} className="mx-auto mb-2 h-17 w-17 rounded-2xl border border-white/60 shadow-sm" />;
 }
 
 function SocialCreator() {
   const [project, setProject] = useState<SocialProject>(STARTER);
+  const [artRevision, setArtRevision] = useState(0);
+  const [artUploading, setArtUploading] = useState(false);
   const [hydrated, setHydrated] = useState(false);
   const [active, setActive] = useState(0);
   const [panel, setPanel] = useState<Panel>("scenes");
@@ -131,6 +138,8 @@ function SocialCreator() {
     }
     setHydrated(true);
     let live = true;
+    void hydrateCharacterArt().then(() => { if(live)setArtRevision(x=>x+1); })
+      .catch(() => { if(live)setMessage("تعذر استعادة بعض صور الشخصيات؛ ستظهر الرسومات الاحتياطية."); });
     void hydrateSceneClips(initial.scenes.map(s=>s.id)).catch(() => { if(live) setMessage("تعذر استعادة بعض ملفات صوت المشاهد."); });
     loadSocialAudio().then(async blob => {
       if (!blob || !live) return;
@@ -203,8 +212,33 @@ function SocialCreator() {
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [project, playing, active, envelope, duration, sceneAudio, sceneAnalyses]);
+  }, [project, playing, active, envelope, duration, sceneAudio, sceneAnalyses, artRevision]);
 
+  async function uploadArtwork(file: File|undefined, layer: CharacterArtLayer) {
+    if(!file || artUploading)return;
+    setArtUploading(true); setError("");
+    try {
+      await saveCharacterArt(selected.character,layer,file);
+      setArtRevision(x=>x+1); setVideo(null);
+      setPlaying(false); stopSceneVoice(); audioPlayer.current?.pause();
+      setNotice(layer==="base"
+        ? "تمت إضافة الشخصية المرسومة. سيستخدم التصدير الصورة نفسها، ويمكن رفع طبقات الفم والعينين لإضافة التحريك."
+        : "تم حفظ طبقة التعبير ودمجها مع الشخصية.");
+    } catch(e) { setError(e instanceof Error?e.message:"تعذر استيراد الرسم."); }
+    finally { setArtUploading(false); }
+  }
+  async function deleteArtwork(layer: CharacterArtLayer) {
+    setArtUploading(true); setError("");
+    try{
+      await saveCharacterArt(selected.character,layer,null);
+      if(layer==="base" && selected.character==="sami")await restoreSamiReferenceArt();
+      setArtRevision(x=>x+1); setVideo(null);
+      setNotice(layer==="base"
+        ? (selected.character==="sami"?"تمت استعادة الرسم المرجعي الأصلي لسامي.":"تمت العودة إلى الشخصية الاحتياطية.")
+        : "تم حذف الطبقة.");
+    } catch(e) {setError(e instanceof Error?e.message:"تعذر حذف الطبقة.");}
+    finally {setArtUploading(false);}
+  }
   function patchProject(change: Partial<SocialProject>) {
     setPlaying(false);
     audioPlayer.current?.pause(); stopSceneVoice();
@@ -473,7 +507,7 @@ function SocialCreator() {
                 {CARTOONS.map(character => (
                   <button type="button" key={character.id} aria-pressed={selected.character === character.id}
                     onClick={() => patchScene({ character: character.id as CartoonId })} className={"rounded-2xl border p-4 text-center transition " + (selected.character === character.id ? "border-cyan-500 bg-cyan-50" : "border-slate-200 bg-slate-50 hover:bg-slate-100")}>
-                    <CartoonThumbnail character={character.id} />
+                    <CartoonThumbnail character={character.id} revision={artRevision} />
                     <strong className="block text-sm">{character.name}</strong><span className="text-xs text-slate-500">{character.description}</span>
                   </button>
                 ))}
@@ -488,7 +522,40 @@ function SocialCreator() {
                   {EXPRESSIONS.map(x=><option key={x.id} value={x.id}>{x.name}</option>)}
                 </select>
               </label>
-              <p className="mt-3 text-xs leading-6 text-slate-500">رسم كرتوني بطبقات منفصلة للرأس والعينين والحاجبين والملابس وأوضاع متعددة للفم. الحركة تلقائية بحسب الشخصية والمشهد.</p>
+              <div className="mt-5 rounded-2xl border border-cyan-100 bg-cyan-50 p-4">
+                <h3 className="text-sm font-black text-cyan-950">أصول الشخصيات المرسومة — بدون أشكال هندسية</h3>
+                <p className="mt-2 text-xs leading-6 text-cyan-900">
+                  يمكنك رفع رسم متكامل شفاف للشخصية المحددة بدل الرسم البرمجي.
+                  ستظهر الصورة نفسها في المكتبة والمعاينة والفيديو، محفوظة محليًا دون تسجيل دخول.
+                </p>
+                <p className="mt-2 text-xs font-bold text-cyan-900">
+                  {artStatus(selected.character).hasBase
+                    ? "الشخصية لها رسم مصور"
+                    : "لم يضاف رسم مصور لهذه الشخصية — يظهر الرسم الاحتياطي"}
+                  {artStatus(selected.character).hasMouth ? " · الشفاه قابلة للتحريك" : " · الشفاه ثابتة حتى تضاف طبقات الفم"}
+                </p>
+                <div className="mt-3 space-y-2">
+                  {(["base","mouthClosed","mouthOpen","eyesClosed"] as CharacterArtLayer[]).map(layer=>(
+                    <div key={layer} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-cyan-100 bg-white p-2">
+                      <span className="text-xs font-extrabold text-slate-700">{ART_LAYER_LABELS[layer]}</span>
+                      <label className={secondary+" cursor-pointer !px-3 !py-2 !text-xs"}>
+                        {artUploading?"...":"رفع صورة"}
+                        <input type="file" accept={layer==="base"?"image/png,image/webp,image/jpeg": "image/png,image/webp"}
+                          aria-label={"رفع "+ART_LAYER_LABELS[layer]}
+                          className="sr-only" disabled={artUploading}
+                          onChange={e=>{void uploadArtwork(e.target.files?.[0],layer);e.currentTarget.value="";}} />
+                      </label>
+                    </div>
+                  ))}
+                </div>
+                <p className="mt-3 text-xs leading-6 text-cyan-900">
+                  طبقات الفم والعينين اختيارية، ويجب أن تكون صور PNG أو WebP شفافة بأبعاد مطابقة للرسم الأساسي.
+                  الرسم المفرد لا يملك مزامنة شفاه أو حركة يد حقيقية. لا تُستبدل التسجيلات الصوتية عند تغيير الرسم.
+                </p>
+                {artStatus(selected.character).hasBase && <button type="button" disabled={artUploading}
+                  className="mt-2 rounded-lg border border-rose-200 bg-white px-3 py-2 text-xs font-bold text-rose-700"
+                  onClick={()=>void deleteArtwork("base")}>{selected.character==="sami"?"استعادة الرسم المرجعي":"العودة إلى الرسم الاحتياطي"}</button>}
+              </div>
               <h3 className="mb-3 mt-6 text-sm font-black">الخلفية</h3>
               <div className="grid grid-cols-3 gap-2">
                 {THEMES.map(theme => <button type="button" key={theme.id} onClick={() => patchScene({ theme: theme.id as SceneTheme })} aria-pressed={selected.theme === theme.id}
