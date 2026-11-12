@@ -1,687 +1,481 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { BookOpen, Camera, Edit3, Heart, Plus, Search, Sparkles, Trash2, X } from "lucide-react";
-import CharacterStage from "@/components/characters/CharacterStage";
+import { createFileRoute } from "@tanstack/react-router";
+import { useEffect, useRef, useState } from "react";
 import {
-  CHARACTER_CATEGORIES, PROVIDER_LABELS, useCharacterLibrary,
-  type CharacterDefinition, type CharacterDraft, type CharacterCategory, type CharacterProvider,
-} from "@/lib/characterLibrary";
-import { useStudioStore, VOICES, ANIMATION_LABELS, type AnimationType, type VoiceType } from "@/lib/store";
-import { assessAnimationReadiness, type AvatarDiagnostics } from "@/lib/modelPresentation";
-import { cacheRemoteGlb, deleteGlbAsset, saveGlbAsset, MAX_GLB_BYTES } from "@/lib/localGlbStorage";
-import { probeRemoteGlb } from "@/lib/glbSourceProbe";
-import { FRAMING_LABELS, REVIEW_ANGLE_LABELS, type CameraFraming, type ReviewCameraAngle } from "@/lib/cameraComposition";
-import { LIGHTING_LABELS, type LightingStyle } from "@/lib/studioLighting";
-import { describeSurfaceLimitations } from "@/lib/avatarSurfaceQuality";
-import { isPinnedMpfbModel } from "@/lib/mpfbSurfaceFixes";
-import { isForestFoxSource } from "@/lib/authoredStoryMotion";
-import { REVIEW_BACKDROPS, REVIEW_STUDIO_GRADIENTS, type ReviewBackdropId } from "@/lib/reviewBackdrops";
-import { REVIEW_EXPRESSION_LABELS, type ReviewExpression } from "@/lib/facialPerformance";
-import { CURATED_CANDIDATES, findImportedCandidate, type CuratedCandidate } from "@/lib/curatedCharacters";
-import ArtReviewWorkbench from "@/components/characters/ArtReviewWorkbench";
-import { Link } from "@tanstack/react-router";
+  Captions, ChevronDown, ChevronUp, Clapperboard, Download, Film, FolderDown,
+  Image, Mic, Pause, Play, Plus, RotateCcw, Settings2, Sparkles, Square,
+  Trash2, Upload, Video, Volume2, WandSparkles,
+} from "lucide-react";
+import {
+  CARTOONS, MAX_AUDIO_BYTES, MAX_DURATION_SECONDS, MAX_SCENES, STARTER, THEMES,
+  parseSocialProject, projectSeconds, sceneAt, srtForProject,
+  type CartoonId, type SceneMotion, type SceneTheme, type SceneTransition,
+  type SocialProject, type SocialScene,
+} from "@/lib/socialStudio";
+import { renderSocialFrame } from "@/lib/socialCanvas";
+import {
+  amplitudeAt, analyzeSocialAudio, exportSocialVideo, loadSocialAudio, saveSocialAudio,
+} from "@/lib/socialVideo";
+import { selectWebmMime } from "@/lib/mediaCapabilities";
 
 export const Route = createFileRoute("/")({
-  head: () => ({ meta: [
-    { title: "مكتبة الشخصيات — Cam Cartoons Studio" },
-    { name: "description", content: "استوديو مفتوح لشخصيات Premium GLB وReady Player Me مع تخصيص كل شخصية." },
-    { property: "og:title", content: "مكتبة الشخصيات — Cam Cartoons Studio" },
-    { property: "og:description", content: "اختر شخصيتك ثلاثية الأبعاد لإنشاء القصص وتحريكها." },
-    { property: "og:type", content: "website" },
-    { name: "twitter:card", content: "summary_large_image" },
-  ] }),
-  component: LibraryPage,
+  head: () => ({
+    meta: [
+      { title: "Cartoon Content Studio | استوديو المحتوى الكرتوني" },
+      { name: "description", content: "صمّم مشاهد برسومات كرتونية متحركة، أضف التعليق الصوتي، وصدّر فيديوهات 9:16 للسوشيال ميديا." },
+      { property: "og:title", content: "استوديو المحتوى الكرتوني" },
+      { property: "og:type", content: "website" },
+    ],
+  }),
+  component: SocialCreator,
 });
 
-const emptyDraft: CharacterDraft = {
-  name: "", category: "other", provider: "imported-glb", modelUrl: "", thumbnail: "",
-  voicePreset: "normal", tags: [], basePreset: "man", scale: 1.02, yOffset: -1.62,
-  preferredFraming: "upper",
-};
-
-function Editor({ initial, onClose, onSave }: {
-  initial?: CharacterDefinition | undefined;
-  onClose: () => void;
-  onSave: (draft: CharacterDraft, file: File | null) => Promise<void>;
-}) {
-  const [draft, setDraft] = useState<CharacterDraft>(() => initial ? {
-    name: initial.name, category: initial.category, provider: initial.provider,
-    modelUrl: initial.modelUrl ?? "", assetId: initial.assetId, thumbnail: initial.thumbnail ?? "",
-    voicePreset: initial.voicePreset ?? "normal", tags: initial.tags,
-    basePreset: initial.basePreset ?? "man", scale: initial.scale ?? 1.02,
-    yOffset: initial.yOffset ?? -1.62,
-    preferredFraming: initial.preferredFraming ?? "upper",
-  } : { ...emptyDraft });
-  const [tags, setTags] = useState(initial?.tags.join("، ") ?? "");
-  const [file, setFile] = useState<File | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
-  const patch = (change: Partial<CharacterDraft>) => setDraft((current) => ({ ...current, ...change }));
-  const inputClass = "mt-1 block w-full rounded-xl border border-border bg-background px-3 py-2.5 font-semibold text-foreground outline-none focus:border-primary";
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={() => { if (!saving) onClose(); }}>
-      <section role="dialog" aria-modal="true" aria-labelledby="editor-title" dir="rtl"
-        className="max-h-full w-full max-w-xl overflow-y-auto rounded-3xl border border-border bg-card p-6 shadow-2xl"
-        onClick={(event) => event.stopPropagation()}>
-        <div className="flex items-center justify-between gap-3">
-          <h2 id="editor-title" className="text-2xl font-black text-foreground">{initial ? "تعديل الشخصية" : "إضافة شخصية GLB"}</h2>
-          <button type="button" disabled={saving} onClick={onClose} aria-label="إغلاق"><X className="size-6" /></button>
-        </div>
-        <form className="mt-4 space-y-3" onSubmit={(event) => {
-          event.preventDefault();
-          if (saving) return;
-          setSaving(true);
-          setError("");
-          void onSave({ ...draft, tags: tags.split(/[,،]/).map((tag) => tag.trim()).filter(Boolean) }, file)
-            .catch((caught: unknown) => setError(caught instanceof Error ? caught.message : "تعذّر الحفظ."))
-            .finally(() => setSaving(false));
-        }}>
-          <label htmlFor="character-editor-name" className="block text-sm font-bold">اسم الشخصية
-            <input id="character-editor-name" required maxLength={80} className={inputClass} value={draft.name} onChange={(e) => patch({ name: e.target.value })} />
-          </label>
-          <div className="grid grid-cols-2 gap-3">
-            <label className="text-sm font-bold">المصدر
-              <select className={inputClass} value={draft.provider} onChange={(e) => patch({ provider: e.target.value as CharacterProvider })}>
-                {(["imported-glb", "readyplayerme"] as const).map((value) => <option key={value} value={value}>{PROVIDER_LABELS[value]}</option>)}
-              </select>
-            </label>
-            <label className="text-sm font-bold">التصنيف
-              <select className={inputClass} value={draft.category} onChange={(e) => patch({ category: e.target.value as CharacterCategory })}>
-                {CHARACTER_CATEGORIES.map(({ value, label }) => <option key={value} value={value}>{label}</option>)}
-              </select>
-            </label>
-          </div>
-          {draft.provider !== "procedural" && <div className="space-y-3 rounded-2xl border border-primary/25 bg-primary/5 p-3">
-            <label className="block text-sm font-black text-foreground">
-              استيراد شخصية 3D من جهازك — GLB
-              <input type="file" accept=".glb,model/gltf-binary" className={inputClass}
-                onChange={(e) => {
-                  const chosen = e.target.files?.[0] ?? null;
-                  setFile(chosen);
-                  if (chosen) patch({ assetId: undefined, modelUrl: "" });
-                }} />
-            </label>
-            {file && <p className="text-xs font-bold text-primary">
-              {file.name} · {(file.size / 1024 / 1024).toFixed(1)} MB
-            </p>}
-            {!file && draft.assetId && <p className="text-xs font-bold text-primary">
-              النموذج محفوظ داخل هذا المتصفح. يمكنك استبداله بملف جديد.
-            </p>}
-            <p className="text-xs font-semibold text-muted-foreground">
-              يقبل ملف GLB 2.0 حتى {(MAX_GLB_BYTES / 1024 / 1024).toFixed(0)} ميجابايت ويخزّنه على هذا الجهاز دون رفعه لخادم.
-            </p>
-            <label className="block text-sm font-bold">أو رابط GLB مباشر (HTTPS أو مسار محلي)
-              <input dir="ltr" className={inputClass} value={draft.modelUrl ?? ""}
-                onChange={(e) => {
-                  setFile(null);
-                  patch({ modelUrl: e.target.value, assetId: undefined });
-                }}
-                placeholder="https://example.com/avatar.glb" />
-            </label>
-          </div>}
-          <label className="block text-sm font-bold">رابط صورة المعاينة (اختياري)
-            <input dir="ltr" className={inputClass} value={draft.thumbnail ?? ""} onChange={(e) => patch({ thumbnail: e.target.value })}
-              placeholder="https://example.com/avatar.webp" />
-          </label>
-          <div className="grid grid-cols-2 gap-3">
-            <label className="text-sm font-bold">الصوت
-              <select className={inputClass} value={draft.voicePreset ?? "normal"} onChange={(e) => patch({ voicePreset: e.target.value as VoiceType })}>
-                {VOICES.map((voice) => <option key={voice} value={voice}>{voice}</option>)}
-              </select>
-            </label>
-            <div className="rounded-xl border border-border bg-muted/50 p-3 text-xs font-semibold text-muted-foreground">
-              يُعرض ملف GLB الأصلي كما هو؛ لا توجد شخصيات هندسية احتياطية.
-            </div>
-          </div>
-          {draft.provider !== "procedural" && <label className="block text-sm font-bold">
-            لقطة المعاينة الافتراضية
-            <select className={inputClass} value={draft.preferredFraming ?? "upper"}
-              onChange={(e) => patch({ preferredFraming: e.target.value as CameraFraming })}>
-              {Object.entries(FRAMING_LABELS).map(([framing, label]) =>
-                <option key={framing} value={framing}>{label}</option>)}
-            </select>
-            <span className="mt-1 block text-xs text-muted-foreground">للصور وبطاقات المكتبة؛ لا يغيّر كاميرا القصص.</span>
-          </label>}
-          {draft.provider !== "procedural" && <div className="grid grid-cols-2 gap-3">
-            <label className="text-sm font-bold">المقياس
-              <input type="number" className={inputClass} min={0.1} max={4} step={0.01}
-                value={draft.scale ?? 1.02} onChange={(e) => patch({ scale: Number(e.target.value) })} />
-            </label>
-            <label className="text-sm font-bold">الإزاحة الرأسية
-              <input type="number" className={inputClass} min={-5} max={5} step={0.01}
-                value={draft.yOffset ?? -1.62} onChange={(e) => patch({ yOffset: Number(e.target.value) })} />
-            </label>
-          </div>}
-          <label className="block text-sm font-bold">وسوم (مفصولة بفاصلة)
-            <input className={inputClass} value={tags} onChange={(e) => setTags(e.target.value)} placeholder="سينمائي، قصص، أطفال" />
-          </label>
-          {error && <p role="alert" className="rounded-xl bg-destructive/10 p-3 text-sm font-bold text-destructive">{error}</p>}
-          <div className="flex justify-end gap-3 pt-2">
-            <button type="button" disabled={saving} onClick={onClose} className="rounded-full bg-muted px-5 py-3 font-bold">إلغاء</button>
-            <button type="submit" disabled={saving} className="rounded-full bg-primary px-6 py-3 font-black text-primary-foreground disabled:opacity-50">{saving ? "جارٍ حفظ ملف الشخصية..." : "حفظ الشخصية"}</button>
-          </div>
-        </form>
-      </section>
-    </div>
-  );
+type Panel = "scenes" | "characters" | "audio" | "export";
+const input = "w-full rounded-2xl border border-slate-200 bg-white px-3 py-3 text-sm text-slate-800 outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100";
+const primary = "inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-900 px-4 py-3 text-sm font-extrabold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50";
+const secondary = "inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-800 transition hover:bg-slate-50 disabled:opacity-50";
+function createId() {
+  return typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : "scene-" + Date.now() + "-" + Math.random();
+}
+function saveFile(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url; link.download = filename;
+  document.body.appendChild(link); link.click(); link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 10_000);
+}
+function formatSeconds(seconds: number) {
+  return String(Math.floor(seconds / 60)).padStart(2, "0") + ":" + String(Math.floor(seconds % 60)).padStart(2, "0");
+}
+function timelineStart(project: SocialProject, index: number) {
+  return project.scenes.slice(0, index).reduce((a, scene) => a + scene.duration, 0);
 }
 
-function LibraryPage() {
-  const navigate = useNavigate();
-  const characters = useCharacterLibrary((s) => s.characters);
-  const addCharacter = useCharacterLibrary((s) => s.addCharacter);
-  const updateCharacter = useCharacterLibrary((s) => s.updateCharacter);
-  const deleteCharacter = useCharacterLibrary((s) => s.deleteCharacter);
-  const toggleFavorite = useCharacterLibrary((s) => s.toggleFavorite);
-  const selectedCharacter = useStudioStore((s) => s.selectedCharacter);
-  const setSelectedCharacter = useStudioStore((s) => s.setSelectedCharacter);
-  const setSelectedVoice = useStudioStore((s) => s.setSelectedVoice);
-  const [filter, setFilter] = useState("all");
-  const [search, setSearch] = useState("");
-  const [editor, setEditor] = useState<CharacterDefinition | "new" | null>(null);
-  const [diagnostics, setDiagnostics] = useState<AvatarDiagnostics | null>(null);
-  const [captureError, setCaptureError] = useState<string | null>(null);
-  const [offlineSavingId, setOfflineSavingId] = useState<string | null>(null);
-  const [offlineError, setOfflineError] = useState<string | null>(null);
-  const [reviewAnimation, setReviewAnimation] = useState<AnimationType>("idle");
-  const [reviewSpin, setReviewSpin] = useState(false);
-  const [reviewFraming, setReviewFraming] = useState<CameraFraming>("upper");
-  const [reviewLighting, setReviewLighting] = useState<LightingStyle>("cinematic");
-  const [surfaceCleanup, setSurfaceCleanup] = useState(true);
-  const [reviewAngle, setReviewAngle] = useState<ReviewCameraAngle>("front");
-  const [reviewBackdrop, setReviewBackdrop] = useState<ReviewBackdropId>("studio");
-  const [previewSpeech, setPreviewSpeech] = useState(false);
-  const [reviewExpression, setReviewExpression] = useState<ReviewExpression>("neutral");
-  const [sourceProbe, setSourceProbe] = useState<{
-    characterId: string; phase: "checking" | "success" | "error"; message: string;
-  } | null>(null);
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  useEffect(() => {
-    setDiagnostics(null);
-    setCaptureError(null);
-    setOfflineError(null);
-    setReviewAnimation("idle");
-    setReviewSpin(false);
-    setReviewFraming(useCharacterLibrary.getState().characters
-      .find((character) => character.id === selectedCharacter)?.preferredFraming ?? "upper");
-    setReviewLighting("cinematic");
-    setSurfaceCleanup(true);
-    setReviewAngle("front");
-    setReviewBackdrop("studio");
-    setPreviewSpeech(false);
-    setReviewExpression("neutral");
-    setSourceProbe(null);
-    canvasRef.current = null;
-  }, [selectedCharacter]);
-  const selected = characters.find((item) => item.id === selectedCharacter);
-  const readiness = assessAnimationReadiness(diagnostics);
-  const filters = [
-    { value: "all", label: "الكل" }, { value: "imported-glb", label: "Premium GLB" },
-    { value: "readyplayerme", label: "Ready Player Me" }, { value: "favorites", label: "المفضلة" },
-    ...CHARACTER_CATEGORIES,
-  ];
-  const visible = useMemo(() => characters.filter((item) => {
-    const matchesFilter = filter === "all" || (filter === "favorites" ? item.isFavorite :
-      item.provider === filter || item.category === filter);
-    const q = search.trim().toLocaleLowerCase();
-    return matchesFilter && (!q || [item.name, ...item.tags, item.provider].some((s) => s.toLocaleLowerCase().includes(q)));
-  }).sort((a, b) => Number(Boolean(b.isFavorite)) - Number(Boolean(a.isFavorite)) ||
-    Number(b.provider === "imported-glb") - Number(a.provider === "imported-glb")), [characters, filter, search]);
+function SocialCreator() {
+  const [project, setProject] = useState<SocialProject>(STARTER);
+  const [hydrated, setHydrated] = useState(false);
+  const [active, setActive] = useState(0);
+  const [panel, setPanel] = useState<Panel>("scenes");
+  const [playing, setPlaying] = useState(false);
+  const [position, setPosition] = useState(0);
+  const [audio, setAudio] = useState<Blob | null>(null);
+  const [audioName, setAudioName] = useState("");
+  const [audioDuration, setAudioDuration] = useState(0);
+  const [envelope, setEnvelope] = useState<Float32Array | null>(null);
+  const [recordingMic, setRecordingMic] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [exportPercent, setExportPercent] = useState(0);
+  const [video, setVideo] = useState<Blob | null>(null);
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+  const previewCanvas = useRef<HTMLCanvasElement | null>(null);
+  const mic = useRef<MediaRecorder | null>(null);
+  const micStream = useRef<MediaStream | null>(null);
+  const audioPlayer = useRef<HTMLAudioElement | null>(null);
+  const exportAbort = useRef<AbortController | null>(null);
+  const projectRef = useRef(project);
+  projectRef.current = project;
+  const duration = projectSeconds(project);
+  const selected = project.scenes[Math.min(active, project.scenes.length - 1)]!;
+  const setNotice = (text: string) => { setMessage(text); setError(""); };
 
-  const captureThumbnail = (silent = false) => {
-    if (!selected) return;
+  useEffect(() => {
     try {
-      const source = canvasRef.current;
-      if (!source || !source.width || !source.height) throw new Error("المعاينة لم تجهز بعد.");
-      const output = document.createElement("canvas");
-      output.width = 480;
-      output.height = 360;
-      const ctx = output.getContext("2d");
-      if (!ctx) throw new Error("تعذر تجهيز صورة المعاينة.");
-      const gradient = ctx.createLinearGradient(0, 0, 480, 360);
-      gradient.addColorStop(0, REVIEW_STUDIO_GRADIENTS[reviewLighting].start);
-      gradient.addColorStop(1, REVIEW_STUDIO_GRADIENTS[reviewLighting].end);
-      ctx.fillStyle = gradient;
-      ctx.fillRect(0, 0, 480, 360);
-      const srcRatio = source.width / source.height;
-      const cropW = srcRatio > 4 / 3 ? source.height * 4 / 3 : source.width;
-      const cropH = srcRatio > 4 / 3 ? source.height : source.width * 3 / 4;
-      ctx.drawImage(source, (source.width - cropW) / 2, (source.height - cropH) / 2,
-        cropW, cropH, 0, 0, 480, 360);
-      const image = output.toDataURL("image/webp", 0.72);
-      if (!image.startsWith("data:image/webp;base64,") || image.length > 300000) {
-        throw new Error("صورة المعاينة كبيرة جدًا أو الصيغة غير مدعومة.");
+      const saved = localStorage.getItem("cam-social-project-v1");
+      if (saved) setProject(parseSocialProject(JSON.parse(saved) as unknown));
+    } catch {
+      setError("تعذر استعادة المشروع المحفوظ؛ لم يتم حذف بياناتك القديمة.");
+    }
+    setHydrated(true);
+    let live = true;
+    loadSocialAudio().then(async blob => {
+      if (!blob || !live) return;
+      const analysis = await analyzeSocialAudio(blob);
+      if (!live) return;
+      setAudio(blob); setEnvelope(analysis.envelope); setAudioDuration(analysis.duration);
+      setAudioName("تعليق صوتي محفوظ");
+    }).catch(() => { if (live) setMessage("لم يمكن استرجاع ملف الصوت السابق؛ أعد تحميله."); });
+    return () => { live = false; };
+  }, []);
+  useEffect(() => {
+    if (!hydrated) return;
+    try { localStorage.setItem("cam-social-project-v1", JSON.stringify(project)); }
+    catch { setError("لم ينجح الحفظ التلقائي. نزّل نسخة JSON من المشروع."); }
+  }, [project, hydrated]);
+  useEffect(() => {
+    if (!audio) { audioPlayer.current = null; return; }
+    const url = URL.createObjectURL(audio);
+    const element = new Audio(url);
+    element.preload = "auto";
+    audioPlayer.current = element;
+    return () => { element.pause(); URL.revokeObjectURL(url); if (audioPlayer.current === element) audioPlayer.current = null; };
+  }, [audio]);
+  useEffect(() => () => {
+    try { if (mic.current && mic.current.state !== "inactive") mic.current.stop(); } catch { /* noop */ }
+    micStream.current?.getTracks().forEach(track => track.stop());
+    exportAbort.current?.abort();
+  }, []);
+
+  useEffect(() => {
+    const canvas = previewCanvas.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d", { alpha: false });
+    if (!ctx) return;
+    let raf = 0;
+    let lastUi = 0;
+    const startClock = performance.now();
+    const initial = playing ? 0 : timelineStart(project, Math.min(active, project.scenes.length - 1)) + .6;
+    const tick = (now: number) => {
+      const t = playing ? Math.min(duration, (now - startClock) / 1000) : initial;
+      renderSocialFrame(ctx, project, t, amplitudeAt(envelope, t));
+      if (playing && now - lastUi > 120) { lastUi = now; setPosition(t); }
+      if (playing && t >= duration) {
+        audioPlayer.current?.pause();
+        setPlaying(false); setPosition(0);
+        return;
       }
-      const { id: _id, isFavorite: _favorite, isDefault: _default, ...draft } = selected;
-      updateCharacter(selected.id, { ...draft, thumbnail: image });
-      setCaptureError(null);
-    } catch (error) {
-      if (!silent) setCaptureError(error instanceof Error ? error.message : "تعذر التقاط صورة المعاينة.");
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [project, playing, active, envelope, duration]);
+
+  function patchProject(change: Partial<SocialProject>) {
+    setPlaying(false);
+    audioPlayer.current?.pause();
+    setVideo(null);
+    setProject(previous => ({ ...previous, ...change }));
+  }
+  function patchScene(change: Partial<SocialScene>) {
+    setPlaying(false);
+    audioPlayer.current?.pause();
+    setVideo(null);
+    setProject(previous => ({
+      ...previous,
+      scenes: previous.scenes.map((item, index) => index === active ? { ...item, ...change } : item),
+    }));
+  }
+  function addScene() {
+    if (project.scenes.length >= MAX_SCENES || duration + 5 > MAX_DURATION_SECONDS) {
+      setError("الحد الأقصى 20 مشهداً ودقيقتان لكل فيديو."); return;
     }
-  };
-
-  // Build a real model-specific portrait after the actual 3D GLB stage loads.
-  // A neutral film glyph is shown only until a genuine screenshot exists.
-  useEffect(() => {
-    if (!selected || selected.provider === "procedural" || selected.thumbnail || diagnostics?.status !== "ready") return;
-    const timer = window.setTimeout(() => captureThumbnail(true), 1400);
-    return () => window.clearTimeout(timer);
-    // The store update from capture adds thumbnail, which stops re-captures.
-  }, [selected?.id, selected?.thumbnail, selected?.provider, diagnostics?.status]);
-
-  const saveOffline = async (item: CharacterDefinition) => {
-    if (!item.modelUrl || item.assetId || offlineSavingId) return;
-    setOfflineError(null);
-    setOfflineSavingId(item.id);
-    let copiedAsset: string | null = null;
-    try {
-      copiedAsset = await cacheRemoteGlb(item.modelUrl);
-      const { id: _id, isDefault: _default, isFavorite: _favorite, ...draft } = item;
-      updateCharacter(item.id, { ...draft, assetId: copiedAsset });
-      copiedAsset = null;
-    } catch (error) {
-      if (copiedAsset) await deleteGlbAsset(copiedAsset).catch(() => {});
-      setOfflineError(error instanceof Error ? error.message : "تعذر حفظ النسخة المحلية.");
-    } finally {
-      setOfflineSavingId(null);
-    }
-  };
-
-  const checkSource = async (item: CharacterDefinition) => {
-    if (!item.modelUrl || item.assetId) return;
-    setSourceProbe({ characterId: item.id, phase: "checking", message: "جارٍ التحقق من المصدر وCORS..." });
-    try {
-      const result = await probeRemoteGlb(item.modelUrl);
-      setSourceProbe({
-        characterId: item.id, phase: "success",
-        message: "المصدر متاح من هذا المتصفح ويعيد GLB 2.0 (" +
-          (result.declaredBytes / 1024 / 1024).toFixed(2) + " ميجابايت).",
-      });
-    } catch (error) {
-      setSourceProbe({
-        characterId: item.id, phase: "error",
-        message: error instanceof Error ? error.message : "تعذر فحص رابط الشخصية.",
-      });
-    }
-  };
-
-  const choose = (item: CharacterDefinition) => {
-    setSelectedCharacter(item.id);
-    if (item.voicePreset) setSelectedVoice(item.voicePreset);
-  };
-
-  const chooseCandidate = (candidate: CuratedCandidate) => {
-    const existing = findImportedCandidate(useCharacterLibrary.getState().characters, candidate);
-    const id = existing?.id ?? addCharacter(candidate.draft);
-    const saved = useCharacterLibrary.getState().characters.find((item) => item.id === id);
-    if (saved) choose(saved);
-    // Always expose the newly selected card even if the prior filter hid it.
-    setFilter("all");
-    setSearch("");
-    window.requestAnimationFrame(() => {
-      document.getElementById("selected-character-preview")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    const next: SocialScene = {
+      id: createId(), headline: "عنوان المشهد", caption: "اكتب هنا الجملة التي ستظهر على الشاشة.",
+      character: selected.character, theme: selected.theme, motion: "talk", transition: "fade", duration: 5,
+    };
+    setProject(previous => ({ ...previous, scenes: [...previous.scenes, next] }));
+    setActive(project.scenes.length); setPlaying(false); setVideo(null); setNotice("تمت إضافة مشهد جديد.");
+  }
+  function moveScene(index: number, step: number) {
+    const to = index + step;
+    if (to < 0 || to >= project.scenes.length) return;
+    setProject(previous => {
+      const scenes = [...previous.scenes];
+      [scenes[index], scenes[to]] = [scenes[to]!, scenes[index]!];
+      return { ...previous, scenes };
     });
-  };
+    setActive(to); setPlaying(false); setVideo(null);
+  }
+  function removeScene(index: number) {
+    if (project.scenes.length === 1) { setError("يجب الاحتفاظ بمشهد واحد على الأقل."); return; }
+    setProject(previous => ({ ...previous, scenes: previous.scenes.filter((_, i) => i !== index) }));
+    setActive(Math.max(0, Math.min(index, project.scenes.length - 2)));
+    setPlaying(false); setVideo(null);
+  }
+  function togglePreview() {
+    if (playing) { audioPlayer.current?.pause(); setPlaying(false); setPosition(0); return; }
+    setError("");
+    const element = audioPlayer.current;
+    if (element) {
+      element.pause();
+      element.currentTime = 0;
+      void element.play().catch(() => { setError("تعذر تشغيل الصوت؛ يرجى التحقق من إعدادات المتصفح."); });
+    }
+    setPosition(0);
+    setPlaying(true);
+  }
+  async function useAudio(blob: Blob, name: string) {
+    setError("");
+    try {
+      if (blob.size > MAX_AUDIO_BYTES || !blob.size) throw new Error("الحد الأقصى للصوت 30 ميجابايت.");
+      const result = await analyzeSocialAudio(blob);
+      await saveSocialAudio(blob);
+      setPlaying(false);
+      setAudio(blob); setEnvelope(result.envelope); setAudioDuration(result.duration);
+      setAudioName(name); setVideo(null);
+      setNotice("تم تجهيز التعليق الصوتي وتخزينه محلياً في هذا المتصفح.");
+    } catch (caught) { setError(caught instanceof Error ? caught.message : "تعذر قراءة الملف الصوتي."); }
+  }
+  async function removeAudio() {
+    try {
+      await saveSocialAudio(null);
+      audioPlayer.current?.pause(); setPlaying(false); setAudio(null); setEnvelope(null);
+      setAudioDuration(0); setAudioName(""); setVideo(null);
+      setNotice("تم حذف التعليق الصوتي من هذا المتصفح.");
+    } catch { setError("تعذر حذف الملف الصوتي."); }
+  }
+  async function startMic() {
+    setError("");
+    try {
+      if (!navigator.mediaDevices?.getUserMedia) throw new Error("الميكروفون غير متاح. استخدم اتصال HTTPS أو ارفع ملف صوتي.");
+      const mimeType = selectWebmMime("audio");
+      if (!mimeType) throw new Error("المتصفح لا يدعم تسجيل الصوت. ارفع ملف MP3 أو WAV.");
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      micStream.current = stream;
+      const parts: Blob[] = [];
+      const recorder = new MediaRecorder(stream, { mimeType });
+      mic.current = recorder;
+      recorder.ondataavailable = event => { if (event.data.size) parts.push(event.data); };
+      recorder.onerror = () => setError("حدث خطأ أثناء تسجيل الميكروفون.");
+      recorder.onstop = () => {
+        stream.getTracks().forEach(track => track.stop());
+        micStream.current = null; mic.current = null; setRecordingMic(false);
+        if (parts.length) void useAudio(new Blob(parts, { type: mimeType }), "تسجيل الميكروفون");
+      };
+      recorder.start();
+      setRecordingMic(true);
+    } catch (caught) { setError(caught instanceof Error ? caught.message : "تعذر فتح الميكروفون."); }
+  }
+  function stopMic() {
+    if (mic.current?.state === "recording") mic.current.stop();
+  }
+  async function exportVideo() {
+    if (exporting) return;
+    setError(""); setMessage(""); setExporting(true); setExportPercent(0); setVideo(null);
+    const controller = new AbortController();
+    exportAbort.current = controller;
+    try {
+      setPlaying(false); audioPlayer.current?.pause();
+      const result = await exportSocialVideo({
+        project, narration: audio, signal: controller.signal, onProgress: value => setExportPercent(Math.round(value * 100)),
+      });
+      setVideo(result);
+      setNotice("تم إنتاج الفيديو. يمكنك تحميله ومراجعته قبل النشر.");
+    } catch (caught) { setError(caught instanceof Error ? caught.message : "فشل التصدير."); }
+    finally { setExporting(false); exportAbort.current = null; }
+  }
+  async function importProject(file?: File) {
+    if (!file) return;
+    if (file.size > 150_000) { setError("ملف JSON كبير جداً."); return; }
+    try {
+      const parsed = parseSocialProject(JSON.parse(await file.text()) as unknown);
+      setProject(parsed); setActive(0); setPlaying(false); setVideo(null);
+      setNotice("تم استيراد المشاهد. الصوت يُخزن بصورة منفصلة على الجهاز، فراجع التعليق الصوتي قبل التصدير.");
+    } catch (caught) { setError(caught instanceof Error ? caught.message : "تعذر استيراد الملف."); }
+  }
+  function resetProject() {
+    if (!window.confirm("إنشاء مشروع جديد؟ سيُستبدل المشروع الحالي. حمّل نسخة JSON أولاً إذا أردت الاحتفاظ به.")) return;
+    setProject(STARTER); setActive(0); setPlaying(false); setVideo(null); setNotice("تم فتح قالب جديد.");
+  }
+  const exportSupported = typeof window === "undefined" || Boolean(selectWebmMime("video"));
 
   return (
-    <main dir="rtl" className="min-h-screen bg-background px-4 py-8">
-      <div className="mx-auto max-w-7xl">
-        <div className="mb-4"><Link to="/projects" className="inline-flex rounded-xl bg-primary px-5 py-3 font-bold text-primary-foreground">🎬 إنشاء وإدارة قصص متعددة المشاهد</Link></div>
-        <header className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <span className="inline-flex items-center gap-2 rounded-full bg-accent px-4 py-1.5 text-sm font-black"><Sparkles className="size-4" /> Cam Cartoons Studio</span>
-            <h1 className="mt-3 text-3xl font-black sm:text-5xl">مكتبة الشخصيات المفتوحة</h1>
-            <p className="mt-2 max-w-xl font-semibold text-muted-foreground">شخصيات GLB احترافية متعددة ومفضلة ووسوم وتصنيفات، بعيدًا عن قيد الأربع شخصيات.</p>
-          </div>
-          <button type="button" onClick={() => setEditor("new")}
-            className="inline-flex items-center gap-2 rounded-full bg-primary px-6 py-4 font-black text-primary-foreground shadow-lg">
-            <Plus className="size-5" /> إضافة شخصية
-          </button>
-        </header>
-        <section className="mt-7 rounded-3xl border border-border bg-card p-4">
-          <div className="relative">
-            <Search className="pointer-events-none absolute right-4 top-3 size-5 text-muted-foreground" />
-            <input type="search" aria-label="البحث عن شخصية" value={search} onChange={(e) => setSearch(e.target.value)}
-              placeholder="ابحث بالاسم أو الوسوم..." className="w-full rounded-2xl border border-border bg-background py-3 pl-4 pr-12 outline-none focus:border-primary" />
-          </div>
-          <div className="mt-4 flex flex-wrap gap-2">
-            {filters.map(({ value, label }) => <button type="button" key={value} onClick={() => setFilter(value)}
-              aria-pressed={filter === value}
-              className={"rounded-full px-4 py-2 text-sm font-bold " + (filter === value ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground")}>
-              {label}
-            </button>)}
-          </div>
-          <p className="mt-3 text-sm font-semibold text-muted-foreground">{visible.length} من {characters.length} شخصية</p>
-        </section>
-        <section aria-labelledby="art-candidates-heading"
-          className="mt-6 rounded-3xl border border-border bg-card p-4 sm:p-6">
-          <div className="flex flex-wrap items-start justify-between gap-3">
+    <main dir="rtl" className="min-h-screen bg-[#f4f7fb] text-slate-900">
+      <div className="border-b border-slate-200 bg-white">
+        <header className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-4 py-5 sm:px-7">
+          <div className="flex items-center gap-3">
+            <div className="flex h-13 w-13 items-center justify-center rounded-2xl bg-cyan-500 text-white shadow-lg shadow-cyan-100"><Clapperboard className="size-7" /></div>
             <div>
-              <h2 id="art-candidates-heading" className="text-xl font-black">شخصيات أصلية وحيوانات للقصص</h2>
-              <p className="mt-1 max-w-3xl text-sm font-semibold text-muted-foreground">
-                نماذج بشرية GLB أصلية من VRoid وRocketbox وMakeHuman، ومعها شخصيات حيوانية متحركة بقصصها. كل ملف يُعرض بخاماته وهندسته الأصلية.
-                تُحمّل الملفات الكبيرة فقط عند فتح الشخصية. الحيوانات تؤدي حركاتها الأصلية؛ دعم الكلام والرمش لا يُعرض إلا إذا كان متوفرًا بالفعل.
-              </p>
+              <div className="text-xl font-black tracking-tight sm:text-2xl">Cartoon Content <span className="text-cyan-600">Studio</span></div>
+              <p className="text-xs font-semibold text-slate-500">صناعة فيديوهات كرتونية متحركة للسوشيال ميديا</p>
             </div>
-            <span className="rounded-full border border-border px-3 py-1 text-xs font-bold text-muted-foreground">
-              {CURATED_CANDIDATES.length} نماذج GLB أصلية
-            </span>
           </div>
-          <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            {CURATED_CANDIDATES.map((candidate) => {
-              const existing = findImportedCandidate(characters, candidate);
-              return <article key={candidate.id} className="flex flex-col justify-between gap-3 rounded-2xl border border-border bg-background p-4">
-                <div>
-                  <h3 className="text-lg font-black">{candidate.name}</h3>
-                  <p className="mt-1 text-xs font-semibold text-muted-foreground">
-                    {candidate.origin} · {(candidate.sizeBytes / 1024 / 1024).toFixed(1)} MB
-                  </p>
-                  <p className="mt-2 text-sm text-muted-foreground">{candidate.description}</p>
-                  {candidate.sizeBytes > 24 * 1024 * 1024 && <p className="mt-2 text-xs font-bold text-amber-700 dark:text-amber-300">
-                    ملف كبير (حوالي {(candidate.sizeBytes / 1024 / 1024).toFixed(0)} MB) يستهلك بيانات وذاكرة أكثر؛ أضفه فقط إذا أردت معاينته.
-                  </p>}
-                  <p className="mt-2 text-xs font-bold text-muted-foreground">
-                    {candidate.faceRig === "blendshapes" ? "مورفات وجه موثّقة من المصدر" :
-                      candidate.faceRig === "body-only" ? "هيكل بشري — تعابير الوجه غير مضمونة" :
-                      "تُفحص عظام الوجه وتعابيره من ملف GLB الحقيقي بعد التحميل"}
-                  </p>
-                </div>
-                <button type="button" onClick={() => chooseCandidate(candidate)}
-                  className="inline-flex items-center justify-center gap-2 rounded-full border border-primary px-4 py-3 text-sm font-black text-foreground hover:bg-primary/10">
-                  <Camera className="size-4" /> {existing ? "افتح " + candidate.name + " في مكتبتي" : "أضف " + candidate.name + " للتقييم"}
-                </button>
-              </article>;
-            })}
+          <div className="flex items-center gap-2">
+            <span className="hidden rounded-full bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700 sm:inline-flex">مشروعك محفوظ على هذا الجهاز</span>
+            <button type="button" className={secondary} onClick={resetProject}><RotateCcw className="size-4" /> مشروع جديد</button>
           </div>
-        </section>
-        <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {visible.map((item) => <article key={item.id} className={"overflow-hidden rounded-3xl border-2 bg-card shadow-sm " +
-            (selectedCharacter === item.id ? "border-primary ring-2 ring-primary/20" : "border-border")}>
-            <button type="button" onClick={() => choose(item)} aria-pressed={selectedCharacter === item.id} className="w-full text-right">
-              <div className="relative flex aspect-[4/3] items-center justify-center overflow-hidden bg-gradient-to-br from-muted to-secondary/20">
-                {item.thumbnail ? <img src={item.thumbnail} alt={"معاينة " + item.name} loading="lazy" className="h-full w-full object-cover" />
-                  : <span className="text-7xl" aria-hidden>🎬</span>}
-                <span className="absolute right-3 top-3 rounded-full bg-background/90 px-2 py-1 text-xs font-black">{PROVIDER_LABELS[item.provider]}</span>
-              </div>
-              <div className="px-4 pt-3">
-                <h2 className="truncate text-xl font-black">{item.name}</h2>
-                <p className="mt-1 text-xs font-semibold text-muted-foreground">
-                  {CHARACTER_CATEGORIES.find((c) => c.value === item.category)?.label ?? "أخرى"} · {item.voicePreset ?? "normal"}
-                </p>
-                <p className="mt-2 min-h-5 truncate text-xs text-muted-foreground">{item.tags.join(" · ") || "بدون وسوم"}</p>
-              </div>
-            </button>
-            <div className="flex items-center justify-between px-3 pb-3 pt-2">
-              <button type="button" onClick={() => toggleFavorite(item.id)} aria-pressed={Boolean(item.isFavorite)}
-                aria-label={item.isFavorite ? "إزالة من المفضلة" : "إضافة للمفضلة"} className="rounded-full p-2 hover:bg-muted">
-                <Heart className={"size-5 " + (item.isFavorite ? "fill-red-500 text-red-500" : "")} />
-              </button>
-              <div className="flex gap-1">
-                <button type="button" aria-label={"تعديل " + item.name} onClick={() => setEditor(item)} className="rounded-full p-2 hover:bg-muted"><Edit3 className="size-5" /></button>
-                <button type="button" aria-label={"حذف " + item.name} onClick={() => {
-                  if (!window.confirm("حذف الشخصية " + item.name + " من المكتبة؟")) return;
-                  deleteCharacter(item.id);
-                  if (item.assetId) void deleteGlbAsset(item.assetId).catch(() => {
-                    setCaptureError("تم حذف الشخصية، لكن تعذر حذف ملفها المحلي من مساحة الجهاز.");
-                  });
-                  if (selectedCharacter === item.id) setSelectedCharacter("");
-                }} className="rounded-full p-2 text-destructive hover:bg-destructive/10"><Trash2 className="size-5" /></button>
-              </div>
+        </header>
+      </div>
+
+      <div className="mx-auto max-w-7xl px-4 pb-16 pt-7 sm:px-7">
+        <div className="mb-6 rounded-3xl bg-gradient-to-l from-[#14223e] to-[#25395b] p-5 text-white sm:p-7">
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <div className="max-w-2xl">
+              <span className="mb-2 inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-bold text-cyan-200"><Sparkles className="size-4" /> استوديو 2D</span>
+              <h1 className="text-2xl font-black leading-relaxed sm:text-3xl">من الفكرة إلى فيديو بشخصية كرتونية</h1>
+              <p className="mt-2 text-sm leading-7 text-slate-200">اكتب مشاهدك، اختر الشخصية والخلفية، أضف صوتك أو ملف التعليق، ثم صدّر فيديو رأسيًا جاهزًا للمونتاج أو النشر.</p>
             </div>
-          </article>)}
+            <div className="flex items-center gap-2 rounded-2xl bg-white/10 px-4 py-3 text-sm font-extrabold"><Video className="size-5 text-cyan-300" /> 9:16 · 720×1280 · WebM</div>
+          </div>
         </div>
-        {visible.length === 0 && <p className="mt-8 rounded-3xl border border-dashed border-border p-8 text-center font-bold">
-          لا توجد شخصيات مطابقة. استخدم «إضافة شخصية» أو غيّر البحث والتصفية.
-        </p>}
-        {selected && <section id="selected-character-preview" className="mt-8 grid gap-5 rounded-3xl border-2 border-primary/40 bg-card p-5 md:grid-cols-2">
-          <div className="h-[420px] overflow-hidden rounded-2xl md:h-[540px]"
-            style={{ background: REVIEW_STUDIO_GRADIENTS[reviewLighting].css }}>
-            <CharacterStage type={selected.id} animation={reviewAnimation} spin={reviewSpin} previewSpeech={previewSpeech}
-               framing={reviewFraming} lighting={reviewLighting} reviewAngle={reviewAngle} reviewMode reviewExpression={reviewExpression} surfaceCleanup={surfaceCleanup}
-               backgroundUrl={REVIEW_BACKDROPS.find((item) => item.id === reviewBackdrop)?.url ?? ""}
-              onCanvasReady={(canvas) => { canvasRef.current = canvas; }}
-              onDiagnostics={setDiagnostics} />
-          </div>
-          <div className="flex flex-col justify-center gap-3">
-            <h2 className="text-3xl font-black">{selected.name}</h2>
-            <div className="rounded-2xl border border-border bg-muted/40 p-3">
-              <p className="text-sm font-black">اختبار الشخصية قبل استخدامها</p>
-              <p className="mt-1 text-xs text-muted-foreground">قارن ملامح الوجه والشعر والملابس من الأمام والجانب بإضاءة ثابتة؛ فنجاح العظام لا يعني الجودة الفنية.</p>
-              <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label="إطار التصوير">
-                {(Object.entries(FRAMING_LABELS) as [CameraFraming, string][]).map(([framing, label]) =>
-                  <button key={framing} type="button" aria-pressed={reviewFraming === framing}
-                    onClick={() => setReviewFraming(framing)}
-                    className={"rounded-full px-3 py-2 text-xs font-bold " + (reviewFraming === framing
-                      ? "bg-primary text-primary-foreground" : "bg-card text-foreground")}>
-                    {label}
-                  </button>)}
+
+        {(message || error) && <div role={error ? "alert" : "status"} className={"mb-5 rounded-2xl border p-4 text-sm font-bold " + (error ? "border-rose-200 bg-rose-50 text-rose-700" : "border-teal-200 bg-teal-50 text-teal-900")}>{error || message}</div>}
+
+        <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(315px,430px)]">
+          <section className="min-w-0 space-y-5">
+            <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+                <h2 className="flex items-center gap-2 text-lg font-black"><Film className="size-5 text-cyan-600" /> إعداد الفيديو</h2>
+                <span className="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-600">{project.scenes.length} مشاهد · {formatSeconds(duration)}</span>
               </div>
-              <div className="mt-2 flex flex-wrap gap-2" role="group" aria-label="إضاءة المعاينة">
-                {(Object.entries(LIGHTING_LABELS) as [LightingStyle, string][]).map(([lighting, label]) =>
-                  <button key={lighting} type="button" aria-pressed={reviewLighting === lighting}
-                    onClick={() => setReviewLighting(lighting)}
-                    className={"rounded-full px-3 py-2 text-xs font-bold " + (reviewLighting === lighting
-                      ? "bg-primary text-primary-foreground" : "bg-card text-foreground")}>
-                    {label}
-                  </button>)}
-              </div>
-              <p className="mt-3 text-xs font-black">زاوية مشاهدة ثابتة</p>
-              <div className="mt-2 flex flex-wrap gap-2" role="group" aria-label="زاوية المعاينة">
-                {(Object.entries(REVIEW_ANGLE_LABELS) as [ReviewCameraAngle, string][]).map(([angle, label]) =>
-                  <button key={angle} type="button" aria-pressed={reviewAngle === angle}
-                    onClick={() => { setReviewSpin(false); setReviewAngle(angle); }}
-                    className={"rounded-full px-3 py-2 text-xs font-bold " + (reviewAngle === angle
-                      ? "bg-primary text-primary-foreground" : "bg-card text-foreground")}>
-                    {label}
-                  </button>)}
-              </div>
-              <label className="mt-2 block text-xs font-black" htmlFor="review-backdrop">خلفية المشهد</label>
-              <select id="review-backdrop" value={reviewBackdrop}
-                onChange={(event) => setReviewBackdrop(event.target.value as ReviewBackdropId)}
-                className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm font-semibold">
-                {REVIEW_BACKDROPS.map((backdrop) => <option key={backdrop.id} value={backdrop.id}>{backdrop.label}</option>)}
-              </select>
-              {isPinnedMpfbModel(selected.modelUrl) && <div className="mt-3 rounded-xl border border-border bg-background p-3">
-                <p className="text-sm font-black">معالجة تداخل طبقات الوجه والشعر</p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  تحسين موجّه لنماذج MakeHuman الأصلية: إخفاء طبقة متداخلة عند وجود البديل عالي التفاصيل،
-                  وضبط تراكب خامات الوجه وشفافية الرموش والشعر دون تغيير ألوان أو صور الخامات.
-                </p>
-                <button type="button" aria-pressed={surfaceCleanup}
-                  onClick={() => setSurfaceCleanup((value) => !value)}
-                  className={"mt-2 rounded-full border px-4 py-2 text-xs font-bold " +
-                    (surfaceCleanup ? "border-primary bg-primary text-primary-foreground" : "border-border bg-muted text-foreground")}>
-                  {surfaceCleanup ? "التحسين مفعّل — اعرض الأصل للمقارنة" : "عرض الأصل — فعّل التحسين"}
-                </button>
-                {diagnostics?.status === "ready" && <p className="mt-2 text-xs text-muted-foreground">
-                  طبقات الوجه المخفية: {diagnostics.mpfbSurfaceFixes?.hiddenLowPolyOverlays ?? 0} ·
-                  خامات الوجه المعدلة: {diagnostics.mpfbSurfaceFixes?.correctedFaceMaterials ?? 0} ·
-                  حواف الشعر والرموش المحسّنة: {diagnostics.mpfbSurfaceFixes?.correctedHairMaterials ?? 0}
-                </p>}
-              </div>}
-              <p className="mt-2 text-xs text-muted-foreground">يمكن التقاط صورة من النموذج الحقيقي بهذه الزاوية والخلفية. الصور المحلية لا تغير هندسة الشخصية أو خاماتها.</p>
-              <p className="mt-3 text-xs font-black">تعابير الوجه (عند دعم النموذج)</p>
-              <div className="mt-2 flex flex-wrap gap-2" role="group" aria-label="تعابير الوجه">
-                {(Object.entries(REVIEW_EXPRESSION_LABELS) as [ReviewExpression, string][]).map(([expression, label]) => {
-                  const supported = expression === "neutral" || (diagnostics?.status === "ready" && (
-                    expression === "smile" ? diagnostics.hasSmile :
-                      expression === "surprise" ? (diagnostics.hasBrowUp || diagnostics.hasLipSync || diagnostics.hasJawBone) :
-                        diagnostics.hasHeadRig
-                  ));
-                  return <button key={expression} type="button" disabled={!supported}
-                    aria-pressed={reviewExpression === expression}
-                    onClick={() => { setReviewExpression(expression); setReviewAnimation("idle"); setPreviewSpeech(false); setReviewSpin(false); }}
-                    className={"rounded-full px-3 py-2 text-xs font-bold disabled:cursor-not-allowed disabled:opacity-40 " + (reviewExpression === expression
-                      ? "bg-primary text-primary-foreground" : "bg-card text-foreground")}>
-                    {label}
-                  </button>;
-                })}
-              </div>
-              <p className="mt-1 text-xs text-muted-foreground">هذه تجربة تعابير من Morph Targets وعظام النموذج الحقيقي وليست مزامنة شفاه مع صوت عربي.</p>
-              <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label="حركات فحص الشخصية">
-                {(isForestFoxSource(selected.modelUrl ?? "")
-                  ? ([
-                      ["idle", "استكشاف"], ["wave", "مشي"], ["dance", "جري"],
-                    ] as [AnimationType, string][])
-                  : (["idle", "wave", "happy", "nod", "dance"] as AnimationType[])
-                      .map((value): [AnimationType, string] => [value, ANIMATION_LABELS[value]])
-                ).map(([animation, label]) =>
-                  <button key={animation} type="button" aria-pressed={reviewAnimation === animation}
-                    onClick={() => setReviewAnimation(animation)}
-                    className={"rounded-full px-3 py-2 text-xs font-bold " + (reviewAnimation === animation
-                      ? "bg-primary text-primary-foreground" : "bg-card text-foreground")}>
-                    {label}
-                  </button>)}
-                <button type="button" aria-pressed={previewSpeech}
-                  disabled={diagnostics?.status !== "ready" || (!diagnostics.hasLipSync && !diagnostics.hasJawBone)}
-                  onClick={() => { setReviewExpression("neutral"); setPreviewSpeech(!previewSpeech); }}
-                  className={"rounded-full border px-3 py-2 text-xs font-bold disabled:cursor-not-allowed disabled:opacity-50 " + (previewSpeech
-                    ? "border-primary bg-primary text-primary-foreground" : "border-border bg-card")}>
-                  {diagnostics?.hasLipSync ? (previewSpeech ? "إيقاف تجربة الفم" : "تجربة حركة الفم") :
-                    (previewSpeech ? "إيقاف تجربة الفك" : "تجربة حركة الفك")}
-                </button>
-                <button type="button" aria-pressed={reviewSpin} onClick={() => setReviewSpin(!reviewSpin)}
-                  className={"rounded-full border px-3 py-2 text-xs font-bold " + (reviewSpin
-                    ? "border-primary bg-primary text-primary-foreground" : "border-border bg-card")}>
-                  {reviewSpin ? "إيقاف الدوران" : "تدوير الشخصية"}
-                </button>
+              <label className="block text-xs font-extrabold text-slate-600" htmlFor="social-title">عنوان المشروع</label>
+              <input id="social-title" className={input + " mt-2"} maxLength={100} value={project.title} onChange={e => patchProject({ title: e.target.value })} />
+              <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                {([
+                  ["scenes", "المشاهد", Film], ["characters", "الشخصيات", WandSparkles],
+                  ["audio", "الصوت", Mic], ["export", "التصدير", Download],
+                ] as const).map(([key, label, Icon]) => (
+                  <button type="button" key={key} onClick={() => setPanel(key)} aria-pressed={panel === key}
+                    className={"flex flex-col items-center gap-2 rounded-2xl px-2 py-4 text-xs font-extrabold transition " + (panel === key ? "bg-cyan-500 text-white shadow-lg shadow-cyan-100" : "bg-slate-50 text-slate-600 hover:bg-cyan-50")}>
+                    <Icon className="size-5" /> {label}
+                  </button>
+                ))}
               </div>
             </div>
-            <p className="font-semibold text-muted-foreground">معاينة مباشرة داخل الاستوديو — {PROVIDER_LABELS[selected.provider]}</p>
-            {selected.provider !== "procedural" && <ArtReviewWorkbench
-              key={selected.id + ":" + (selected.assetId ?? selected.modelUrl ?? "")}
-              character={selected}
-              diagnostics={diagnostics}
-              getCanvas={() => canvasRef.current}
-              framing={reviewFraming}
-              lighting={reviewLighting}
-              angle={reviewAngle}
-              setFraming={setReviewFraming}
-              setLighting={setReviewLighting}
-              setAngle={setReviewAngle}
-              prepareNeutralReview={() => {
-                setReviewSpin(false);
-                setReviewAnimation("idle");
-                setPreviewSpeech(false);
-                setReviewExpression("neutral");
-                setReviewBackdrop("studio");
-              }}
-            />}
-            {selected.provider === "imported-glb" && (
-              <div className="rounded-2xl border border-border bg-muted/40 p-3 text-sm">
-                {selected.assetId ? (
-                  <p className="font-bold text-primary">هذا النموذج محفوظ فعليًا داخل متصفحك، ويمكن عرضه دون إعادة تنزيله من المصدر.</p>
-                ) : selected.modelUrl ? (
-                  <>
-                    <p className="font-semibold text-muted-foreground">هذا النموذج مستضاف خارجيًا؛ يمكنك الاحتفاظ بنسخة محلية داخل التطبيق.</p>
-                    <button type="button" disabled={Boolean(offlineSavingId)}
-                      onClick={() => void saveOffline(selected)}
-                      className="mt-2 rounded-full bg-primary px-5 py-3 font-black text-primary-foreground disabled:opacity-50">
-                      {offlineSavingId === selected.id ? "جارٍ تنزيل وحفظ GLB..." : "حفظ الشخصية على هذا الجهاز"}
-                    </button>
-                    <button type="button"
-                      disabled={sourceProbe?.characterId === selected.id && sourceProbe.phase === "checking"}
-                      onClick={() => void checkSource(selected)}
-                      className="mt-2 mr-2 rounded-full border border-primary px-4 py-2 font-bold text-foreground disabled:opacity-50">
-                      فحص رابط GLB وCORS
-                    </button>
-                    {sourceProbe?.characterId === selected.id &&
-                      <p role="status" className={"mt-2 font-bold " + (sourceProbe.phase === "error"
-                        ? "text-destructive" : "text-primary")}>{sourceProbe.message}</p>}
-                  </>
-                ) : <p className="text-muted-foreground">لا يوجد ملف GLB لهذا النموذج.</p>}
-                {offlineError && <p role="alert" className="mt-2 font-bold text-destructive">{offlineError}</p>}
-              </div>
-            )}
-            <button type="button" onClick={() => captureThumbnail()}
-              disabled={selected.provider !== "procedural" && diagnostics?.status !== "ready"}
-              className="rounded-full border-2 border-primary px-6 py-3 font-bold text-foreground disabled:cursor-not-allowed disabled:opacity-40">
-              التقاط صورة معاينة من النموذج
-            </button>
-            {captureError && <p role="alert" className="text-sm font-bold text-destructive">{captureError}</p>}
-            {selected.provider !== "procedural" && <div className="rounded-2xl border border-border bg-background p-4 text-sm">
-              <h3 className="font-black">تقرير جاهزية نموذج GLB</h3>
-              {!diagnostics && <p className="mt-2 text-muted-foreground">جارٍ فحص النموذج وتحميله...</p>}
-              {diagnostics?.status === "error" && <p role="alert" className="mt-2 text-destructive">
-                تعذر تحميل النموذج: {diagnostics.message}. لن يتم عرض أي شخصية بديلة قديمة.
-              </p>}
-              {diagnostics?.status === "ready" && <div className="mt-2 space-y-1 font-semibold text-muted-foreground">
-                <p className="font-black text-foreground">حالة التوافق: {readiness.title}</p>
-                <p>المجسمات: {diagnostics.meshCount ?? 0} · الخامات: {diagnostics.materialCount ?? 0} · المجسمات المرتبطة بالعظام: {diagnostics.skinnedMeshCount ?? 0}</p>
-                <p>العظام: {diagnostics.boneCount ?? 0} · تعابير Morph: {diagnostics.morphCount ?? 0} · مقاطع الحركة المرفقة: {diagnostics.animationClipCount ?? 0}</p>
-                <div className="mt-3 rounded-xl border border-border bg-muted/30 p-3">
-                  <p className="font-black text-foreground">تحليل الأسطح والخامات الفعلية</p>
-                  <p className="mt-1">المثلثات (تقديريًا): {(diagnostics.triangleCount ?? 0).toLocaleString("ar")} · خرائط النسيج: {diagnostics.textureCount ?? 0}</p>
-                  <p>خامات PBR: {diagnostics.pbrMaterialCount ?? 0} · خامات ذات Normal Maps: {diagnostics.normalMappedMaterialCount ?? 0}</p>
-                  <p>خرائط معروفة الدقة: {diagnostics.knownResolutionCount ?? 0} · خرائط منخفضة الدقة: {diagnostics.lowResolutionCount ?? 0}</p>
-                  <p>خرائط تحسّن ترشيح عرضها: {diagnostics.enhancedTextureCount ?? 0}</p>
-                  <p className="mt-2 text-xs font-normal">يتم الحفاظ على خشونة المواد وألوانها الأصلية؛ دقة الخرائط وحدها لا تثبت جودة التصميم.</p>
-                  {describeSurfaceLimitations({
-                    triangleCount: diagnostics.triangleCount ?? 0,
-                    textureCount: diagnostics.textureCount ?? 0,
-                    knownResolutionCount: diagnostics.knownResolutionCount ?? 0,
-                    lowResolutionCount: diagnostics.lowResolutionCount ?? 0,
-                    pbrMaterialCount: diagnostics.pbrMaterialCount ?? 0,
-                    normalMappedMaterialCount: diagnostics.normalMappedMaterialCount ?? 0,
-                    enhancedTextureCount: diagnostics.enhancedTextureCount ?? 0,
-                  }).length > 0 && <ul className="mt-2 list-disc space-y-1 pr-5 text-xs">
-                    {describeSurfaceLimitations({
-                      triangleCount: diagnostics.triangleCount ?? 0,
-                      textureCount: diagnostics.textureCount ?? 0,
-                      knownResolutionCount: diagnostics.knownResolutionCount ?? 0,
-                      lowResolutionCount: diagnostics.lowResolutionCount ?? 0,
-                      pbrMaterialCount: diagnostics.pbrMaterialCount ?? 0,
-                      normalMappedMaterialCount: diagnostics.normalMappedMaterialCount ?? 0,
-                      enhancedTextureCount: diagnostics.enhancedTextureCount ?? 0,
-                    }).map((note) => <li key={note}>{note}</li>)}
-                  </ul>}
+
+            {panel === "scenes" && <>
+              <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+                <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                  <h2 className="text-lg font-black">تسلسل المشاهد</h2>
+                  <button type="button" className={secondary} onClick={addScene} disabled={project.scenes.length >= MAX_SCENES || duration + 5 > MAX_DURATION_SECONDS}><Plus className="size-4" /> مشهد جديد</button>
                 </div>
-                <p>تحريك الرأس: {diagnostics.hasHeadRig ? "متاح" : "غير مدعوم"} · الذراعان: {diagnostics.hasArmRig ? "متاحان" : "غير مدعومين"}</p>
-                <p>تحريك الفم: {diagnostics.hasLipSync ? "مدعوم" : "غير مدعوم"} · رمش العين: {diagnostics.hasBlink ? "مدعوم" : "غير مدعوم"}</p>
-                <p>عظمة الفك: {diagnostics.hasJawBone ? "متاحة" : "غير متاحة"} · توجيه العينين بالعظام: {diagnostics.hasEyeBones ? "متاح" : "غير متاح"}</p>
-                {diagnostics.hasJawBone && !diagnostics.hasLipSync && <p className="text-xs">تجربة الفك تحريك مفصل فعلي وليست مزامنة شفاه مع الأصوات.</p>}
-                {diagnostics.dimensions && <p>
-                  أبعاد الأصل: {diagnostics.dimensions.width.toFixed(2)} × {diagnostics.dimensions.height.toFixed(2)} × {diagnostics.dimensions.depth.toFixed(2)}
-                </p>}
-                {diagnostics.message && <p className="text-amber-700">{diagnostics.message}</p>}
-                {readiness.limitations.length > 0 && <div className="mt-3 rounded-xl border border-border p-3">
-                  <p className="font-bold text-foreground">ملاحظات التوافق مع الحركة:</p>
-                  <ul className="mt-2 list-disc space-y-1 pr-5">
-                    {readiness.limitations.map((message) => <li key={message}>{message}</li>)}
-                  </ul>
-                </div>}
-                <p className="text-xs font-normal">هذا فحص تقني للتوافق فقط، ولا يُعد تقييمًا لجودة الوجه أو الملابس أو مطابقة المراجع.</p>
+                <div className="space-y-2">
+                  {project.scenes.map((scene, index) => (
+                    <div key={scene.id} className={"flex items-center gap-2 rounded-2xl border p-2.5 transition " + (active === index ? "border-cyan-400 bg-cyan-50" : "border-slate-200")}>
+                      <button type="button" onClick={() => { setActive(index); setPlaying(false); audioPlayer.current?.pause(); }} className="min-w-0 flex flex-1 items-center gap-3 text-right">
+                        <span className={"grid h-10 w-10 shrink-0 place-items-center rounded-xl text-sm font-black " + (active === index ? "bg-cyan-500 text-white" : "bg-slate-100 text-slate-700")}>{index + 1}</span>
+                        <span className="min-w-0"><strong className="block truncate text-sm">{scene.headline || "مشهد بلا عنوان"}</strong><span className="block text-xs text-slate-500">{CARTOONS.find(c => c.id === scene.character)?.name} · {scene.duration} ثوانٍ</span></span>
+                      </button>
+                      <button type="button" aria-label="تحريك المشهد للأعلى" title="لأعلى" disabled={index === 0} className="rounded-lg p-2 text-slate-500 disabled:opacity-30" onClick={() => moveScene(index, -1)}><ChevronUp className="size-4" /></button>
+                      <button type="button" aria-label="تحريك المشهد للأسفل" title="لأسفل" disabled={index === project.scenes.length - 1} className="rounded-lg p-2 text-slate-500 disabled:opacity-30" onClick={() => moveScene(index, 1)}><ChevronDown className="size-4" /></button>
+                      <button type="button" aria-label="حذف المشهد" title="حذف" disabled={project.scenes.length === 1} className="rounded-lg p-2 text-rose-600 disabled:opacity-30" onClick={() => removeScene(index)}><Trash2 className="size-4" /></button>
+                    </div>
+                  ))}
+                </div>
+                <p className="mt-4 text-xs leading-6 text-slate-500">اختر أي مشهد لتعديل النص وحركة الشخصية. مجموع الفيديو بحد أقصى دقيقتين.</p>
+              </div>
+              <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+                <h3 className="mb-5 text-lg font-black">تحرير المشهد {active + 1}</h3>
+                <div className="space-y-4">
+                  <label className="block text-sm font-bold">عنوان المشهد<input className={input + " mt-2"} maxLength={80} value={selected.headline} onChange={e => patchScene({ headline: e.target.value })} /></label>
+                  <label className="block text-sm font-bold">النص الظاهر على الفيديو<textarea className={input + " mt-2 min-h-30 resize-y"} maxLength={400} value={selected.caption} onChange={e => patchScene({ caption: e.target.value })} placeholder="جملة قصيرة وواضحة تناسب سرعة القراءة" /></label>
+                  <div className="grid grid-cols-2 gap-4">
+                    <label className="block text-sm font-bold">مدة المشهد
+                      <select className={input + " mt-2"} value={selected.duration} onChange={e => {
+                        const next = Number(e.target.value);
+                        if (duration - selected.duration + next > MAX_DURATION_SECONDS) { setError("لا يمكن تجاوز دقيقتين."); return; }
+                        patchScene({ duration: next });
+                      }}>
+                        {Array.from({ length: 29 }, (_, i) => i + 2).map(n => <option key={n} value={n}>{n} ثانية</option>)}
+                      </select>
+                    </label>
+                    <label className="block text-sm font-bold">طريقة الانتقال
+                      <select className={input + " mt-2"} value={selected.transition} onChange={e => patchScene({ transition: e.target.value as SceneTransition })}>
+                        <option value="cut">قطع مباشر</option><option value="fade">ظهور تدريجي</option>
+                      </select>
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </>}
+
+            {panel === "characters" && <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+              <h2 className="text-lg font-black">شخصيات كرتونية مرسومة 2D</h2>
+              <p className="mt-2 text-sm leading-6 text-slate-500">الشخصيات أصلية مرسومة بأشكال قابلة للتحريك، لا تعتمد على صور أشخاص حقيقيين ولا على الكاميرا.</p>
+              <div className="mt-5 grid grid-cols-2 gap-3">
+                {CARTOONS.map(character => (
+                  <button type="button" key={character.id} aria-pressed={selected.character === character.id}
+                    onClick={() => patchScene({ character: character.id as CartoonId })} className={"rounded-2xl border p-4 text-center transition " + (selected.character === character.id ? "border-cyan-500 bg-cyan-50" : "border-slate-200 bg-slate-50 hover:bg-slate-100")}>
+                    <span className="mx-auto mb-2 grid h-14 w-14 place-items-center rounded-2xl text-2xl shadow-sm" style={{ background: character.color }}>{character.id === "nour" ? "🤖" : character.id === "layla" ? "👩🏻" : character.id === "omar" ? "👨🏻‍🏫" : "🧑🏻"}</span>
+                    <strong className="block text-sm">{character.name}</strong><span className="text-xs text-slate-500">{character.description}</span>
+                  </button>
+                ))}
+              </div>
+              <label className="mt-6 block text-sm font-bold">الحركة
+                <select className={input + " mt-2"} value={selected.motion} onChange={e => patchScene({ motion: e.target.value as SceneMotion })}>
+                  <option value="talk">تحدث</option><option value="explain">شرح وإشارة باليد</option><option value="wave">ترحيب</option><option value="idle">وقوف طبيعي</option>
+                </select>
+              </label>
+              <h3 className="mb-3 mt-6 text-sm font-black">الخلفية</h3>
+              <div className="grid grid-cols-3 gap-2">
+                {THEMES.map(theme => <button type="button" key={theme.id} onClick={() => patchScene({ theme: theme.id as SceneTheme })} aria-pressed={selected.theme === theme.id}
+                  className={"rounded-2xl border p-2 text-xs font-bold " + (selected.theme === theme.id ? "border-cyan-500 ring-2 ring-cyan-100" : "border-slate-200")}>
+                  <span className="mb-2 block h-14 rounded-xl" style={{ background: theme.color }} /><span>{theme.name}</span>
+                </button>)}
+              </div>
+            </div>}
+
+            {panel === "audio" && <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+              <h2 className="flex items-center gap-2 text-lg font-black"><Volume2 className="size-5 text-cyan-500" /> التعليق الصوتي</h2>
+              <p className="mt-2 text-sm leading-7 text-slate-600">ارفع تعليقًا صوتيًا مسجلًا أو سجله مباشرة. يتحرك فم الشخصية تقريبياً بحسب شدة الصوت، ويدمج ملف الصوت فعليًا في الفيديو المصدر.</p>
+              <div className="mt-5 flex flex-wrap gap-2">
+                <label className={secondary + " cursor-pointer"}><Upload className="size-4" /> رفع MP3 / WAV / WebM
+                  <input type="file" className="sr-only" accept="audio/*,.mp3,.wav,.webm,.m4a" onChange={e => { const file = e.target.files?.[0]; if (file) void useAudio(file, file.name); e.currentTarget.value = ""; }} />
+                </label>
+                {recordingMic ?
+                  <button type="button" className="inline-flex items-center gap-2 rounded-2xl bg-rose-600 px-4 py-3 text-sm font-bold text-white" onClick={stopMic}><Square className="size-4" /> إنهاء التسجيل</button> :
+                  <button type="button" className={primary} onClick={() => void startMic()}><Mic className="size-4" /> تسجيل صوت</button>}
+              </div>
+              {recordingMic && <p role="status" className="mt-3 text-sm font-bold text-rose-600">الميكروفون يسجل الآن. اضغط إنهاء التسجيل لحفظه.</p>}
+              {audio ? <div className="mt-5 rounded-2xl bg-emerald-50 p-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div><strong className="block text-sm text-emerald-900">{audioName}</strong><span className="text-xs text-emerald-700">المدة: {formatSeconds(audioDuration)} · الحجم {(audio.size / 1024 / 1024).toFixed(1)} MB</span></div>
+                  <button type="button" className="rounded-xl bg-white px-3 py-2 text-xs font-bold text-rose-600" onClick={() => void removeAudio()}>حذف الصوت</button>
+                </div>
+                {Math.abs(audioDuration - duration) > 1 && <p className="mt-3 text-xs leading-6 text-amber-900">مدة التعليق مختلفة عن مدة المشاهد ({formatSeconds(duration)}). سيُقطع الصوت الزائد أو يبقى باقي الفيديو صامتًا. اضبط أزمنة المشاهد لتتوافق معه.</p>}
+              </div> : <div className="mt-5 rounded-2xl bg-amber-50 p-4 text-sm leading-7 text-amber-900">لا يوجد ملف صوتي بعد. يمكن تصدير فيديو صامت، لكن إنشاء تعليق صوتي آلي غير مفعّل دون مزود توليد صوت حقيقي.</div>}
+              <p className="mt-4 text-xs leading-6 text-slate-500">الصوت محفوظ محليًا في IndexedDB، ولا يُرفع للخادم. نسخ JSON تتضمن المشاهد فقط ولا تحتوي على الملف الصوتي.</p>
+            </div>}
+
+            {panel === "export" && <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+              <h2 className="flex items-center gap-2 text-lg font-black"><Settings2 className="size-5 text-cyan-500" /> إعدادات وتصدير الفيديو</h2>
+              <div className="mt-5 grid gap-4 sm:grid-cols-2">
+                <label className="block text-sm font-bold">تذييل أو اسم القناة<input className={input + " mt-2"} maxLength={60} value={project.watermark} onChange={e => patchProject({ watermark: e.target.value })} /></label>
+                <label className="block text-sm font-bold">لون النص
+                  <select className={input + " mt-2"} value={project.captionColor} onChange={e => patchProject({ captionColor: e.target.value as SocialProject["captionColor"] })}>
+                    <option value="white">أبيض</option><option value="yellow">أصفر</option>
+                  </select>
+                </label>
+              </div>
+              <label className="mt-4 flex items-center gap-3 text-sm font-bold"><input type="checkbox" checked={project.showCaptions} onChange={e => patchProject({ showCaptions: e.target.checked })} className="size-5 accent-cyan-500" /> إظهار نصوص المشاهد داخل الفيديو</label>
+              <div className="mt-5 rounded-2xl bg-slate-50 p-4 text-sm leading-7 text-slate-600">
+                <strong className="block text-slate-900">مواصفات النسخة الحالية</strong>
+                فيديو رأسي 9:16 · دقة 720×1280 · 24 إطار/ثانية · WebM. التصدير يعمل في الوقت الحقيقي، ويجب إبقاء علامة تبويب الموقع ظاهرة طوال العملية. MP4 غير متاح حاليًا.
+              </div>
+              <div className="mt-5 flex flex-wrap gap-2">
+                <button type="button" className={secondary} onClick={() => saveFile(new Blob([JSON.stringify(project, null, 2)], { type: "application/json" }), "cartoon-project.json")}><FolderDown className="size-4" /> نسخة JSON</button>
+                <label className={secondary + " cursor-pointer"}><Upload className="size-4" /> استيراد JSON
+                  <input type="file" accept=".json,application/json" className="sr-only" onChange={e => { void importProject(e.target.files?.[0]); e.currentTarget.value = ""; }} />
+                </label>
+                <button type="button" className={secondary} onClick={() => saveFile(new Blob(["\ufeff", srtForProject(project)], { type: "text/plain;charset=utf-8" }), "cartoon-subtitles.srt")}><Captions className="size-4" /> ترجمة SRT</button>
+              </div>
+              <button type="button" disabled={exporting || recordingMic || !exportSupported} className={primary + " mt-5 w-full !bg-cyan-600 hover:!bg-cyan-700"} onClick={() => void exportVideo()}><Download className="size-5" /> تصدير فيديو WebM {audio ? "بالصوت" : "صامت"}</button>
+              {exporting && <div className="mt-4 space-y-2">
+                <div className="flex items-center justify-between text-xs font-extrabold"><span>جاري تركيب المشاهد والصوت</span><span>{exportPercent}%</span></div>
+                <div className="h-3 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-cyan-500 transition-all" style={{ width: exportPercent + "%" }} /></div>
+                <button type="button" className={secondary} onClick={() => exportAbort.current?.abort()}>إلغاء التصدير</button>
+              </div>}
+              {!exportSupported && <p className="mt-3 text-sm font-bold text-rose-600">المتصفح الحالي لا يدعم تسجيل WebM.</p>}
+              {video && <div className="mt-5 rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+                <strong className="text-sm text-emerald-900">الفيديو جاهز للمعاينة والتحميل</strong>
+                <video key={video.size} className="mx-auto mt-3 max-h-95 rounded-xl bg-black" controls playsInline src={URL.createObjectURL(video)} />
+                <button type="button" className={primary + " mt-4 w-full"} onClick={() => saveFile(video, "cartoon-content-" + Date.now() + ".webm")}><Download className="size-4" /> تنزيل الفيديو</button>
               </div>}
             </div>}
-            <button type="button" onClick={() => navigate({ to: "/customize" })} className="rounded-full bg-secondary px-6 py-3 font-black">تخصيص الشخصية</button>
-            <button type="button" onClick={() => navigate({ to: "/story" })} className="inline-flex items-center justify-center gap-2 rounded-full bg-primary px-6 py-3 font-black text-primary-foreground"><BookOpen className="size-5" /> ابدأ القصة</button>
-          </div>
-        </section>}
+          </section>
+
+          <aside className="min-w-0 lg:sticky lg:top-5">
+            <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+              <div className="mb-4 flex items-center justify-between gap-2"><h2 className="flex items-center gap-2 text-lg font-black"><Image className="size-5 text-cyan-500" /> معاينة الفيديو</h2><span className="rounded-lg bg-slate-100 px-2 py-1 text-xs font-extrabold">9:16</span></div>
+              <div className="mx-auto w-full max-w-[330px] overflow-hidden rounded-3xl border-4 border-slate-800 bg-cyan-200 shadow-xl">
+                <canvas ref={previewCanvas} width={360} height={640} aria-label="معاينة مباشرة للشخصية الكرتونية والمشهد" role="img" className="block h-auto w-full" />
+              </div>
+              <div className="mt-5 flex items-center gap-3">
+                <button type="button" className={primary + " min-w-31"} onClick={togglePreview}>{playing ? <Pause className="size-4" /> : <Play className="size-4" />}{playing ? "إيقاف" : "معاينة"}</button>
+                <div className="min-w-0 flex-1">
+                  <div className="mb-1 flex justify-between text-xs font-bold text-slate-500"><span>{formatSeconds(playing ? position : timelineStart(project, active))}</span><span>{formatSeconds(duration)}</span></div>
+                  <div className="h-2.5 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-cyan-500" style={{ width: (playing ? position / duration : timelineStart(project, active) / duration) * 100 + "%" }} /></div>
+                </div>
+              </div>
+              <p className="mt-4 rounded-2xl bg-slate-50 p-3 text-center text-xs leading-6 text-slate-600">الشفاه تتحرك تقريبياً مع مستوى الصوت المسجل، بينما تظهر المشاهد والعناوين والنصوص في المعاينة وفي الملف المصدر.</p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <button type="button" onClick={() => setPanel("audio")} className="flex-1 rounded-xl bg-cyan-50 px-3 py-3 text-xs font-extrabold text-cyan-800">1 · التعليق الصوتي</button>
+                <button type="button" onClick={() => setPanel("export")} className="flex-1 rounded-xl bg-slate-100 px-3 py-3 text-xs font-extrabold text-slate-800">2 · تحميل الفيديو</button>
+              </div>
+            </div>
+          </aside>
+        </div>
+        <footer className="mt-8 text-center text-xs leading-7 text-slate-500">يعمل المحرر بدون حساب أو قاعدة بيانات سحابية. احتفظ بنسخة احتياطية من المشروع والصوت قبل تنظيف بيانات المتصفح.</footer>
       </div>
-      {editor && <Editor key={editor === "new" ? "new" : editor.id}
-        initial={editor === "new" ? undefined : editor} onClose={() => setEditor(null)}
-        onSave={async (draft, file) => {
-          const previousAsset = editor === "new" ? undefined : editor.assetId;
-          const importedAsset = file ? await saveGlbAsset(file) : undefined;
-          const saved = file ? { ...draft, assetId: importedAsset, modelUrl: undefined } : draft;
-          try {
-          if (editor === "new") {
-            const id = addCharacter(saved);
-            const added = useCharacterLibrary.getState().characters.find((item) => item.id === id);
-            if (added) choose(added);
-            setFilter("all"); setSearch("");
-          } else updateCharacter(editor.id, saved);
-          if (previousAsset && previousAsset !== saved.assetId) {
-            void deleteGlbAsset(previousAsset).catch(() => {
-              setCaptureError("تم حفظ التعديل، لكن تعذر تنظيف الملف السابق من مساحة الجهاز.");
-            });
-          }
-          setEditor(null);
-          } catch (caught) {
-            if (importedAsset) await deleteGlbAsset(importedAsset).catch(() => {});
-            throw caught;
-          }
-        }} />}
     </main>
   );
 }
