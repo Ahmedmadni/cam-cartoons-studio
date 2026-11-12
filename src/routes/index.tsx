@@ -14,7 +14,7 @@ import {
 import { renderSocialFrame } from "@/lib/socialCanvas";
 import { renderCartoonCharacter } from "@/lib/socialCharacterRig";
 import {
-  ART_LAYER_LABELS, artStatus, hydrateCharacterArt, paintIllustratedCharacter, saveCharacterArt,
+  ART_LAYER_LABELS, artStatus, hydrateCharacterArt, paintIllustratedCharacter, saveCharacterArt, restoreSamiReferenceArt,
   type CharacterArtLayer,
 } from "@/lib/socialCharacterArt";
 import {
@@ -231,8 +231,11 @@ function SocialCreator() {
     setArtUploading(true); setError("");
     try{
       await saveCharacterArt(selected.character,layer,null);
+      if(layer==="base" && selected.character==="sami")await restoreSamiReferenceArt();
       setArtRevision(x=>x+1); setVideo(null);
-      setNotice(layer==="base"?"تمت العودة إلى الشخصية الاحتياطية.":"تم حذف الطبقة.");
+      setNotice(layer==="base"
+        ? (selected.character==="sami"?"تمت استعادة الرسم المرجعي الأصلي لسامي.":"تمت العودة إلى الشخصية الاحتياطية.")
+        : "تم حذف الطبقة.");
     } catch(e) {setError(e instanceof Error?e.message:"تعذر حذف الطبقة.");}
     finally {setArtUploading(false);}
   }
@@ -551,7 +554,7 @@ function SocialCreator() {
                 </p>
                 {artStatus(selected.character).hasBase && <button type="button" disabled={artUploading}
                   className="mt-2 rounded-lg border border-rose-200 bg-white px-3 py-2 text-xs font-bold text-rose-700"
-                  onClick={()=>void deleteArtwork("base")}>العودة إلى الرسم الاحتياطي</button>}
+                  onClick={()=>void deleteArtwork("base")}>{selected.character==="sami"?"استعادة الرسم المرجعي":"العودة إلى الرسم الاحتياطي"}</button>}
               </div>
               <h3 className="mb-3 mt-6 text-sm font-black">الخلفية</h3>
               <div className="grid grid-cols-3 gap-2">
