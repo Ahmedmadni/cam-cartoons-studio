@@ -6,15 +6,18 @@ import {
   Trash2, Upload, Video, Volume2, WandSparkles,
 } from "lucide-react";
 import {
-  CARTOONS, MAX_AUDIO_BYTES, MAX_DURATION_SECONDS, MAX_SCENES, STARTER, THEMES,
+  CARTOONS, EXPRESSIONS, MAX_AUDIO_BYTES, MAX_DURATION_SECONDS, MAX_SCENES, STARTER, THEMES,
   parseSocialProject, projectSeconds, sceneAt, srtForProject,
-  type CartoonId, type SceneMotion, type SceneTheme, type SceneTransition,
+  type CartoonId, type SceneMotion, type SceneExpression, type SceneTheme, type SceneTransition,
   type SocialProject, type SocialScene,
 } from "@/lib/socialStudio";
 import { renderSocialFrame } from "@/lib/socialCanvas";
+import { renderCartoonCharacter } from "@/lib/socialCharacterRig";
 import {
   amplitudeAt, analyzeSocialAudio, exportSocialVideo, loadSocialAudio, saveSocialAudio,
+  loadSceneVoices, saveSceneVoice,
 } from "@/lib/socialVideo";
+import { sceneVoiceEnergyAt, voiceBarHeights } from "@/lib/socialAudioTimeline";
 import { selectWebmMime } from "@/lib/mediaCapabilities";
 
 export const Route = createFileRoute("/")({
@@ -50,6 +53,23 @@ function timelineStart(project: SocialProject, index: number) {
   return project.scenes.slice(0, index).reduce((a, scene) => a + scene.duration, 0);
 }
 
+/** Actual miniature rig preview, rather than misleading stock emoji for each actor. */
+function CartoonThumbnail({character}:{character:CartoonId}) {
+  const ref=useRef<HTMLCanvasElement|null>(null);
+  useEffect(()=>{
+    const canvas=ref.current,ctx=canvas?.getContext("2d");
+    if(!canvas||!ctx)return;
+    const colors:Record<CartoonId,string>={sami:"#fff0cf",layla:"#f0defc",omar:"#ddf4e9",nour:"#d7e9fe"};
+    ctx.fillStyle=colors[character];ctx.fillRect(0,0,160,160);
+    ctx.save();
+    ctx.translate(80-360*.38,80-500*.38);
+    ctx.scale(.38,.38);
+    renderCartoonCharacter(ctx,character,.7,0,"idle","happy");
+    ctx.restore();
+  },[character]);
+  return <canvas ref={ref} width={160} height={160} role="img" aria-label={"رسم شخصية "+character} className="mx-auto mb-2 h-17 w-17 rounded-2xl border border-white/60 shadow-sm" />;
+}
+
 function SocialCreator() {
   const [project, setProject] = useState<SocialProject>(STARTER);
   const [hydrated, setHydrated] = useState(false);
@@ -61,6 +81,9 @@ function SocialCreator() {
   const [audioName, setAudioName] = useState("");
   const [audioDuration, setAudioDuration] = useState(0);
   const [envelope, setEnvelope] = useState<Float32Array | null>(null);
+  const [sceneAudio, setSceneAudio] = useState<Map<string, Blob>>(() => new Map());
+  const [sceneAnalyses, setSceneAnalyses] = useState<Map<string, {duration:number; envelope:Float32Array}>>(() => new Map());
+  const [quality, setQuality] = useState<"standard"|"high">("standard");
   const [recordingMic, setRecordingMic] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [exportPercent, setExportPercent] = useState(0);
@@ -72,22 +95,43 @@ function SocialCreator() {
   const mic = useRef<MediaRecorder | null>(null);
   const micStream = useRef<MediaStream | null>(null);
   const audioPlayer = useRef<HTMLAudioElement | null>(null);
+  const activeSceneVoice = useRef<{id:string; player: HTMLAudioElement; url:string}|null>(null);
   const exportAbort = useRef<AbortController | null>(null);
   const projectRef = useRef(project);
   projectRef.current = project;
   const duration = projectSeconds(project);
   const selected = project.scenes[Math.min(active, project.scenes.length - 1)]!;
   const setNotice = (text: string) => { setMessage(text); setError(""); };
+  const activeSceneAudio = sceneAudio.get(selected.id) ?? null;
+  const currentAnalysis = sceneAnalyses.get(selected.id);
+  const hasNarration = project.narrationMode === "scenes" ? sceneAudio.size > 0 : audio !== null;
+  function stopSceneVoice() {
+    const current = activeSceneVoice.current;
+    if (!current) return;
+    current.player.pause(); URL.revokeObjectURL(current.url);
+    activeSceneVoice.current = null;
+  }
+  async function hydrateSceneClips(ids: string[]) {
+    const voices = await loadSceneVoices(ids);
+    const analyses = new Map<string, {duration:number; envelope:Float32Array}>();
+    for (const [id,clip] of voices) {
+      try { analyses.set(id, await analyzeSocialAudio(clip)); } catch { /* corrupted legacy audio is skipped */ }
+    }
+    setSceneAudio(voices); setSceneAnalyses(analyses);
+  }
 
   useEffect(() => {
+    let initial = STARTER;
     try {
       const saved = localStorage.getItem("cam-social-project-v1");
-      if (saved) setProject(parseSocialProject(JSON.parse(saved) as unknown));
+      if (saved) initial = parseSocialProject(JSON.parse(saved) as unknown);
+      setProject(initial);
     } catch {
       setError("تعذر استعادة المشروع المحفوظ؛ لم يتم حذف بياناتك القديمة.");
     }
     setHydrated(true);
     let live = true;
+    void hydrateSceneClips(initial.scenes.map(s=>s.id)).catch(() => { if(live) setMessage("تعذر استعادة بعض ملفات صوت المشاهد."); });
     loadSocialAudio().then(async blob => {
       if (!blob || !live) return;
       const analysis = await analyzeSocialAudio(blob);
@@ -117,6 +161,7 @@ function SocialCreator() {
     return () => URL.revokeObjectURL(url);
   }, [video]);
   useEffect(() => () => {
+    stopSceneVoice();
     try { if (mic.current && mic.current.state !== "inactive") mic.current.stop(); } catch { /* noop */ }
     micStream.current?.getTracks().forEach(track => track.stop());
     exportAbort.current?.abort();
@@ -131,12 +176,26 @@ function SocialCreator() {
     let lastUi = 0;
     const startClock = performance.now();
     const initial = playing ? 0 : timelineStart(project, Math.min(active, project.scenes.length - 1)) + .6;
+    const sceneCurves = new Map([...sceneAnalyses].map(([id,a])=>[id,a.envelope] as const));
     const tick = (now: number) => {
       const t = playing ? Math.min(duration, (now - startClock) / 1000) : initial;
-      renderSocialFrame(ctx, project, t, amplitudeAt(envelope, t));
+      const energy = project.narrationMode==="scenes" ? sceneVoiceEnergyAt(project,t,sceneCurves) : amplitudeAt(envelope,t);
+      renderSocialFrame(ctx, project, t, energy);
+      if (playing && project.narrationMode==="scenes") {
+        const {scene,elapsed} = sceneAt(project,t);
+        const voice = sceneAudio.get(scene.id);
+        if (voice && elapsed >= scene.audioDelayMs/1000 && elapsed < scene.duration && activeSceneVoice.current?.id!==scene.id) {
+          stopSceneVoice();
+          const url=URL.createObjectURL(voice);
+          const player=new Audio(url); player.preload="auto";
+          player.currentTime=Math.max(0,elapsed-scene.audioDelayMs/1000);
+          activeSceneVoice.current={id:scene.id,player,url};
+          void player.play().catch(()=>setError("تعذر تشغيل صوت المشهد؛ تحقق من إعدادات المتصفح."));
+        } else if (!voice || elapsed < scene.audioDelayMs/1000 || elapsed >= scene.duration) stopSceneVoice();
+      }
       if (playing && now - lastUi > 120) { lastUi = now; setPosition(t); }
       if (playing && t >= duration) {
-        audioPlayer.current?.pause();
+        stopSceneVoice(); audioPlayer.current?.pause();
         setPlaying(false); setPosition(0);
         return;
       }
@@ -144,17 +203,17 @@ function SocialCreator() {
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [project, playing, active, envelope, duration]);
+  }, [project, playing, active, envelope, duration, sceneAudio, sceneAnalyses]);
 
   function patchProject(change: Partial<SocialProject>) {
     setPlaying(false);
-    audioPlayer.current?.pause();
+    audioPlayer.current?.pause(); stopSceneVoice();
     setVideo(null);
     setProject(previous => ({ ...previous, ...change }));
   }
   function patchScene(change: Partial<SocialScene>) {
     setPlaying(false);
-    audioPlayer.current?.pause();
+    audioPlayer.current?.pause(); stopSceneVoice();
     setVideo(null);
     setProject(previous => ({
       ...previous,
@@ -167,7 +226,7 @@ function SocialCreator() {
     }
     const next: SocialScene = {
       id: createId(), headline: "عنوان المشهد", caption: "اكتب هنا الجملة التي ستظهر على الشاشة.",
-      character: selected.character, theme: selected.theme, motion: "talk", transition: "fade", duration: 5,
+      character: selected.character, theme: selected.theme, motion: "talk", expression:"happy", audioDelayMs:0, transition: "fade", duration: 5,
     };
     setProject(previous => ({ ...previous, scenes: [...previous.scenes, next] }));
     setActive(project.scenes.length); setPlaying(false); setVideo(null); setNotice("تمت إضافة مشهد جديد.");
@@ -180,23 +239,27 @@ function SocialCreator() {
       [scenes[index], scenes[to]] = [scenes[to]!, scenes[index]!];
       return { ...previous, scenes };
     });
-    setActive(to); setPlaying(false); setVideo(null);
+    stopSceneVoice(); setActive(to); setPlaying(false); setVideo(null);
   }
   function removeScene(index: number) {
     if (project.scenes.length === 1) { setError("يجب الاحتفاظ بمشهد واحد على الأقل."); return; }
     setProject(previous => ({ ...previous, scenes: previous.scenes.filter((_, i) => i !== index) }));
     setActive(Math.max(0, Math.min(index, project.scenes.length - 2)));
+    stopSceneVoice(); setSceneAudio(prev=>{const next=new Map(prev);next.delete(project.scenes[index]!.id);return next;});
+    setSceneAnalyses(prev=>{const next=new Map(prev);next.delete(project.scenes[index]!.id);return next;});
+    void saveSceneVoice(project.scenes[index]!.id,null).catch(()=>setError("تعذر حذف صوت المشهد من التخزين."));
     setPlaying(false); setVideo(null);
   }
   function togglePreview() {
-    if (playing) { audioPlayer.current?.pause(); setPlaying(false); setPosition(0); return; }
+    if (playing) { stopSceneVoice(); audioPlayer.current?.pause(); setPlaying(false); setPosition(0); return; }
     setError("");
     const element = audioPlayer.current;
-    if (element) {
+    if (element && project.narrationMode==="global") {
       element.pause();
       element.currentTime = 0;
       void element.play().catch(() => { setError("تعذر تشغيل الصوت؛ يرجى التحقق من إعدادات المتصفح."); });
-    }
+    } else element?.pause();
+    stopSceneVoice();
     setPosition(0);
     setPlaying(true);
   }
@@ -212,6 +275,26 @@ function SocialCreator() {
       setNotice("تم تجهيز التعليق الصوتي وتخزينه محلياً في هذا المتصفح.");
     } catch (caught) { setError(caught instanceof Error ? caught.message : "تعذر قراءة الملف الصوتي."); }
   }
+  async function useSceneAudio(blob: Blob, sceneId: string) {
+    setError("");
+    try {
+      const analysis = await analyzeSocialAudio(blob);
+      await saveSceneVoice(sceneId,blob);
+      setSceneAudio(prev=>new Map(prev).set(sceneId,blob));
+      setSceneAnalyses(prev=>new Map(prev).set(sceneId,analysis));
+      stopSceneVoice(); setPlaying(false); setVideo(null);
+      setNotice("تم حفظ التعليق الصوتي للمشهد الحالي، ويمكن استخدامه بعد إعادة ترتيب المشاهد.");
+    } catch(caught) { setError(caught instanceof Error?caught.message:"تعذر حفظ صوت المشهد."); }
+  }
+  async function removeSceneAudio(id:string) {
+    try {
+      await saveSceneVoice(id,null);
+      stopSceneVoice(); setPlaying(false);
+      setSceneAudio(prev=>{const next=new Map(prev);next.delete(id);return next;});
+      setSceneAnalyses(prev=>{const next=new Map(prev);next.delete(id);return next;});
+      setVideo(null);setNotice("تم حذف صوت المشهد.");
+    } catch {setError("تعذر حذف صوت المشهد.");}
+  }
   async function removeAudio() {
     try {
       await saveSocialAudio(null);
@@ -226,6 +309,7 @@ function SocialCreator() {
       if (!navigator.mediaDevices?.getUserMedia) throw new Error("الميكروفون غير متاح. استخدم اتصال HTTPS أو ارفع ملف صوتي.");
       const mimeType = selectWebmMime("audio");
       if (!mimeType) throw new Error("المتصفح لا يدعم تسجيل الصوت. ارفع ملف MP3 أو WAV.");
+      const targetScene = project.narrationMode==="scenes" ? selected.id : null;
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       micStream.current = stream;
       const parts: Blob[] = [];
@@ -236,7 +320,11 @@ function SocialCreator() {
       recorder.onstop = () => {
         stream.getTracks().forEach(track => track.stop());
         micStream.current = null; mic.current = null; setRecordingMic(false);
-        if (parts.length) void useAudio(new Blob(parts, { type: mimeType }), "تسجيل الميكروفون");
+        if (parts.length) {
+          const recording=new Blob(parts, { type: mimeType });
+          if(targetScene) void useSceneAudio(recording,targetScene);
+          else void useAudio(recording, "تسجيل الميكروفون");
+        }
       };
       recorder.start();
       setRecordingMic(true);
@@ -251,9 +339,10 @@ function SocialCreator() {
     const controller = new AbortController();
     exportAbort.current = controller;
     try {
-      setPlaying(false); audioPlayer.current?.pause();
+      setPlaying(false); audioPlayer.current?.pause(); stopSceneVoice();
       const result = await exportSocialVideo({
-        project, narration: audio, signal: controller.signal, onProgress: value => setExportPercent(Math.round(value * 100)),
+        project, narration: audio, sceneNarrations:sceneAudio, quality,
+        signal: controller.signal, onProgress: value => setExportPercent(Math.round(value * 100)),
       });
       setVideo(result);
       setNotice("تم إنتاج الفيديو. يمكنك تحميله ومراجعته قبل النشر.");
@@ -265,13 +354,15 @@ function SocialCreator() {
     if (file.size > 150_000) { setError("ملف JSON كبير جداً."); return; }
     try {
       const parsed = parseSocialProject(JSON.parse(await file.text()) as unknown);
-      setProject(parsed); setActive(0); setPlaying(false); setVideo(null);
+      stopSceneVoice(); setProject(parsed); setActive(0); setPlaying(false); setVideo(null);
+      void hydrateSceneClips(parsed.scenes.map(s=>s.id)).catch(()=>setError("تعذر استعادة أصوات بعض المشاهد."));
       setNotice("تم استيراد المشاهد. الصوت يُخزن بصورة منفصلة على الجهاز، فراجع التعليق الصوتي قبل التصدير.");
     } catch (caught) { setError(caught instanceof Error ? caught.message : "تعذر استيراد الملف."); }
   }
   function resetProject() {
     if (!window.confirm("إنشاء مشروع جديد؟ سيُستبدل المشروع الحالي. حمّل نسخة JSON أولاً إذا أردت الاحتفاظ به.")) return;
-    setProject(STARTER); setActive(0); setPlaying(false); setVideo(null); setNotice("تم فتح قالب جديد.");
+    stopSceneVoice();setProject(STARTER); setActive(0); setPlaying(false); setVideo(null); setNotice("تم فتح قالب جديد. ملفات الصوت القديمة لم تُحذف من التخزين المحلي.");
+    void hydrateSceneClips(STARTER.scenes.map(s=>s.id)).catch(()=>{});
   }
   const exportSupported = typeof window === "undefined" || Boolean(selectWebmMime("video"));
 
@@ -301,7 +392,7 @@ function SocialCreator() {
               <h1 className="text-2xl font-black leading-relaxed sm:text-3xl">من الفكرة إلى فيديو بشخصية كرتونية</h1>
               <p className="mt-2 text-sm leading-7 text-slate-200">اكتب مشاهدك، اختر الشخصية والخلفية، أضف صوتك أو ملف التعليق، ثم صدّر فيديو رأسيًا جاهزًا للمونتاج أو النشر.</p>
             </div>
-            <div className="flex items-center gap-2 rounded-2xl bg-white/10 px-4 py-3 text-sm font-extrabold"><Video className="size-5 text-cyan-300" /> 9:16 · 720×1280 · WebM</div>
+            <div className="flex items-center gap-2 rounded-2xl bg-white/10 px-4 py-3 text-sm font-extrabold"><Video className="size-5 text-cyan-300" /> 9:16 · رسوم 2D · صوت متعدد المشاهد</div>
           </div>
         </div>
 
@@ -338,7 +429,7 @@ function SocialCreator() {
                 <div className="space-y-2">
                   {project.scenes.map((scene, index) => (
                     <div key={scene.id} className={"flex items-center gap-2 rounded-2xl border p-2.5 transition " + (active === index ? "border-cyan-400 bg-cyan-50" : "border-slate-200")}>
-                      <button type="button" onClick={() => { setActive(index); setPlaying(false); audioPlayer.current?.pause(); }} className="min-w-0 flex flex-1 items-center gap-3 text-right">
+                      <button type="button" onClick={() => { stopSceneVoice(); setActive(index); setPlaying(false); audioPlayer.current?.pause(); }} className="min-w-0 flex flex-1 items-center gap-3 text-right">
                         <span className={"grid h-10 w-10 shrink-0 place-items-center rounded-xl text-sm font-black " + (active === index ? "bg-cyan-500 text-white" : "bg-slate-100 text-slate-700")}>{index + 1}</span>
                         <span className="min-w-0"><strong className="block truncate text-sm">{scene.headline || "مشهد بلا عنوان"}</strong><span className="block text-xs text-slate-500">{CARTOONS.find(c => c.id === scene.character)?.name} · {scene.duration} ثوانٍ</span></span>
                       </button>
@@ -360,7 +451,7 @@ function SocialCreator() {
                       <select className={input + " mt-2"} value={selected.duration} onChange={e => {
                         const next = Number(e.target.value);
                         if (duration - selected.duration + next > MAX_DURATION_SECONDS) { setError("لا يمكن تجاوز دقيقتين."); return; }
-                        patchScene({ duration: next });
+                        patchScene({ duration: next, audioDelayMs: Math.min(selected.audioDelayMs, Math.max(0, next*1000-250)) });
                       }}>
                         {Array.from({ length: 29 }, (_, i) => i + 2).map(n => <option key={n} value={n}>{n} ثانية</option>)}
                       </select>
@@ -382,7 +473,7 @@ function SocialCreator() {
                 {CARTOONS.map(character => (
                   <button type="button" key={character.id} aria-pressed={selected.character === character.id}
                     onClick={() => patchScene({ character: character.id as CartoonId })} className={"rounded-2xl border p-4 text-center transition " + (selected.character === character.id ? "border-cyan-500 bg-cyan-50" : "border-slate-200 bg-slate-50 hover:bg-slate-100")}>
-                    <span className="mx-auto mb-2 grid h-14 w-14 place-items-center rounded-2xl text-2xl shadow-sm" style={{ background: character.color }}>{character.id === "nour" ? "🤖" : character.id === "layla" ? "👩🏻" : character.id === "omar" ? "👨🏻‍🏫" : "🧑🏻"}</span>
+                    <CartoonThumbnail character={character.id} />
                     <strong className="block text-sm">{character.name}</strong><span className="text-xs text-slate-500">{character.description}</span>
                   </button>
                 ))}
@@ -392,6 +483,12 @@ function SocialCreator() {
                   <option value="talk">تحدث</option><option value="explain">شرح وإشارة باليد</option><option value="wave">ترحيب</option><option value="idle">وقوف طبيعي</option>
                 </select>
               </label>
+              <label className="mt-4 block text-sm font-bold">تعبير الوجه
+                <select aria-label="تعبير الوجه" className={input + " mt-2"} value={selected.expression} onChange={e=>patchScene({expression:e.target.value as SceneExpression})}>
+                  {EXPRESSIONS.map(x=><option key={x.id} value={x.id}>{x.name}</option>)}
+                </select>
+              </label>
+              <p className="mt-3 text-xs leading-6 text-slate-500">رسم كرتوني بطبقات منفصلة للرأس والعينين والحاجبين والملابس وأوضاع متعددة للفم. الحركة تلقائية بحسب الشخصية والمشهد.</p>
               <h3 className="mb-3 mt-6 text-sm font-black">الخلفية</h3>
               <div className="grid grid-cols-3 gap-2">
                 {THEMES.map(theme => <button type="button" key={theme.id} onClick={() => patchScene({ theme: theme.id as SceneTheme })} aria-pressed={selected.theme === theme.id}
@@ -403,24 +500,63 @@ function SocialCreator() {
 
             {panel === "audio" && <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
               <h2 className="flex items-center gap-2 text-lg font-black"><Volume2 className="size-5 text-cyan-500" /> التعليق الصوتي</h2>
-              <p className="mt-2 text-sm leading-7 text-slate-600">ارفع تعليقًا صوتيًا مسجلًا أو سجله مباشرة. يتحرك فم الشخصية تقريبياً بحسب شدة الصوت، ويدمج ملف الصوت فعليًا في الفيديو المصدر.</p>
+              <p className="mt-2 text-sm leading-7 text-slate-600">اختر تسجيلًا واحدًا للفيديو أو تعليقًا مستقلًا لكل مشهد. الفيديو النهائي يدمج المقاطع المسجلة فعليًا، ويحرك الفم وفق مستوى الصوت، وليس تعرفًا دقيقًا على الحروف.</p>
+              <div role="radiogroup" aria-label="طريقة التعليق الصوتي" className="mt-4 grid grid-cols-2 gap-2">
+                <button type="button" role="radio" aria-checked={project.narrationMode==="global"}
+                  className={"rounded-xl border p-3 text-xs font-extrabold "+(project.narrationMode==="global"?"border-cyan-500 bg-cyan-50 text-cyan-900":"border-slate-200")}
+                  onClick={()=>patchProject({narrationMode:"global"})}>صوت للفيديو بالكامل</button>
+                <button type="button" role="radio" aria-checked={project.narrationMode==="scenes"}
+                  className={"rounded-xl border p-3 text-xs font-extrabold "+(project.narrationMode==="scenes"?"border-cyan-500 bg-cyan-50 text-cyan-900":"border-slate-200")}
+                  onClick={()=>patchProject({narrationMode:"scenes"})}>صوت مستقل لكل مشهد</button>
+              </div>
+              {project.narrationMode==="scenes" && <div className="mt-4 rounded-xl bg-cyan-50 p-3 text-sm font-bold text-cyan-950">
+                الصوت الجاري تعديله: المشهد {active+1} — {selected.headline || "مشهد بلا عنوان"}
+                <p className="mt-1 text-xs font-normal">يمكن اختيار أي مشهد من الأزرار التالية وإرفاق صوت مختلف له. يظل الصوت مرتبطًا بالمشهد عند تغيير الترتيب.</p>
+                <div aria-label="اختيار مشهد الصوت" className="mt-3 flex flex-wrap gap-2">
+                  {project.scenes.map((s,i)=><button type="button" key={s.id}
+                    onClick={()=>{stopSceneVoice();audioPlayer.current?.pause();setPlaying(false);setActive(i);}}
+                    aria-pressed={active===i}
+                    className={"rounded-lg border px-3 py-2 text-xs font-bold "+(active===i?"border-cyan-500 bg-cyan-600 text-white":"border-cyan-200 bg-white text-cyan-900")}>
+                    المشهد {i+1} {sceneAudio.has(s.id)?"●":""}
+                  </button>)}
+                </div>
+              </div>}
               <div className="mt-5 flex flex-wrap gap-2">
                 <label className={secondary + " cursor-pointer"}><Upload className="size-4" /> رفع MP3 / WAV / WebM
-                  <input type="file" className="sr-only" accept="audio/*,.mp3,.wav,.webm,.m4a" onChange={e => { const file = e.target.files?.[0]; if (file) void useAudio(file, file.name); e.currentTarget.value = ""; }} />
+                  <input type="file" className="sr-only" accept="audio/*,.mp3,.wav,.webm,.m4a" onChange={e => { const file = e.target.files?.[0]; if (file) { if(project.narrationMode==="scenes")void useSceneAudio(file,selected.id);else void useAudio(file,file.name); } e.currentTarget.value = ""; }} />
                 </label>
                 {recordingMic ?
                   <button type="button" className="inline-flex items-center gap-2 rounded-2xl bg-rose-600 px-4 py-3 text-sm font-bold text-white" onClick={stopMic}><Square className="size-4" /> إنهاء التسجيل</button> :
                   <button type="button" className={primary} onClick={() => void startMic()}><Mic className="size-4" /> تسجيل صوت</button>}
               </div>
               {recordingMic && <p role="status" className="mt-3 text-sm font-bold text-rose-600">الميكروفون يسجل الآن. اضغط إنهاء التسجيل لحفظه.</p>}
-              {audio ? <div className="mt-5 rounded-2xl bg-emerald-50 p-4">
+              {project.narrationMode==="global" && audio ? <div className="mt-5 rounded-2xl bg-emerald-50 p-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div><strong className="block text-sm text-emerald-900">{audioName}</strong><span className="text-xs text-emerald-700">المدة: {formatSeconds(audioDuration)} · الحجم {(audio.size / 1024 / 1024).toFixed(1)} MB</span></div>
                   <button type="button" className="rounded-xl bg-white px-3 py-2 text-xs font-bold text-rose-600" onClick={() => void removeAudio()}>حذف الصوت</button>
                 </div>
                 {Math.abs(audioDuration - duration) > 1 && <p className="mt-3 text-xs leading-6 text-amber-900">مدة التعليق مختلفة عن مدة المشاهد ({formatSeconds(duration)}). سيُقطع الصوت الزائد أو يبقى باقي الفيديو صامتًا. اضبط أزمنة المشاهد لتتوافق معه.</p>}
-              </div> : <div className="mt-5 rounded-2xl bg-amber-50 p-4 text-sm leading-7 text-amber-900">لا يوجد ملف صوتي بعد. يمكن تصدير فيديو صامت، لكن إنشاء تعليق صوتي آلي غير مفعّل دون مزود توليد صوت حقيقي.</div>}
-              <p className="mt-4 text-xs leading-6 text-slate-500">الصوت محفوظ محليًا في IndexedDB، ولا يُرفع للخادم. نسخ JSON تتضمن المشاهد فقط ولا تحتوي على الملف الصوتي.</p>
+              </div> : null}
+              {project.narrationMode==="scenes" && <>
+                {activeSceneAudio && currentAnalysis ? <div className="mt-5 space-y-3 rounded-2xl bg-emerald-50 p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <strong className="text-sm text-emerald-900">التعليق الصوتي للمشهد {active+1} — {formatSeconds(currentAnalysis.duration)}</strong>
+                    <button type="button" className="rounded-lg bg-white px-3 py-2 text-xs font-bold text-rose-600" onClick={()=>void removeSceneAudio(selected.id)}>حذف تسجيل المشهد</button>
+                  </div>
+                  <div aria-label="الموجة الصوتية للمشهد" className="flex h-17 items-center justify-center gap-[2px] rounded-lg bg-white px-2">
+                    {voiceBarHeights(currentAnalysis.envelope,42).map((height,i)=><span key={i} className="w-1 flex-1 rounded-full bg-cyan-500" style={{height:height+"%"}} />)}
+                  </div>
+                  <label className="block text-sm font-bold">تأخير بداية الصوت داخل المشهد
+                    <select aria-label="تأخير بداية الصوت" className={input+" mt-2"} value={selected.audioDelayMs} onChange={e=>patchScene({audioDelayMs:Number(e.target.value)})}>
+                      {[0,250,500,750,1000,1500,2000,3000].filter(n=>n<selected.duration*1000-249).map(n=><option value={n} key={n}>{(n/1000).toFixed(2)} ثانية</option>)}
+                    </select>
+                  </label>
+                  {currentAnalysis.duration+selected.audioDelayMs/1000>selected.duration+.2 && <p className="text-xs text-amber-800">التعليق أطول من الوقت المتاح؛ سيتم قص الصوت تلقائيًا عند نهاية المشهد.</p>}
+                </div> : <div className="mt-5 rounded-2xl bg-amber-50 p-4 text-sm text-amber-900">لم تُضف تسجيلًا للمشهد {active+1} بعد. يمكنك رفع ملف أو تسجيل صوت الآن.</div>}
+                <div className="mt-3 text-xs font-bold text-slate-500">المشاهد التي تحتوي على صوت: {sceneAudio.size} من {project.scenes.length}</div>
+              </>}
+              {project.narrationMode==="global" && !audio && <div className="mt-5 rounded-2xl bg-amber-50 p-4 text-sm leading-7 text-amber-900">لا يوجد ملف صوتي بعد. يمكن تصدير فيديو صامت، لكن إنشاء تعليق صوتي آلي غير مفعّل دون مزود توليد صوت حقيقي.</div>}
+              <p className="mt-4 text-xs leading-6 text-slate-500">ملفات الصوت محفوظة محليًا في IndexedDB وليست جزءًا من نسخة JSON. احتفظ بنسخ ملفاتك الصوتية الأصلية بشكل مستقل.</p>
             </div>}
 
             {panel === "export" && <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
@@ -433,10 +569,22 @@ function SocialCreator() {
                   </select>
                 </label>
               </div>
+              <label className="mt-4 block text-sm font-bold">أسلوب ظهور الكلمات
+                <select aria-label="أسلوب ظهور الكلمات" className={input+" mt-2"} value={project.captionAnimation} onChange={e=>patchProject({captionAnimation:e.target.value as SocialProject["captionAnimation"]})}>
+                  <option value="static">عرض النص بالكامل</option>
+                  <option value="reveal">إظهار الكلمات بالتتابع (توقيت تقديري)</option>
+                </select>
+              </label>
+              <label className="mt-4 block text-sm font-bold">دقة التصدير
+                <select aria-label="دقة التصدير" className={input+" mt-2"} value={quality} onChange={e=>setQuality(e.target.value as "standard"|"high")}>
+                  <option value="standard">720×1280 — أسرع وأخف</option>
+                  <option value="high">1080×1920 — أعلى دقة، يتطلب جهازًا أقوى</option>
+                </select>
+              </label>
               <label className="mt-4 flex items-center gap-3 text-sm font-bold"><input type="checkbox" checked={project.showCaptions} onChange={e => patchProject({ showCaptions: e.target.checked })} className="size-5 accent-cyan-500" /> إظهار نصوص المشاهد داخل الفيديو</label>
               <div className="mt-5 rounded-2xl bg-slate-50 p-4 text-sm leading-7 text-slate-600">
                 <strong className="block text-slate-900">مواصفات النسخة الحالية</strong>
-                فيديو رأسي 9:16 · دقة 720×1280 · 24 إطار/ثانية · WebM. التصدير يعمل في الوقت الحقيقي، ويجب إبقاء علامة تبويب الموقع ظاهرة طوال العملية. MP4 غير متاح حاليًا.
+                فيديو رأسي 9:16 · دقة {quality==="high"?"1080×1920":"720×1280"} · 24 إطار/ثانية · WebM. التصدير يعمل في الوقت الحقيقي، ويجب إبقاء علامة تبويب الموقع ظاهرة طوال العملية. MP4 غير متاح حاليًا.
               </div>
               <div className="mt-5 flex flex-wrap gap-2">
                 <button type="button" className={secondary} onClick={() => saveFile(new Blob([JSON.stringify(project, null, 2)], { type: "application/json" }), "cartoon-project.json")}><FolderDown className="size-4" /> نسخة JSON</button>
@@ -445,7 +593,7 @@ function SocialCreator() {
                 </label>
                 <button type="button" className={secondary} onClick={() => saveFile(new Blob(["\ufeff", srtForProject(project)], { type: "text/plain;charset=utf-8" }), "cartoon-subtitles.srt")}><Captions className="size-4" /> ترجمة SRT</button>
               </div>
-              <button type="button" disabled={exporting || recordingMic || !exportSupported} className={primary + " mt-5 w-full !bg-cyan-600 hover:!bg-cyan-700"} onClick={() => void exportVideo()}><Download className="size-5" /> تصدير فيديو WebM {audio ? "بالصوت" : "صامت"}</button>
+              <button type="button" disabled={exporting || recordingMic || !exportSupported} className={primary + " mt-5 w-full !bg-cyan-600 hover:!bg-cyan-700"} onClick={() => void exportVideo()}><Download className="size-5" /> تصدير فيديو WebM {hasNarration ? "بالصوت" : "صامت"}</button>
               {exporting && <div className="mt-4 space-y-2">
                 <div className="flex items-center justify-between text-xs font-extrabold"><span>جاري تركيب المشاهد والصوت</span><span>{exportPercent}%</span></div>
                 <div className="h-3 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-cyan-500 transition-all" style={{ width: exportPercent + "%" }} /></div>
@@ -473,7 +621,7 @@ function SocialCreator() {
                   <div className="h-2.5 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-cyan-500" style={{ width: (playing ? position / duration : timelineStart(project, active) / duration) * 100 + "%" }} /></div>
                 </div>
               </div>
-              <p className="mt-4 rounded-2xl bg-slate-50 p-3 text-center text-xs leading-6 text-slate-600">الشفاه تتحرك تقريبياً مع مستوى الصوت المسجل، بينما تظهر المشاهد والعناوين والنصوص في المعاينة وفي الملف المصدر.</p>
+              <p className="mt-4 rounded-2xl bg-slate-50 p-3 text-center text-xs leading-6 text-slate-600">طبقات وجه وتعبيرات مختلفة، وحركة فم تقريبية حسب شدة الصوت. يمكن تخصيص تعليق مستقل لكل مشهد. إظهار الكلمات بالتتابع تقديري وليس توقيتًا مستخرجًا من الصوت.</p>
               <div className="mt-4 flex flex-wrap gap-2">
                 <button type="button" onClick={() => setPanel("audio")} className="flex-1 rounded-xl bg-cyan-50 px-3 py-3 text-xs font-extrabold text-cyan-800">1 · التعليق الصوتي</button>
                 <button type="button" onClick={() => setPanel("export")} className="flex-1 rounded-xl bg-slate-100 px-3 py-3 text-xs font-extrabold text-slate-800">2 · تحميل الفيديو</button>

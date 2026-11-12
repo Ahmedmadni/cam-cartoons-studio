@@ -1,7 +1,8 @@
 import { describe, expect, test } from "bun:test";
+import { planSceneAudio, sceneVoiceEnergyAt, voiceBarHeights } from "../src/lib/socialAudioTimeline";
 import {
   STARTER, MAX_DURATION_SECONDS, MAX_SCENES, parseSocialProject,
-  projectSeconds, sceneAt, srtForProject,
+  projectSeconds, sceneAt, srtForProject, visibleCaptionAt,
 } from "../src/lib/socialStudio";
 
 describe("2D social content timeline", () => {
@@ -38,5 +39,58 @@ describe("2D social content timeline", () => {
     expect(srt).toContain("00:00:05,000 --> 00:00:13,000");
     expect(srt).toContain("00:00:13,000 --> 00:00:19,000");
     expect(srt).toContain("معلومة بسيطة");
+  });
+});
+
+
+describe("Expressive 2D animation and per-scene narration migration", () => {
+  test("old v1 JSON loads without losing story details", () => {
+    const legacy = {
+      ...STARTER, narrationMode: undefined, captionAnimation: undefined,
+      scenes: STARTER.scenes.map(s=>({...s,expression:undefined,audioDelayMs:undefined})),
+    };
+    const migrated = parseSocialProject(legacy);
+    expect(migrated.narrationMode).toBe("global");
+    expect(migrated.captionAnimation).toBe("static");
+    expect(migrated.scenes.every(s=>s.expression==="happy" && s.audioDelayMs===0)).toBe(true);
+  });
+  test("a different voice clip for each scene stays on stable scene boundaries", () => {
+    const project = parseSocialProject({
+      ...STARTER,
+      narrationMode:"scenes",
+      scenes: [
+        {...STARTER.scenes[0],duration:4,audioDelayMs:500},
+        {...STARTER.scenes[1],duration:4,audioDelayMs:1000},
+      ],
+    });
+    const lengths = new Map([["scene-1",12],["scene-2",1.5]]);
+    expect(planSceneAudio(project,lengths)).toEqual([
+      { sceneId:"scene-1",startSeconds:.5,durationSeconds:3.5 },
+      { sceneId:"scene-2",startSeconds:5,durationSeconds:1.5 },
+    ]);
+    const energy = new Map([["scene-1",new Float32Array(120).fill(.45)],["scene-2",new Float32Array(120).fill(.8)]]);
+    expect(sceneVoiceEnergyAt(project,.1,energy)).toBe(0);
+    expect(sceneVoiceEnergyAt(project,1,energy)).toBeCloseTo(.45);
+    expect(sceneVoiceEnergyAt(project,4.8,energy)).toBe(0);
+    expect(sceneVoiceEnergyAt(project,5.5,energy)).toBeCloseTo(.8);
+  });
+  test("rejects unsupported visual modes and invalid audio delays safely", () => {
+    const parsed = parseSocialProject({...STARTER,narrationMode:"impossible",captionAnimation:"broken",
+      scenes:[{...STARTER.scenes[0],expression:"magic",audioDelayMs:-100}]});
+    expect(parsed.narrationMode).toBe("global");
+    expect(parsed.captionAnimation).toBe("static");
+    expect(parsed.scenes[0]?.expression).toBe("happy");
+    expect(parsed.scenes[0]?.audioDelayMs).toBe(0);
+  });
+  test("text reveal is deterministic and never claims speech-level timestamps", () => {
+    expect(visibleCaptionAt("أهلا بكم في الحلقة",0,4,"reveal")).toBe("أهلا");
+    expect(visibleCaptionAt("أهلا بكم في الحلقة",2,4,"reveal")).toBe("أهلا بكم");
+    expect(visibleCaptionAt("أهلا بكم في الحلقة",4,4,"reveal")).toBe("أهلا بكم في الحلقة");
+    expect(visibleCaptionAt("أهلا بكم في الحلقة",0,4,"static")).toBe("أهلا بكم في الحلقة");
+  });
+  test("waveform bins are bounded and safe for empty samples", () => {
+    expect(voiceBarHeights(new Float32Array([.2,.7,.1]),3)).toEqual([20,70,10]);
+    expect(voiceBarHeights(new Float32Array(),3)).toEqual([8,8,8]);
+    expect(voiceBarHeights(new Float32Array([.7]),500)).toEqual([]);
   });
 });

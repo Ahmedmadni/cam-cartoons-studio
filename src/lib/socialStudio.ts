@@ -6,6 +6,9 @@ export type CartoonId = "sami" | "layla" | "omar" | "nour";
 export type SceneTheme = "sky" | "studio" | "classroom" | "warm" | "night" | "mint";
 export type SceneMotion = "talk" | "explain" | "wave" | "idle";
 export type SceneTransition = "cut" | "fade";
+export type SceneExpression = "happy" | "neutral" | "curious" | "serious" | "surprised";
+export type NarrationMode = "global" | "scenes";
+export type CaptionAnimation = "static" | "reveal";
 
 export type SocialScene = {
   id: string;
@@ -14,6 +17,9 @@ export type SocialScene = {
   character: CartoonId;
   theme: SceneTheme;
   motion: SceneMotion;
+  expression: SceneExpression;
+  /** Delay inside this scene before playing its voice clip. */
+  audioDelayMs: number;
   transition: SceneTransition;
   duration: number;
 };
@@ -24,6 +30,8 @@ export type SocialProject = {
   watermark: string;
   captionColor: "white" | "yellow";
   showCaptions: boolean;
+  captionAnimation: CaptionAnimation;
+  narrationMode: NarrationMode;
   scenes: SocialScene[];
 };
 
@@ -32,6 +40,10 @@ export const CARTOONS: ReadonlyArray<{ id: CartoonId; name: string; description:
   { id: "layla", name: "ليلى", description: "شخصية محجبة", color: "#aa81e8" },
   { id: "omar", name: "عمر", description: "مدرس بنظارة", color: "#54b6a4" },
   { id: "nour", name: "نور", description: "روبوت لطيف", color: "#79b7fa" },
+];
+export const EXPRESSIONS: ReadonlyArray<{ id: SceneExpression; name: string }> = [
+  { id: "happy", name: "مبتسم" }, { id: "neutral", name: "طبيعي" },
+  { id: "curious", name: "متسائل" }, { id: "serious", name: "جاد" }, { id: "surprised", name: "مندهش" },
 ];
 export const THEMES: ReadonlyArray<{ id: SceneTheme; name: string; color: string }> = [
   { id: "sky", name: "سماء مشرقة", color: "#5ce7ea" },
@@ -48,10 +60,12 @@ export const STARTER: SocialProject = {
   watermark: "ahmedelmadni.com",
   captionColor: "white",
   showCaptions: true,
+  captionAnimation: "static",
+  narrationMode: "global",
   scenes: [
-    { id: "scene-1", headline: "هل تعلم؟", caption: "معلومة بسيطة ممكن تغير طريقة تفكيرك!", character: "sami", theme: "sky", motion: "wave", transition: "cut", duration: 5 },
-    { id: "scene-2", headline: "الفكرة", caption: "الفهم الجيد يبدأ بسؤال واحد واضح.", character: "omar", theme: "classroom", motion: "explain", transition: "fade", duration: 8 },
-    { id: "scene-3", headline: "الخلاصة", caption: "شارك المعلومة مع شخص ممكن يستفيد منها.", character: "layla", theme: "warm", motion: "talk", transition: "fade", duration: 6 },
+    { id: "scene-1", headline: "هل تعلم؟", caption: "معلومة بسيطة ممكن تغير طريقة تفكيرك!", character: "sami", theme: "sky", motion: "wave", expression: "happy", audioDelayMs: 0, transition: "cut", duration: 5 },
+    { id: "scene-2", headline: "الفكرة", caption: "الفهم الجيد يبدأ بسؤال واحد واضح.", character: "omar", theme: "classroom", motion: "explain", expression: "curious", audioDelayMs: 0, transition: "fade", duration: 8 },
+    { id: "scene-3", headline: "الخلاصة", caption: "شارك المعلومة مع شخص ممكن يستفيد منها.", character: "layla", theme: "warm", motion: "talk", expression: "happy", audioDelayMs: 0, transition: "fade", duration: 6 },
   ],
 };
 
@@ -76,6 +90,7 @@ const ids = new Set(CARTOONS.map(item => item.id));
 const themeIds = new Set(THEMES.map(item => item.id));
 const motions = new Set(["talk", "explain", "wave", "idle"]);
 const transitions = new Set(["cut", "fade"]);
+const expressions = new Set(EXPRESSIONS.map(item => item.id));
 const safeText = (value: unknown, max: number, fallback = "") =>
   typeof value === "string" ? value.slice(0, max) : fallback;
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -104,6 +119,8 @@ export function parseSocialProject(value: unknown): SocialProject {
       character: ids.has(v["character"] as CartoonId) ? v["character"] as CartoonId : "sami",
       theme: themeIds.has(v["theme"] as SceneTheme) ? v["theme"] as SceneTheme : "sky",
       motion: motions.has(v["motion"] as string) ? v["motion"] as SceneMotion : "talk",
+      expression: expressions.has(v["expression"] as SceneExpression) ? v["expression"] as SceneExpression : "happy",
+      audioDelayMs: Number.isInteger(v["audioDelayMs"]) && typeof v["audioDelayMs"] === "number" && v["audioDelayMs"] >= 0 && v["audioDelayMs"] <= (duration * 1000 - 250) ? v["audioDelayMs"] as number : 0,
       transition: transitions.has(v["transition"] as string) ? v["transition"] as SceneTransition : "cut",
       duration,
     };
@@ -114,6 +131,8 @@ export function parseSocialProject(value: unknown): SocialProject {
     watermark: safeText(value["watermark"], 60),
     captionColor: value["captionColor"] === "yellow" ? "yellow" : "white",
     showCaptions: value["showCaptions"] !== false,
+    captionAnimation: value["captionAnimation"] === "reveal" ? "reveal" : "static",
+    narrationMode: value["narrationMode"] === "scenes" ? "scenes" : "global",
     scenes,
   };
   if (projectSeconds(project) > MAX_DURATION_SECONDS) throw new Error("مدة الفيديو تتجاوز دقيقتين.");
@@ -136,4 +155,18 @@ export function srtForProject(project: SocialProject): string {
     start = end;
     return result;
   }).join("\n\n") + "\n";
+}
+
+
+/**
+ * Visual word reveal uses scene timing, not speech transcription. It deliberately
+ * does not claim spoken-word accuracy or mutate the authored caption.
+ */
+export function visibleCaptionAt(text: string, elapsed: number, duration: number, mode: CaptionAnimation): string {
+  if (mode !== "reveal") return text;
+  const words = text.trim().split(/\s+/).filter(Boolean);
+  if (!words.length) return "";
+  const fraction = Math.min(1, Math.max(0, elapsed / Math.max(0.001, duration)));
+  const count = Math.max(1, Math.ceil(words.length * fraction));
+  return words.slice(0, count).join(" ");
 }

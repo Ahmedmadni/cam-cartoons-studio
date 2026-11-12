@@ -94,6 +94,36 @@ def main():
             expect(page.get_by_label("عنوان المشروع")).to_have_value("فيديو تجربة 2D")
             page.get_by_role("button", name="الصوت", exact=True).click()
             expect(page.get_by_text("تعليق صوتي محفوظ")).to_be_visible(timeout=15000)
+            # Real per-scene audio export: no external service, no fallback to global narration.
+            page.get_by_role("radio", name="صوت مستقل لكل مشهد").click()
+            page.locator('input[type="file"][accept^="audio/"]').set_input_files(str(fixture))
+            expect(page.get_by_text("التعليق الصوتي للمشهد 1", exact=False)).to_be_visible(timeout=12000)
+            page.get_by_label("تأخير بداية الصوت").select_option("250")
+            page.get_by_role("button", name="الشخصيات", exact=True).click()
+            expect(page.locator('canvas[aria-label^="رسم شخصية"]')).to_have_count(4)
+            page.screenshot(path=str(out / "character-rigs.png"), full_page=False)
+            page.get_by_label("تعبير الوجه").select_option("curious")
+            page.get_by_role("button", name="التصدير", exact=True).click()
+            page.get_by_label("أسلوب ظهور الكلمات").select_option("reveal")
+            page.get_by_label("دقة التصدير").select_option("high")
+            page.get_by_role("button", name="تصدير فيديو WebM بالصوت").click()
+            expect(page.get_by_text("الفيديو جاهز للمعاينة والتحميل")).to_be_visible(timeout=35000)
+            with page.expect_download() as hd_download:
+                page.get_by_role("button", name="تنزيل الفيديو").click()
+            hd = hd_download.value.path()
+            assert hd is not None and hd.stat().st_size > 4096, "HD scene-voice output is empty"
+            if shutil.which("ffprobe"):
+                probe = subprocess.run(["ffprobe","-v","error","-show_entries",
+                                       "stream=codec_type,width,height","-of","json",str(hd)],
+                                       check=True,capture_output=True,text=True)
+                import json
+                streams = json.loads(probe.stdout)["streams"]
+                assert any(s.get("codec_type")=="audio" for s in streams), "No scene voice track"
+                assert any(s.get("width")==1080 and s.get("height")==1920 for s in streams), "Not full HD"
+            page.reload(wait_until="networkidle")
+            page.get_by_role("button", name="الصوت", exact=True).click()
+            expect(page.get_by_role("radio", name="صوت مستقل لكل مشهد")).to_have_attribute("aria-checked","true")
+            expect(page.get_by_text("التعليق الصوتي للمشهد 1", exact=False)).to_be_visible(timeout=15000)
             mobile = browser.new_page(viewport={"width": 390, "height": 844}, device_scale_factor=2)
             mobile.goto(URL, wait_until="networkidle")
             expect(mobile.get_by_role("heading", name="من الفكرة إلى فيديو بشخصية كرتونية")).to_be_visible()

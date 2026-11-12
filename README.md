@@ -5,10 +5,10 @@ Arabic-first **2D narrated short-video editor** for TikTok, Reels and Shorts. Us
 ## Real features
 
 1. Up to 20 editable scenes totaling 120 seconds.
-2. Four original programmatically drawn 2D cartoon actors, six backgrounds, motion presets, titles and captions.
-3. Microphone recording or uploaded audio; persist the real blob in IndexedDB; mouth movement follows audio volume (not phonemes).
-4. Full vertical story preview and baked Arabic captions.
-5. Real-time **720×1280, 24 fps WebM** export, muxing the uploaded/recorded audio through Web Audio. Supports deliberate silent export if there is no clip.
+2. Four expressive layered, vector-rendered cartoon actors with independently animated eyes, brows, mouth poses, articulated arms, five emotions, six backgrounds and motion presets.
+3. Microphone recording or uploaded audio. Choose whole-film narration or an independent clip for each scene with waveform and per-scene delay; IndexedDB keeps real audio files keyed to stable scene IDs.
+4. Full vertical story preview and baked Arabic captions; selectable static or approximate word-reveal animation.
+5. Real-time **720×1280 or 1080×1920, 24 fps WebM** export. Web Audio muxes each clip at its scene start plus optional delay and trims audio exactly to scene boundaries. Supports silent output when no audio exists.
 6. Download editable JSON scene backup or separate SRT subtitles.
 
 ## Accurate limitations
@@ -17,7 +17,9 @@ Arabic-first **2D narrated short-video editor** for TikTok, Reels and Shorts. Us
 - No hosted generative AI, automatic voice synthesis, voice cloning, transcription, MP4 or music library is implemented.
 - Mic access requires HTTPS/localhost and browser permission. Some uploaded files may not decode despite their extension.
 - The WebM export occurs in real time; the browser tab must stay visible and the device must support MediaRecorder. Current preview/export is capped at two minutes and 720×1280.
-- A supplied audio clip starts at time zero and is cut to the storyboard duration; there is not yet per-scene waveform alignment. Mismatched lengths are warned about.
+- Whole-video audio starts at zero; per-scene audio begins at the selected scene plus its user-defined delay. Clips longer than the available scene are truncated. There is no automatic voice-to-word alignment.
+- The reveal of Arabic words is **estimated uniformly from scene duration**, not derived from speech timestamps. Mouth poses are driven by PCM amplitude, not viseme / phoneme inference.
+- 1080p export demands more browser memory and can drop frames on slower devices. Validate it on intended phones.
 - Local project metadata is saved in localStorage; audio in IndexedDB. Clearing browser storage destroys local work.
 - **JSON backups omit audio**. Keep your source audio separately.
 - The user-provided cartoon picture is an art-direction reference; the new four programmatic vector characters are not a motion-rig copy of that picture.
@@ -26,7 +28,9 @@ Arabic-first **2D narrated short-video editor** for TikTok, Reels and Shorts. Us
 
 - src/routes/index.tsx — responsive authoring workflow
 - src/lib/socialStudio.ts — safe versioned schema, timeline and SRT
-- src/lib/socialCanvas.ts — 2D character rendering, headlines and captions
+- src/lib/socialCanvas.ts — 2D scene compositor and captions
+- src/lib/socialCharacterRig.ts — expressive layered character rigs
+- src/lib/socialAudioTimeline.ts — pure audio cue scheduling and waveform bins
 - src/lib/socialVideo.ts — audio persistence, amplitude, WebM compositor
 - tests/socialStudio.test.ts — contract tests
 - scripts/browser_social_smoke.py — browser recording smoke test
@@ -47,10 +51,10 @@ The still-open [3D audio PR #33](https://github.com/Ahmedmadni/cam-cartoons-stud
 
 ## Priority roadmap
 
-1. Commission/license a consistent high-fidelity **2D layered art pack** matching the uploaded reference: separate eyes, brows, hands and 6–12 mouth shapes per reusable character.
-2. Per-scene audio dialogue, waveform editor, proper speech timing / visemes, multi-character dialogue.
+1. Refine and art-direct a truly production-grade **layered, editable 2D art pack** matching the supplied illustrated style (current rigs are original Canvas vectors, not a copy of the supplied image).
+2. Add forced-alignment phoneme/viseme timing and word-level narration synchronization; current audio envelopes and uniform caption reveal are deliberately approximate.
 3. Word-level captions, audio transcription, optional API-backed Arabic voice generation with consent and clear cost.
-4. H.264 MP4, tested 1080×1920 export, browser/mobile performance improvements.
+4. H.264 MP4 and tested iOS/Android high-resolution performance improvements.
 5. Multi-project media backups and compatibility matrix.
 6. Once old data is migrated: remove GLB, camera, Ready Player Me and legacy UI/dependencies, with test-driven cleanup.
 
