@@ -11,10 +11,11 @@
 import type { CartoonId, SceneExpression, SceneMotion } from "./socialStudio";
 import { SAMI_REFERENCE_WEBP } from "./socialReferenceArt";
 import { createBuiltinSamiArt } from "./builtinSamiRig";
+import { createBuiltinCastArt } from "./builtinCastArt";
 import { defaultRigSettings, evaluateRigPose, type RigSettings } from "./characterRig";
 import { isFullCutoutRig, paintCutoutRig, RIG_REQUIRED_LAYERS } from "./characterRigRenderer";
 
-export type CharacterArtLayer = "base" | "mouthClosed" | "mouthOpen" | "eyesClosed" |
+export type CharacterArtLayer = "base" | "mouthClosed" | "mouthSmall" | "mouthRound" | "mouthOpen" | "mouthWide" | "eyesClosed" |
   "torso" | "head" | "leftUpperArm" | "leftForearm" | "leftHand" |
   "rightUpperArm" | "rightForearm" | "rightHand" |
   "eyesOpen" | "eyesHalf" | "browsNeutral" | "browsRaised";
@@ -23,6 +24,7 @@ export const ART_LAYER_LABELS: Record<CharacterArtLayer, string> = {
   base: "الرسم الأساسي المتكامل",
   mouthClosed: "طبقة الفم المغلق",
   mouthOpen: "طبقة الفم المفتوح",
+  mouthSmall:"الفم نصف مفتوح",mouthRound:"الفم المستدير",mouthWide:"الفم المفتوح بالكامل",
   eyesClosed: "طبقة العينين المغلقتين",
   torso:"الجذع والملابس (شفاف)",head:"الرأس والشعر (شفاف)",
   leftUpperArm:"العضد الأيسر",leftForearm:"الساعد الأيسر",leftHand:"اليد اليسرى",
@@ -37,7 +39,7 @@ const MAX_PIXELS = 4096 * 4096;
 const cache = new Map<CartoonId, CharacterArt>();
 const IDS: CartoonId[] = ["sami","layla","omar","nour"];
 const layers: CharacterArtLayer[] = [
-  "base","mouthClosed","mouthOpen","eyesClosed",
+  "base","mouthClosed","mouthSmall","mouthRound","mouthOpen","mouthWide","eyesClosed",
   "torso","head","leftUpperArm","leftForearm","leftHand",
   "rightUpperArm","rightForearm","rightHand","eyesOpen","eyesHalf","browsNeutral","browsRaised",
 ];
@@ -148,19 +150,35 @@ export async function hydrateCharacterArt():Promise<void> {
     }
     if(images.base){
       for(const layer of layers)updateCache(character,layer,images[layer]);
-    } else if(character==="sami") {
-      // First-party art is bundled with the app. A user's uploaded base always
-      // takes precedence. Locally saved facial overlays can customize that art.
-      await restoreSamiReferenceArt();
-      const base=getCharacterArt("sami")?.base;
+    } else {
+      // Only a missing user-supplied BASE receives a built-in actor. A saved
+      // custom base always wins; previously saved overlays remain user-owned.
+      await restoreBuiltinCharacterArt(character);
+      const base=getCharacterArt(character)?.base;
       for(const layer of layers){
         if(layer==="base")continue;
         const image=images[layer];
         if(image && base && image.width===base.width && image.height===base.height)
-          updateCache("sami",layer,image);
+          updateCache(character,layer,image);
         else image?.close();
       }
     }
+  }
+}
+export async function restoreBuiltinCharacterArt(character:CartoonId):Promise<void> {
+  if(getCharacterArt(character))return;
+  if(character==="sami"){await restoreSamiReferenceArt();return;}
+  try{
+    const art=await createBuiltinCastArt(character);
+    if(getCharacterArt(character)){
+      for(const bitmap of Object.values(art))bitmap?.close();
+      return;
+    }
+    for(const [layer,bitmap] of Object.entries(art))
+      if(bitmap)updateCache(character,layer as CharacterArtLayer,bitmap);
+  }catch {
+    // Old vector preview remains available when the browser cannot decode
+    // one of the built-in layers; never delete the user's existing project.
   }
 }
 export async function restoreSamiReferenceArt():Promise<void> {
