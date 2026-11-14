@@ -203,7 +203,7 @@ export async function exportSocialVideo({
       signal?.addEventListener("abort",onAbort,{once:true});
       document.addEventListener("visibilitychange",onHidden);
     });
-    recorder.start(1000);
+    recorder.start(250); // frequent chunks help short clips yield data before stop
     const startClock=context?context.currentTime:performance.now()/1000;
     for(const cue of clipStarts)cue.source.start(startClock+.04+cue.start,0,cue.duration);
     const tick=()=>{
@@ -223,6 +223,14 @@ export async function exportSocialVideo({
       }
       onProgress?.(Math.min(1,progress/duration));
       if(elapsed>=duration){
+        // A busy 1080p encoder may have no frame-ready chunks at the precise
+        // storyboard endpoint. Allow a bounded flush grace period rather than
+        // producing an empty file; the last scene stays frozen while flushing.
+        const grace = quality==="high" ? 1.5 : .5;
+        if(chunks.length===0 && elapsed<duration+grace){
+          raf=requestAnimationFrame(tick);
+          return;
+        }
         if(recorder.state!=="inactive"){
           try{recorder.requestData();}catch{/* may already be stopping */}
           recorder.stop();
