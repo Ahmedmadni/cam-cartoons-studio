@@ -12,7 +12,7 @@ import type { CartoonId, SceneExpression, SceneMotion } from "./socialStudio";
 import { SAMI_REFERENCE_WEBP } from "./socialReferenceArt";
 import { createBuiltinSamiArt } from "./builtinSamiRig";
 import { createBuiltinCastArt } from "./builtinCastArt";
-import { defaultRigSettings, evaluateRigPose, type RigSettings } from "./characterRig";
+import { automaticSceneRigPose, defaultRigSettings, evaluateRigPose, type RigSettings } from "./characterRig";
 import { isFullCutoutRig, paintCutoutRig, RIG_REQUIRED_LAYERS } from "./characterRigRenderer";
 
 export type CharacterArtLayer = "base" | "mouthClosed" | "mouthSmall" | "mouthRound" | "mouthOpen" | "mouthWide" | "eyesClosed" |
@@ -224,8 +224,11 @@ export function paintIllustratedCharacter(
   const art=getCharacterArt(character);
   if(!art?.base)return false;
   if (isFullCutoutRig(art)) {
-    const pose=evaluateRigPose(rigSettings??defaultRigSettings(),elapsedMs,voiceAmplitude);
-    return paintCutoutRig(ctx,art,rigSettings??defaultRigSettings(),pose,time);
+    const rig=rigSettings??defaultRigSettings();
+    const pose=rigSettings
+      ? evaluateRigPose(rig,elapsedMs,voiceAmplitude)
+      : automaticSceneRigPose(motion,expression,elapsedMs,voiceAmplitude);
+    return paintCutoutRig(ctx,art,rig,pose,time);
   }
   const w=488,h=644;
   const x=360-w/2,y=249+4*Math.sin(time*2.3);
