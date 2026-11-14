@@ -2,6 +2,7 @@ import { describe,expect,test } from "bun:test";
 import {
   JOINT_META, PIVOT_IDS, DEFAULT_RIG_POSE,
   defaultRigSettings, readRigSettings, evaluateRigPose, putRigKeyframe,
+  automaticSceneRigPose,
 } from "../src/lib/characterRig";
 import {parseSocialProject, STARTER} from "../src/lib/socialStudio";
 import { mouthPoseAt } from "../src/lib/characterRigRenderer";
@@ -76,5 +77,33 @@ describe("Five-pose mouth illustration selection",()=>{
     expect(mouthPoseAt(.34)).toBe("mouthRound");
     expect(mouthPoseAt(.57)).toBe("mouthOpen");
     expect(mouthPoseAt(.84)).toBe("mouthWide");
+  });
+});
+
+describe("automatic built-in character scene motions",()=>{
+  test("wave gestures articulate shoulder, elbow and wrist, not only the mouth",()=>{
+    const start=automaticSceneRigPose("wave","happy",0,.3);
+    const middle=automaticSceneRigPose("wave","happy",1800,.3);
+    const next=automaticSceneRigPose("wave","happy",2200,.3);
+    expect(start.rightWrist).toBe(0);
+    expect(middle.rightShoulder).toBeLessThan(-30);
+    expect(middle.rightElbow).toBeLessThan(-60);
+    expect(middle.rightWrist).not.toBeCloseTo(next.rightWrist);
+    expect(middle.mouth).toBeCloseTo(.75);
+  });
+  test("explaining animates both arms, idle leaves lip closed",()=>{
+    const explain=automaticSceneRigPose("explain","curious",1500,.2);
+    expect(explain.rightElbow).toBeLessThan(-45);
+    expect(explain.leftElbow).toBeLessThan(-10);
+    expect(explain.brows).toBeGreaterThan(0);
+    const idle=automaticSceneRigPose("idle","neutral",1500,1);
+    expect(idle.mouth).toBe(0);
+    expect(Math.abs(idle.rightElbow)).toBe(0);
+  });
+  test("motion remains bounded and stable with unexpected time/energy",()=>{
+    const v=automaticSceneRigPose("talk","surprised",Number.NaN,100);
+    expect(v.mouth).toBe(1);
+    expect(v.rightShoulder).toBe(0);
+    expect(v.brows).toBeLessThanOrEqual(1);
   });
 });
