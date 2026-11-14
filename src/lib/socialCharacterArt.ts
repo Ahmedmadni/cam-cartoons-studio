@@ -153,7 +153,7 @@ export async function hydrateCharacterArt():Promise<void> {
     } else {
       // Only a missing user-supplied BASE receives a built-in actor. A saved
       // custom base always wins; previously saved overlays remain user-owned.
-      await restoreBuiltinCharacterArt(character);
+      await restoreBundledCharacterArt(character);
       const base=getCharacterArt(character)?.base;
       for(const layer of layers){
         if(layer==="base")continue;
@@ -165,7 +165,7 @@ export async function hydrateCharacterArt():Promise<void> {
     }
   }
 }
-export async function restoreBuiltinCharacterArt(character:CartoonId):Promise<void> {
+export async function restoreBundledCharacterArt(character:CartoonId):Promise<void> {
   if(getCharacterArt(character))return;
   if(character==="sami"){await restoreSamiReferenceArt();return;}
   try{
