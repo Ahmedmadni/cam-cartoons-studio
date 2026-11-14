@@ -198,7 +198,16 @@ def main():
             page.get_by_label("أسلوب ظهور الكلمات").select_option("reveal")
             page.get_by_label("دقة التصدير").select_option("high")
             page.get_by_role("button", name="تصدير فيديو WebM بالصوت").click()
-            expect(page.get_by_text("الفيديو جاهز للمعاينة والتحميل")).to_be_visible(timeout=35000)
+            try:
+                expect(page.get_by_text("الفيديو جاهز للمعاينة والتحميل")).to_be_visible(timeout=18000)
+            except AssertionError:
+                print("HD EXPORT DEBUG URL:",page.url,flush=True)
+                print("HD EXPORT ALERTS:",page.locator('[role="alert"]').all_text_contents(),flush=True)
+                print("HD EXPORT STATUS:",page.locator('[role="status"]').all_text_contents(),flush=True)
+                print("HD EXPORT MESSAGES:",page.locator("main").inner_text()[-2500:],flush=True)
+                print("HD EXPORT JS ERRORS:",errors,flush=True)
+                page.screenshot(path=str(out / "high-res-export-failure.png"),full_page=False)
+                raise
             with page.expect_download() as hd_download:
                 page.get_by_role("button", name="تنزيل الفيديو").click()
             hd = hd_download.value.path()
