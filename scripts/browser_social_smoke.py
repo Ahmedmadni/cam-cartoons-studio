@@ -131,7 +131,9 @@ def main():
                 ("نور روبوت لطيف", "nour"),
             ]:
                 page.get_by_role("button", name=label).click()
-                page.wait_for_timeout(170)
+                expect(page.get_by_text("المفاصل جاهزة للتحريك",exact=False)).to_be_visible(timeout=30000)
+                expect(page.get_by_text("خمس وضعيات فم",exact=False)).to_be_visible(timeout=30000)
+                page.wait_for_timeout(190)
                 page.screenshot(path=str(out / ("portrait-" + slug + ".png")), full_page=False)
             page.get_by_role("button", name="سامي مقدم شاب").click()
             expect(page.get_by_text("الشخصية لها رسم مصور", exact=False)).to_be_visible(timeout=15000)
@@ -188,6 +190,8 @@ def main():
             page.get_by_role("button",name="المفاصل",exact=True).click()
             expect(page.get_by_text("عدد إطارات الحركة المحفوظة: 2",exact=False)).to_be_visible()
             page.get_by_role("button",name="الشخصيات",exact=True).click()
+            page.get_by_role("button",name="استعادة الشخصية الافتراضية").click()
+            expect(page.get_by_text("خمس وضعيات فم",exact=False)).to_be_visible(timeout=20000)
             page.get_by_role("button", name="عمر مدرس بنظارة").click()
             page.get_by_label("تعبير الوجه").select_option("curious")
             page.get_by_role("button", name="التصدير", exact=True).click()
