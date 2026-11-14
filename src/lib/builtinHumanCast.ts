@@ -106,16 +106,16 @@ const OMAR_GLASSES=`
 <path d="M191 207 L204 203 M271 206 L281 202"
  stroke="#fff" stroke-width="2.5" opacity=".73" fill="none" stroke-linecap="round"/>`;
 function mouthVariations(layers:Record<string,string>,color:string){
-  layers.mouthSmall=`
+  layers["mouthSmall"]=`
 <path d="M231 280 Q245 274 263 280 Q274 286 263 294 Q243 299 231 290Z"
  fill="MOUTHCOLOR" stroke="#773c4b" stroke-width="2.3"/>
 <path d="M235 282 Q248 281 261 282 Q252 288 237 286Z" fill="#fff7ed"/>`.replace("MOUTHCOLOR",color);
-  layers.mouthRound=`
+  layers["mouthRound"]=`
 <path d="M240 272 C247 270 261 269 268 278 C274 290 268 305 254 306
  C240 308 234 298 235 285 Q235 276 240 272Z"
  fill="MOUTHCOLOR" stroke="#793949" stroke-width="2.4"/>
 <ellipse cx="253" cy="298" rx="9" ry="4" fill="#e98d9b"/>`.replace("MOUTHCOLOR",color);
-  layers.mouthWide=`
+  layers["mouthWide"]=`
 <path d="M224 280 C239 270 269 271 284 279 Q294 299 276 314
  Q253 330 230 313 Q217 297 224 280Z"
  fill="MOUTHCOLOR" stroke="#793844" stroke-width="2.6"/>
@@ -125,23 +125,23 @@ function mouthVariations(layers:Record<string,string>,color:string){
 export async function createHumanVectorPack(character:Human):Promise<Pack>{
   const base=await loadSamiVectorSource();
   const pack=transform(base,character==="layla"?laylaColors:omarColors);
-  const face=faceSection(pack.layers.head??"");
+  const face=faceSection(pack.layers["head"]??"");
   if(character==="layla"){
     pack.defs+=LAYLA_DEFS;
-    pack.layers.head=LAYLA_BACK+face+LAYLA_FRONT;
-    pack.layers.eyesOpen+=(`<path d="M188 215 L185 206 M194 211 L190 201
+    pack.layers["head"]=LAYLA_BACK+face+LAYLA_FRONT;
+    pack.layers["eyesOpen"]+=(`<path d="M188 215 L185 206 M194 211 L190 201
  M305 215 L311 206 M299 211 L305 202"
  stroke="#67465b" stroke-width="2.5" fill="none" stroke-linecap="round"/>`);
-    pack.layers.torso+=(`
+    pack.layers["torso"]+=(`
 <path d="M181 385 Q206 414 220 429 M310 381 Q293 419 272 437"
  fill="none" stroke="#f4dffa" stroke-width="6" opacity=".72" stroke-linecap="round"/>
 <path d="M124 627 Q244 608 374 629" fill="none" stroke="#e5d0ee" stroke-width="4" opacity=".5"/>`);
     mouthVariations(pack.layers,"#95465b");
   } else {
-    pack.layers.head=OMAR_HAIR+face+OMAR_BEARD;
+    pack.layers["head"]=OMAR_HAIR+face+OMAR_BEARD;
     for(const state of ["eyesOpen","eyesHalf","eyesClosed"])
       pack.layers[state]=(pack.layers[state]??"")+OMAR_GLASSES;
-    pack.layers.torso+=(`
+    pack.layers["torso"]+=(`
 <path d="M241 385 L253 385 L264 402 L248 430 L233 401Z"
  fill="#264c68" stroke="#365770" stroke-width="2"/>
 <path d="M248 430 L267 405 L273 518 L251 543 L226 512Z"
