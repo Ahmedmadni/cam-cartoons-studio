@@ -14,7 +14,7 @@ import {
 import { renderSocialFrame } from "@/lib/socialCanvas";
 import { renderCartoonCharacter } from "@/lib/socialCharacterRig";
 import {
-  ART_LAYER_LABELS, artStatus, getCharacterArt, hydrateCharacterArt, paintIllustratedCharacter, saveCharacterArt, restoreBuiltinCharacterArt,
+  ART_LAYER_LABELS, artStatus, getCharacterArt, hydrateCharacterArt, paintIllustratedCharacter, saveCharacterArt, restoreBundledCharacterArt,
   type CharacterArtLayer,
 } from "@/lib/socialCharacterArt";
 import {
@@ -233,7 +233,7 @@ function SocialCreator() {
     setArtUploading(true); setError("");
     try{
       await saveCharacterArt(selected.character,layer,null);
-      if(layer==="base")await restoreBuiltinCharacterArt(selected.character);
+      if(layer==="base")await restoreBundledCharacterArt(selected.character);
       setArtRevision(x=>x+1); setVideo(null);
       setNotice(layer==="base"
         ? "تمت استعادة الرسم المدمج للشخصية؛ بقيت المشاهد والتسجيلات كما هي."
