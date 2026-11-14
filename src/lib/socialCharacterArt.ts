@@ -101,6 +101,18 @@ export function getCharacterArt(character:CartoonId):CharacterArt | null {
   const result=cache.get(character);
   return result?.base ? result : null;
 }
+/** Free decoded textures for actors absent from the exported project's scenes.
+ * Source blobs remain intact in IndexedDB. Their art can be rehydrated afterward.
+ */
+export function releaseUnusedCharacterArt(keep:ReadonlySet<CartoonId>):void {
+  for(const character of IDS){
+    if(keep.has(character))continue;
+    const art=cache.get(character);
+    if(!art)continue;
+    for(const bitmap of Object.values(art))bitmap?.close();
+    cache.delete(character);
+  }
+}
 export function artStatus(character:CartoonId) {
   const a=cache.get(character);
   return { hasBase:!!a?.base, hasMouth:!!(a?.mouthClosed && a?.mouthOpen), hasBlink:!!a?.eyesClosed, hasRig:isFullCutoutRig(a??null), rigLayerCount:RIG_REQUIRED_LAYERS.filter(layer=>!!a?.[layer]).length };
