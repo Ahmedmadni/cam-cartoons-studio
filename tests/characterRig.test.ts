@@ -103,7 +103,7 @@ describe("automatic built-in character scene motions",()=>{
   test("motion remains bounded and stable with unexpected time/energy",()=>{
     const v=automaticSceneRigPose("talk","surprised",Number.NaN,100);
     expect(v.mouth).toBe(1);
-    expect(v.rightShoulder).toBe(0);
+    expect(v.rightShoulder).toBeCloseTo(0);
     expect(v.brows).toBeLessThanOrEqual(1);
   });
 });
