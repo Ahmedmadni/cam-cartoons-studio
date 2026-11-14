@@ -44,3 +44,12 @@
 - Never replace or delete user-uploaded local IndexedDB art automatically.
 - Sami has real arm/head articulation; Layla, Omar and Nour remain fallback art until they get separate packs.
 - Regression check: scripts/browser_social_smoke.py checks full illustrated master rig and facial layer availability.
+
+
+## Phase 6 cast art constraints
+- Layla and Omar's distinct silhouette, wardrobe and face details: src/lib/builtinHumanCast.ts; Nour's independent robot: src/lib/builtinNourArt.ts.
+- src/lib/builtinCastArt.ts composes/rasterizes first-party trusted vector art at 1x for mobile memory.
+- Preserve IndexedDB uploads over built-in art. Never silently replace a user-supplied base or lose its overlay layers.
+- Built-in source vectors are trusted only; keep blocking arbitrary user SVG uploads.
+- Five mouth states are selected by audio ENERGY, not phonemes. Do not claim precise lip sync; use aligned user-uploaded PNG/WebP for external art.
+- CI browser smoke asserts full rig + five mouth states for every built-in character and 1080p narration export.
