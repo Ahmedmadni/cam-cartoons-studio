@@ -14,7 +14,7 @@ import {
 import { renderSocialFrame } from "@/lib/socialCanvas";
 import { renderCartoonCharacter } from "@/lib/socialCharacterRig";
 import {
-  ART_LAYER_LABELS, artStatus, getCharacterArt, hydrateCharacterArt, paintIllustratedCharacter, saveCharacterArt, restoreBundledCharacterArt,
+  ART_LAYER_LABELS, artStatus, getCharacterArt, hydrateCharacterArt, paintIllustratedCharacter, saveCharacterArt, restoreBundledCharacterArt, releaseUnusedCharacterArt,
   type CharacterArtLayer,
 } from "@/lib/socialCharacterArt";
 import {
@@ -376,6 +376,7 @@ function SocialCreator() {
     exportAbort.current = controller;
     try {
       setPlaying(false); audioPlayer.current?.pause(); stopSceneVoice();
+      if(quality==="high") releaseUnusedCharacterArt(new Set(project.scenes.map(s=>s.character)));
       const result = await exportSocialVideo({
         project, narration: audio, sceneNarrations:sceneAudio, quality,
         signal: controller.signal, onProgress: value => setExportPercent(Math.round(value * 100)),
@@ -383,7 +384,11 @@ function SocialCreator() {
       setVideo(result);
       setNotice("تم إنتاج الفيديو. يمكنك تحميله ومراجعته قبل النشر.");
     } catch (caught) { setError(caught instanceof Error ? caught.message : "فشل التصدير."); }
-    finally { setExporting(false); exportAbort.current = null; }
+    finally {
+      setExporting(false); exportAbort.current = null;
+      if(quality==="high")void hydrateCharacterArt().then(()=>setArtRevision(x=>x+1))
+        .catch(()=>setMessage("يمكن إعادة تحميل الصفحة لاستعادة معاينات الشخصيات غير المستخدمة."));
+    }
   }
   async function importProject(file?: File) {
     if (!file) return;
