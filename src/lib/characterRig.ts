@@ -121,6 +121,48 @@ export function evaluateRigPose(rig:RigSettings,timeMs:number,voiceEnergy:number
   if(rig.mouthSource==="audio")out.mouth=bounded(voiceEnergy*2.5,0,0,1);
   return out;
 }
+/**
+ * Built-in actors should MOVE when the scene says wave/explain/talk even when
+ * the user has not entered the manual rig editor. Motion is deterministic,
+ * scene-local and used by the same preview/export renderer.
+ */
+export function automaticSceneRigPose(
+  motion:"talk"|"wave"|"explain"|"idle",
+  expression:"happy"|"neutral"|"curious"|"serious"|"surprised",
+  elapsedMs:number,voiceAmplitude:number,
+):RigPose {
+  const time=Math.max(0,Number.isFinite(elapsedMs)?elapsedMs:0)/1000;
+  const onset=Math.min(1,time/.35);
+  const sin=Math.sin, micro=sin(time*2.0), pulse=sin(time*4.5);
+  const result={...DEFAULT_RIG_POSE};
+  result.head=onset*(1.5*sin(time*1.6) + (expression==="curious"?-3:expression==="surprised"?3:0));
+  result.brows=expression==="surprised"?.8:expression==="curious"?.35:expression==="serious"?-.25:0;
+  result.eyes=expression==="serious"?.86:1;
+  if(motion==="talk"){
+    result.rightShoulder=onset*(-13+3*sin(time*1.7));
+    result.rightElbow=onset*(-18+8*pulse);
+    result.leftShoulder=onset*(6+1.7*micro);
+    result.head+=onset*1.2*sin(time*3);
+  }else if(motion==="explain"){
+    result.rightShoulder=onset*(-33+4*sin(time*2.1));
+    result.rightElbow=onset*(-67+9*sin(time*2.5));
+    result.rightWrist=onset*(8+8*sin(time*3.2));
+    result.leftShoulder=onset*(8+2*micro);
+    result.leftElbow=onset*(-22+4*pulse);
+    result.head+=onset*1.5*sin(time*2.3);
+  }else if(motion==="wave"){
+    result.rightShoulder=onset*(-44+3*sin(time*2));
+    result.rightElbow=onset*(-88+4*sin(time*4));
+    result.rightWrist=onset*(14+17*sin(time*5.3));
+    result.head+=onset*2*sin(time*2.2);
+  }else{
+    result.head=1.2*sin(time*1.35);
+    result.leftShoulder=.9*micro;
+    result.rightShoulder=-.9*micro;
+  }
+  result.mouth=motion==="idle"?0:bounded(voiceAmplitude*2.5,0,0,1);
+  return readRigPose(result);
+}
 export function putRigKeyframe(rig:RigSettings,atMs:number,pose:RigPose,durationMs:number):RigSettings {
   const time=Math.round(bounded(atMs,0,0,durationMs));
   const frames=rig.keyframes.filter(f=>f.atMs!==time);

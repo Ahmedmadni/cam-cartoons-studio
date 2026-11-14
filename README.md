@@ -73,3 +73,11 @@ Lovable sync: keep main history intact. Review changes in a feature branch PR.
 - Existing user-uploaded PNG/WebP art always takes priority. If compressed-source decoding is unsupported, Sami falls back to the previous flattened portrait.
 - Layla, Omar and Nour do not yet have equivalent illustration packs; their older vector renderers remain as fallbacks.
 - This is an original hand-designed vector interpretation of the owner's style reference, not a claim of pixel-perfect likeness or professionally approved character quality.
+
+
+## Phase 6 — illustrated cast and expressive mouth shapes
+- The three remaining built-ins, **Layla**, **Omar**, and **Nour**, now ship as self-contained, distinct upper-body SVG illustration packs. Layla wears an amethyst headscarf, Omar has short hair and glasses with a teal jacket, and Nour is a blue articulated enamel robot. The head/torso and six arm/hand pieces align to the same rig layout as Sami, while distinctive face and clothing details are separately authored.
+- Character art stays offline, with no account or external image-generation dependency. The three extra actors use **native-resolution bitmaps** for a smaller memory footprint. Their source is still vector.
+- There are now up to **five illustrated mouth poses** (closed, small, round, open, wide) selected by audio amplitude. **This is not a phoneme classifier or accurate Arabic lip sync.** A user with only the legacy open/closed layers keeps the older fallback without rendering artifacts.
+- Existing custom character art and old projects are preserved. The **استعادة الشخصية الافتراضية** control restores each built-in actor, not just Sami. The editor can import optional advanced mouth overlays.
+- The older statement that Layla/Omar/Nour lack built-in layered art is superseded by this phase. Artistic quality and naturality of arm movement require manual review at motion extremes; green CI checks functionality, not a professional artist's approval.

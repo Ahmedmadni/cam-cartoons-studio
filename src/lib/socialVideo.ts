@@ -108,7 +108,12 @@ export async function exportSocialVideo({
   if (!duration || duration>MAX_DURATION_SECONDS) throw new Error("مدة الفيديو يجب ألا تتجاوز دقيقتين.");
   if(signal?.aborted)throw new Error("تم إلغاء التصدير.");
   if(typeof document==="undefined" || typeof MediaRecorder==="undefined")throw new Error("التصدير غير مدعوم في هذا المتصفح.");
-  const mime=selectWebmMime("video");
+  // VP8 is materially lighter than VP9 for live 1080p Canvas capture on mobile
+  // and software-only headless browsers. Never imply support if the probe fails.
+  let preferredHdMime:string|null=null;
+  try { if(quality==="high" && MediaRecorder.isTypeSupported("video/webm;codecs=vp8,opus"))
+    preferredHdMime="video/webm;codecs=vp8,opus"; } catch { /* use normal browser format */ }
+  const mime=preferredHdMime ?? selectWebmMime("video");
   if(!mime)throw new Error("المتصفح لا يدعم WebM. جرّب أحدث إصدار من Chrome.");
   const canvas=document.createElement("canvas");
   canvas.width=quality==="high"?1080:720;
@@ -116,7 +121,10 @@ export async function exportSocialVideo({
   const draw=canvas.getContext("2d",{alpha:false});
   if(!draw || typeof canvas.captureStream!=="function")throw new Error("المتصفح لا يدعم التقاط اللوحة.");
   if(document.fonts)await document.fonts.ready;
-  const stream=new MediaStream(canvas.captureStream(24).getTracks());
+  const captured=canvas.captureStream(24);
+  const stream=new MediaStream(captured.getTracks());
+  const captureTrack=captured.getVideoTracks()[0] as CanvasCaptureMediaStreamTrack|undefined;
+  const pushFrame=()=>{try{captureTrack?.requestFrame?.();}catch{/* auto capture stays active */}};
   const sources: AudioBufferSourceNode[]=[];
   let context:AudioContext|null=null;
   let mainEnvelope:Float32Array|null=null;
@@ -170,15 +178,17 @@ export async function exportSocialVideo({
       await context.resume();
     }
     renderSocialFrame(draw,project,0,0);
+    pushFrame();
     const recorder=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:quality==="high"?5_500_000:3_000_000});
+    let drawError:Error|null=null;
     const result=new Promise<Blob>((resolve,reject)=>{
       const settle=(error?:Error)=>{
         if(finished)return;
         finished=true;
         void clean().then(()=>{
-          if(error){reject(error);return;}
+          if(error || drawError){reject(error ?? drawError);return;}
           const blob=new Blob(chunks,{type:recorder.mimeType||"video/webm"});
-          if(!blob.size)reject(new Error("فشل إنتاج فيديو صالح."));
+          if(!blob.size)reject(new Error("لم ينتج المتصفح إطارات فيديو صالحة. جرّب دقة 720p أو متصفحًا أحدث."));
           else resolve(blob);
         }).catch(reject);
       };
@@ -193,7 +203,7 @@ export async function exportSocialVideo({
       signal?.addEventListener("abort",onAbort,{once:true});
       document.addEventListener("visibilitychange",onHidden);
     });
-    recorder.start(1000);
+    recorder.start(250); // frequent chunks help short clips yield data before stop
     const startClock=context?context.currentTime:performance.now()/1000;
     for(const cue of clipStarts)cue.source.start(startClock+.04+cue.start,0,cue.duration);
     const tick=()=>{
@@ -203,9 +213,29 @@ export async function exportSocialVideo({
       const energy=project.narrationMode==="scenes"
         ? sceneVoiceEnergyAt(project,progress,sceneEnvelopes)
         : amplitudeAt(mainEnvelope,progress);
-      renderSocialFrame(draw,project,progress,energy);
+      try{
+        renderSocialFrame(draw,project,progress,energy);
+        pushFrame();
+      }catch(caught){
+        drawError=caught instanceof Error?caught:new Error("حدث خطأ أثناء رسم إطار الفيديو.");
+        if(recorder.state!=="inactive")recorder.stop();
+        return;
+      }
       onProgress?.(Math.min(1,progress/duration));
-      if(elapsed>=duration){if(recorder.state!=="inactive")recorder.stop();}
+      if(elapsed>=duration){
+        // A busy 1080p encoder may have no frame-ready chunks at the precise
+        // storyboard endpoint. Allow a bounded flush grace period rather than
+        // producing an empty file; the last scene stays frozen while flushing.
+        const grace = quality==="high" ? 1.5 : .5;
+        if(chunks.length===0 && elapsed<duration+grace){
+          raf=requestAnimationFrame(tick);
+          return;
+        }
+        if(recorder.state!=="inactive"){
+          try{recorder.requestData();}catch{/* may already be stopping */}
+          recorder.stop();
+        }
+      }
       else raf=requestAnimationFrame(tick);
     };
     raf=requestAnimationFrame(tick);

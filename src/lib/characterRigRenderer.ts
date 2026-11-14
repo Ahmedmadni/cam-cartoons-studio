@@ -3,7 +3,7 @@
  * full-frame transparent part and its descendants. A flattened screenshot
  * cannot be "articulated" and is intentionally left in the still fallback.
  */
-import type { CharacterArt } from "./socialCharacterArt";
+import type { CharacterArt, CharacterArtLayer } from "./socialCharacterArt";
 import { type RigPose, type RigSettings, type RigPoint } from "./characterRig";
 const W=488,H=644,X=360-W/2,Y=249;
 function draw(ctx:CanvasRenderingContext2D,img:ImageBitmap | undefined){
@@ -42,6 +42,14 @@ export const RIG_REQUIRED_LAYERS = [
 export function isFullCutoutRig(art:CharacterArt|null):boolean {
   return !!art && RIG_REQUIRED_LAYERS.every(key=>!!art[key]);
 }
+/** Syllable-sized illustrated mouth poses driven by energy, not by speech recognition. */
+export function mouthPoseAt(openness:number):CharacterArtLayer {
+  if(openness<.14)return "mouthClosed";
+  if(openness<.34)return "mouthSmall";
+  if(openness<.57)return "mouthRound";
+  if(openness<.84)return "mouthOpen";
+  return "mouthWide";
+}
 export function paintCutoutRig(
   ctx:CanvasRenderingContext2D,art:CharacterArt,rig:RigSettings,pose:RigPose,time:number
 ):boolean {
@@ -64,8 +72,8 @@ export function paintCutoutRig(
   if((pose.eyes<.26 || blink) && art.eyesClosed)draw(ctx,art.eyesClosed);
   else if(pose.eyes<.74 && art.eyesHalf)draw(ctx,art.eyesHalf);
   else draw(ctx,art.eyesOpen);
-  if(pose.mouth>.22 && art.mouthOpen)draw(ctx,art.mouthOpen);
-  else draw(ctx,art.mouthClosed);
+  const selected=mouthPoseAt(pose.mouth);
+  draw(ctx,art[selected] ?? (selected==="mouthClosed" ? art.mouthClosed : art.mouthOpen ?? art.mouthClosed));
   ctx.restore();
   ctx.restore();
   return true;

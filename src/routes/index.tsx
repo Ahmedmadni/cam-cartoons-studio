@@ -14,7 +14,7 @@ import {
 import { renderSocialFrame } from "@/lib/socialCanvas";
 import { renderCartoonCharacter } from "@/lib/socialCharacterRig";
 import {
-  ART_LAYER_LABELS, artStatus, getCharacterArt, hydrateCharacterArt, paintIllustratedCharacter, saveCharacterArt, restoreSamiReferenceArt,
+  ART_LAYER_LABELS, artStatus, getCharacterArt, hydrateCharacterArt, paintIllustratedCharacter, saveCharacterArt, restoreBundledCharacterArt, releaseUnusedCharacterArt,
   type CharacterArtLayer,
 } from "@/lib/socialCharacterArt";
 import {
@@ -233,10 +233,10 @@ function SocialCreator() {
     setArtUploading(true); setError("");
     try{
       await saveCharacterArt(selected.character,layer,null);
-      if(layer==="base" && selected.character==="sami")await restoreSamiReferenceArt();
+      if(layer==="base")await restoreBundledCharacterArt(selected.character);
       setArtRevision(x=>x+1); setVideo(null);
       setNotice(layer==="base"
-        ? (selected.character==="sami"?"تمت استعادة الرسم المرجعي الأصلي لسامي.":"تمت العودة إلى الشخصية الاحتياطية.")
+        ? "تمت استعادة الرسم المدمج للشخصية؛ بقيت المشاهد والتسجيلات كما هي."
         : "تم حذف الطبقة.");
     } catch(e) {setError(e instanceof Error?e.message:"تعذر حذف الطبقة.");}
     finally {setArtUploading(false);}
@@ -376,6 +376,7 @@ function SocialCreator() {
     exportAbort.current = controller;
     try {
       setPlaying(false); audioPlayer.current?.pause(); stopSceneVoice();
+      if(quality==="high") releaseUnusedCharacterArt(new Set(project.scenes.map(s=>s.character)));
       const result = await exportSocialVideo({
         project, narration: audio, sceneNarrations:sceneAudio, quality,
         signal: controller.signal, onProgress: value => setExportPercent(Math.round(value * 100)),
@@ -383,7 +384,11 @@ function SocialCreator() {
       setVideo(result);
       setNotice("تم إنتاج الفيديو. يمكنك تحميله ومراجعته قبل النشر.");
     } catch (caught) { setError(caught instanceof Error ? caught.message : "فشل التصدير."); }
-    finally { setExporting(false); exportAbort.current = null; }
+    finally {
+      setExporting(false); exportAbort.current = null;
+      if(quality==="high")void hydrateCharacterArt().then(()=>setArtRevision(x=>x+1))
+        .catch(()=>setMessage("يمكن إعادة تحميل الصفحة لاستعادة معاينات الشخصيات غير المستخدمة."));
+    }
   }
   async function importProject(file?: File) {
     if (!file) return;
@@ -538,6 +543,7 @@ function SocialCreator() {
                     : "لم يضاف رسم مصور لهذه الشخصية — يظهر الرسم الاحتياطي"}
                   {artStatus(selected.character).hasMouth ? " · الشفاه قابلة للتحريك" : " · الشفاه ثابتة حتى تضاف طبقات الفم"}
                   {artStatus(selected.character).hasRig ? " · المفاصل جاهزة للتحريك" : " · المفاصل تحتاج طبقات مستقلة"}
+                  {["mouthClosed","mouthSmall","mouthRound","mouthOpen","mouthWide"].every(key=>!!getCharacterArt(selected.character)?.[key as CharacterArtLayer]) ? " · خمس وضعيات فم" : ""}
                 </p>
                 <div className="mt-3 space-y-2">
                   {(["base","mouthClosed","mouthOpen","eyesClosed"] as CharacterArtLayer[]).map(layer=>(
@@ -553,6 +559,27 @@ function SocialCreator() {
                     </div>
                   ))}
                 </div>
+                <details className="mt-3 rounded-2xl border border-cyan-200 bg-white p-3">
+                  <summary className="cursor-pointer text-sm font-black text-cyan-900">مزيد من أوضاع الفم (اختياري)</summary>
+                  <p className="mt-2 text-xs leading-6 text-slate-600">
+                    أضف صور الفم الصغير والمستدير والمفتوح بالكامل. ينتقل البرنامج بينها حسب مستوى الصوت بشكل تقديري، وليس حسب مخارج الحروف.
+                  </p>
+                  <div className="mt-3 space-y-2">
+                    {(["mouthSmall","mouthRound","mouthWide"] as CharacterArtLayer[]).map(layer=>(
+                      <div key={layer} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 p-2">
+                        <strong className="text-xs">{ART_LAYER_LABELS[layer]} {getCharacterArt(selected.character)?.[layer]?"✓":""}</strong>
+                        <label className={secondary+" cursor-pointer !px-3 !py-2 !text-xs"}>
+                          رفع صورة
+                          <input type="file" className="sr-only" accept="image/png,image/webp" disabled={artUploading}
+                            aria-label={"رفع "+ART_LAYER_LABELS[layer]}
+                            onChange={e=>{void uploadArtwork(e.target.files?.[0],layer);e.currentTarget.value="";}} />
+                        </label>
+                        {getCharacterArt(selected.character)?.[layer] && <button type="button" className="text-xs font-bold text-rose-700"
+                          disabled={artUploading} onClick={()=>void deleteArtwork(layer)}>حذف الطبقة</button>}
+                      </div>
+                    ))}
+                  </div>
+                </details>
                 <details className="mt-4 rounded-2xl border border-cyan-200 bg-white p-3">
                   <summary className="cursor-pointer text-sm font-black text-cyan-900">طبقات المفاصل — الرأس والجذع والذراعان</summary>
                   <p className="mt-2 text-xs leading-6 text-slate-600">
@@ -588,7 +615,7 @@ function SocialCreator() {
                 </p>
                 {artStatus(selected.character).hasBase && <button type="button" disabled={artUploading}
                   className="mt-2 rounded-lg border border-rose-200 bg-white px-3 py-2 text-xs font-bold text-rose-700"
-                  onClick={()=>void deleteArtwork("base")}>{selected.character==="sami"?"استعادة الرسم المرجعي":"العودة إلى الرسم الاحتياطي"}</button>}
+                  onClick={()=>void deleteArtwork("base")}>استعادة الشخصية الافتراضية</button>}
               </div>
               <h3 className="mb-3 mt-6 text-sm font-black">الخلفية</h3>
               <div className="grid grid-cols-3 gap-2">

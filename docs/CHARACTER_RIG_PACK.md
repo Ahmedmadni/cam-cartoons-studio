@@ -62,3 +62,11 @@ Sami ships with a complete, original, **15-layer** upper-body vector pack. Eight
 The first-party vectors are bundled and trusted; SVG uploads from the public remain disabled. Your own uploaded raster art overrides the built-in package without replacing saved scenes and narration.
 
 Preview and export must remain visually identical. Mouth animation follows voice energy (not phoneme-level speech analysis). Large extreme joint angles may still benefit from extra artist-authored sleeve overlap variants.
+
+
+## Phase 6 character library
+All four default characters now have eight physical upper-body layers and multiple facial overlays. The default mouth library has closed, small, round, open and wide drawings, selected by speech loudness only. Existing projects containing a single flat imported illustration can still only move as one piece unless genuine matching cut-out layers are supplied.
+
+Layla and Omar were individually art-directed with different clothing, face detail and hair/head coverings from Sami, but preserve normalized joint coordinates. Nour uses a separately designed cohesive robot housing and joint pieces. Animated art is not automatically inferred from a photo or screenshot.
+
+Built-in vectors for the three additional actors are rasterized at 488×644 to limit local device memory; inspect output sharpness on 1080p exports. Higher resolution rasterization can be added as a quality setting with a memory budget.
