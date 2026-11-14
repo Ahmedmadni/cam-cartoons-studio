@@ -4,6 +4,7 @@ import {
   defaultRigSettings, readRigSettings, evaluateRigPose, putRigKeyframe,
 } from "../src/lib/characterRig";
 import {parseSocialProject, STARTER} from "../src/lib/socialStudio";
+import { mouthPoseAt } from "../src/lib/characterRigRenderer";
 
 describe("versioned cut-out joint rig",()=>{
   test("previous projects keep the exact scene count and do not require a rig",()=>{
@@ -59,5 +60,21 @@ describe("versioned cut-out joint rig",()=>{
     expect(invalid.scenes[0]?.rig?.pose.leftShoulder).toBe(JOINT_META.leftShoulder.max);
     expect(invalid.scenes[0]?.rig?.keyframes).toHaveLength(0);
     expect(invalid.scenes[0]?.rig?.pivots.rightElbow).toEqual({x:1,y:0});
+  });
+});
+
+describe("Five-pose mouth illustration selection",()=>{
+  test("selects 5 discrete poses from voice energy, without claiming phoneme accuracy",()=>{
+    expect(mouthPoseAt(0)).toBe("mouthClosed");
+    expect(mouthPoseAt(.23)).toBe("mouthSmall");
+    expect(mouthPoseAt(.44)).toBe("mouthRound");
+    expect(mouthPoseAt(.7)).toBe("mouthOpen");
+    expect(mouthPoseAt(.95)).toBe("mouthWide");
+  });
+  test("respects exact threshold boundaries",()=>{
+    expect(mouthPoseAt(.14)).toBe("mouthSmall");
+    expect(mouthPoseAt(.34)).toBe("mouthRound");
+    expect(mouthPoseAt(.57)).toBe("mouthOpen");
+    expect(mouthPoseAt(.84)).toBe("mouthWide");
   });
 });
