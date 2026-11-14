@@ -124,6 +124,7 @@ export async function exportSocialVideo({
   const captured=canvas.captureStream(24);
   const stream=new MediaStream(captured.getTracks());
   const captureTrack=captured.getVideoTracks()[0] as CanvasCaptureMediaStreamTrack|undefined;
+  const pushFrame=()=>{try{captureTrack?.requestFrame?.();}catch{/* auto capture stays active */}};
   const sources: AudioBufferSourceNode[]=[];
   let context:AudioContext|null=null;
   let mainEnvelope:Float32Array|null=null;
@@ -177,16 +178,17 @@ export async function exportSocialVideo({
       await context.resume();
     }
     renderSocialFrame(draw,project,0,0);
-    captureTrack?.requestFrame?.();
+    pushFrame();
     const recorder=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:quality==="high"?5_500_000:3_000_000});
+    let drawError:Error|null=null;
     const result=new Promise<Blob>((resolve,reject)=>{
       const settle=(error?:Error)=>{
         if(finished)return;
         finished=true;
         void clean().then(()=>{
-          if(error){reject(error);return;}
+          if(error || drawError){reject(error ?? drawError);return;}
           const blob=new Blob(chunks,{type:recorder.mimeType||"video/webm"});
-          if(!blob.size)reject(new Error("فشل إنتاج فيديو صالح."));
+          if(!blob.size)reject(new Error("لم ينتج المتصفح إطارات فيديو صالحة. جرّب دقة 720p أو متصفحًا أحدث."));
           else resolve(blob);
         }).catch(reject);
       };
@@ -211,8 +213,14 @@ export async function exportSocialVideo({
       const energy=project.narrationMode==="scenes"
         ? sceneVoiceEnergyAt(project,progress,sceneEnvelopes)
         : amplitudeAt(mainEnvelope,progress);
-      renderSocialFrame(draw,project,progress,energy);
-      captureTrack?.requestFrame?.();
+      try{
+        renderSocialFrame(draw,project,progress,energy);
+        pushFrame();
+      }catch(caught){
+        drawError=caught instanceof Error?caught:new Error("حدث خطأ أثناء رسم إطار الفيديو.");
+        if(recorder.state!=="inactive")recorder.stop();
+        return;
+      }
       onProgress?.(Math.min(1,progress/duration));
       if(elapsed>=duration){
         if(recorder.state!=="inactive"){
