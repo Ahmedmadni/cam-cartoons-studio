@@ -79,5 +79,10 @@ export async function loadSamiVectorSource(): Promise<VectorCharacterPack> {
   return decodeSource();
 }
 export async function createBuiltinSamiArt():Promise<CharacterArt> {
-  return rasterizeVectorCharacter(await decodeSource(),2);
+  const original=await decodeSource();
+  const layers={...original.layers};
+  layers["mouthSmall"] = '<path d="M232 279 Q244 274 263 279 Q273 286 263 294 Q241 298 231 290Z" fill="#994656" stroke="#713b4a" stroke-width="2.4"/><path d="M234 282 Q249 283 262 281 Q248 288 238 287Z" fill="#fff7ef"/>';
+  layers["mouthRound"] = '<path d="M240 273 C250 269 260 270 268 278 C274 289 268 302 255 306 C240 308 234 296 234 284 Q235 276 240 273Z" fill="#8e4051" stroke="#713947" stroke-width="2.5"/><ellipse cx="252" cy="296" rx="8" ry="4.5" fill="#ec8899"/>';
+  layers["mouthWide"] = '<path d="M222 279 C240 270 266 270 284 279 Q294 298 275 314 Q253 330 230 312 Q216 299 222 279Z" fill="#8c3e51" stroke="#753c48" stroke-width="2.6"/><path d="M226 280 Q250 287 280 280 L278 291 Q252 301 229 289Z" fill="#fff9ef"/><path d="M237 310 Q252 300 271 309 Q253 319 237 310Z" fill="#e98797"/>';
+  return rasterizeVectorCharacter({...original,layers},2);
 }
