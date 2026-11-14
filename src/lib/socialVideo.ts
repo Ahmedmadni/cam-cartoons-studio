@@ -108,7 +108,12 @@ export async function exportSocialVideo({
   if (!duration || duration>MAX_DURATION_SECONDS) throw new Error("مدة الفيديو يجب ألا تتجاوز دقيقتين.");
   if(signal?.aborted)throw new Error("تم إلغاء التصدير.");
   if(typeof document==="undefined" || typeof MediaRecorder==="undefined")throw new Error("التصدير غير مدعوم في هذا المتصفح.");
-  const mime=selectWebmMime("video");
+  // VP8 is materially lighter than VP9 for live 1080p Canvas capture on mobile
+  // and software-only headless browsers. Never imply support if the probe fails.
+  let preferredHdMime:string|null=null;
+  try { if(quality==="high" && MediaRecorder.isTypeSupported("video/webm;codecs=vp8,opus"))
+    preferredHdMime="video/webm;codecs=vp8,opus"; } catch { /* use normal browser format */ }
+  const mime=preferredHdMime ?? selectWebmMime("video");
   if(!mime)throw new Error("المتصفح لا يدعم WebM. جرّب أحدث إصدار من Chrome.");
   const canvas=document.createElement("canvas");
   canvas.width=quality==="high"?1080:720;
@@ -116,7 +121,9 @@ export async function exportSocialVideo({
   const draw=canvas.getContext("2d",{alpha:false});
   if(!draw || typeof canvas.captureStream!=="function")throw new Error("المتصفح لا يدعم التقاط اللوحة.");
   if(document.fonts)await document.fonts.ready;
-  const stream=new MediaStream(canvas.captureStream(24).getTracks());
+  const captured=canvas.captureStream(24);
+  const stream=new MediaStream(captured.getTracks());
+  const captureTrack=captured.getVideoTracks()[0] as CanvasCaptureMediaStreamTrack|undefined;
   const sources: AudioBufferSourceNode[]=[];
   let context:AudioContext|null=null;
   let mainEnvelope:Float32Array|null=null;
@@ -170,6 +177,7 @@ export async function exportSocialVideo({
       await context.resume();
     }
     renderSocialFrame(draw,project,0,0);
+    captureTrack?.requestFrame?.();
     const recorder=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:quality==="high"?5_500_000:3_000_000});
     const result=new Promise<Blob>((resolve,reject)=>{
       const settle=(error?:Error)=>{
@@ -204,8 +212,14 @@ export async function exportSocialVideo({
         ? sceneVoiceEnergyAt(project,progress,sceneEnvelopes)
         : amplitudeAt(mainEnvelope,progress);
       renderSocialFrame(draw,project,progress,energy);
+      captureTrack?.requestFrame?.();
       onProgress?.(Math.min(1,progress/duration));
-      if(elapsed>=duration){if(recorder.state!=="inactive")recorder.stop();}
+      if(elapsed>=duration){
+        if(recorder.state!=="inactive"){
+          try{recorder.requestData();}catch{/* may already be stopping */}
+          recorder.stop();
+        }
+      }
       else raf=requestAnimationFrame(tick);
     };
     raf=requestAnimationFrame(tick);
